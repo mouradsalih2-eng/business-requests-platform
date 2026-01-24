@@ -15,18 +15,51 @@ const router = Router();
  * All authenticated users can view all requests
  */
 
-// Configure multer for file uploads
+// Allowed file types for uploads
+const ALLOWED_FILE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/csv',
+];
+
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv'];
+
+// Configure multer for file uploads with validation
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, join(__dirname, '../../uploads'));
   },
   filename: (req, file, cb) => {
+    // Sanitize filename - remove path traversal and special characters
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    cb(null, uniqueSuffix + '-' + sanitizedName);
   }
 });
 
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
+const fileFilter = (req, file, cb) => {
+  const ext = '.' + file.originalname.split('.').pop().toLowerCase();
+
+  if (ALLOWED_FILE_TYPES.includes(file.mimetype) && ALLOWED_EXTENSIONS.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Allowed: images, PDF, Word, Excel, and text files.'), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter
+});
 
 // Get analytics data (admin only) - MUST be before /:id routes
 router.get('/stats/analytics', authenticateToken, requireAdmin, (req, res) => {

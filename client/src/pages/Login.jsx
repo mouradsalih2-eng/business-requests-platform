@@ -89,10 +89,7 @@ export function Login() {
         </div>
 
         <p className="mt-6 text-center text-sm text-neutral-500">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-neutral-900 font-medium hover:underline">
-            Create one
-          </Link>
+          Need an account? Contact your administrator.
         </p>
       </div>
     </div>

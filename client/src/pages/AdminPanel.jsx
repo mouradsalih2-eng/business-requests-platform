@@ -873,7 +873,7 @@ export function AdminPanel() {
               type="email"
               value={newUser.email}
               onChange={(e) => setNewUser((prev) => ({ ...prev, email: e.target.value }))}
-              placeholder="john@company.com"
+              placeholder="user@example.com"
               required
             />
 

@@ -62,9 +62,10 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Email, password, and name are required' });
     }
 
-    // Validate email format
-    if (!email.endsWith('@company.com')) {
-      return res.status(400).json({ error: 'Email must be a @company.com address' });
+    // Validate email format (basic validation)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
     }
 
     // Validate role

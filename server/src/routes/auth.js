@@ -6,48 +6,11 @@ import { authenticateToken, JWT_SECRET } from '../middleware/auth.js';
 
 const router = Router();
 
-// Register
+// Register - DISABLED (users are added by admin only)
 router.post('/register', (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: 'Email, password, and name are required' });
-    }
-
-    // Validate company email
-    if (!email.endsWith('@company.com')) {
-      return res.status(400).json({ error: 'Only @company.com email addresses are allowed' });
-    }
-
-    // Check if user exists
-    const existingUser = db.get('SELECT id FROM users WHERE email = ?', [email]);
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email already registered' });
-    }
-
-    // Hash password and create user
-    const hashedPassword = bcrypt.hashSync(password, 10);
-    db.run(
-      'INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
-      [email, hashedPassword, name]
-    );
-
-    // Get the newly created user by email
-    const user = db.get('SELECT id, email, name, role, created_at FROM users WHERE email = ?', [email]);
-
-    // Generate token
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({ user, token });
-  } catch (err) {
-    console.error('Register error:', err);
-    res.status(500).json({ error: 'Failed to register user' });
-  }
+  return res.status(403).json({
+    error: 'Registration is disabled. Please contact an administrator to get an account.'
+  });
 });
 
 // Login
