@@ -73,12 +73,28 @@ app.use('/uploads', express.static(join(__dirname, '../uploads')));
 // Serve client static files in production
 if (process.env.NODE_ENV === 'production') {
   const clientPath = join(__dirname, '../../client/dist');
+  console.log('Serving static files from:', clientPath);
   app.use(express.static(clientPath));
 }
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Debug endpoint (only in production for troubleshooting)
+app.get('/api/debug', (req, res) => {
+  const fs = require('fs');
+  const clientPath = join(__dirname, '../../client/dist');
+  const indexPath = join(clientPath, 'index.html');
+  res.json({
+    __dirname,
+    cwd: process.cwd(),
+    clientPath,
+    indexExists: fs.existsSync(indexPath),
+    clientDirExists: fs.existsSync(clientPath),
+    clientFiles: fs.existsSync(clientPath) ? fs.readdirSync(clientPath) : [],
+  });
 });
 
 // Routes
@@ -91,9 +107,15 @@ app.use('/api/users', usersRoutes);
 
 // Serve client app for all non-API routes in production (SPA fallback)
 if (process.env.NODE_ENV === 'production') {
+  const indexPath = join(__dirname, '../../client/dist/index.html');
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      res.sendFile(join(__dirname, '../../client/dist/index.html'));
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error('Error serving index.html:', err.message);
+          res.status(500).send('Client files not found. Build may have failed.');
+        }
+      });
     }
   });
 }
