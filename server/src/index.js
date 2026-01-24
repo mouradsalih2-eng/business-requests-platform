@@ -70,6 +70,12 @@ app.use(express.json({ limit: '1mb' }));
 // Serve uploaded files
 app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
+// Serve client static files in production
+if (process.env.NODE_ENV === 'production') {
+  const clientPath = join(__dirname, '../../client/dist');
+  app.use(express.static(clientPath));
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -82,6 +88,15 @@ app.use('/api/requests', votesRoutes);
 app.use('/api/requests', commentsRoutes);
 app.use('/api/comments', commentsRoutes);
 app.use('/api/users', usersRoutes);
+
+// Serve client app for all non-API routes in production (SPA fallback)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(join(__dirname, '../../client/dist/index.html'));
+    }
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
