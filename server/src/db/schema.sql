@@ -85,6 +85,16 @@ CREATE TABLE IF NOT EXISTS admin_read_requests (
   UNIQUE(request_id, admin_id)
 );
 
+-- Request tags table
+CREATE TABLE IF NOT EXISTS request_tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL,
+  tag TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE,
+  UNIQUE(request_id, tag)
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_requests_user_id ON requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
@@ -93,3 +103,4 @@ CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
 CREATE INDEX IF NOT EXISTS idx_votes_request_id ON votes(request_id);
 CREATE INDEX IF NOT EXISTS idx_comments_request_id ON comments(request_id);
 CREATE INDEX IF NOT EXISTS idx_admin_read_requests ON admin_read_requests(request_id, admin_id);
+CREATE INDEX IF NOT EXISTS idx_request_tags_request_id ON request_tags(request_id);
