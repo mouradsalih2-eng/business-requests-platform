@@ -17,6 +17,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+
+// Trust proxy - required for Railway/Heroku (reverse proxy)
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 
 // Security headers
@@ -54,6 +57,13 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+
+    // In production, allow all origins (client/API are same domain)
+    if (process.env.NODE_ENV === 'production') {
+      return callback(null, true);
+    }
+
+    // In development, check against allowed origins
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
