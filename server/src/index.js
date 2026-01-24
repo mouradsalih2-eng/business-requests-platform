@@ -72,14 +72,30 @@ app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
 // Serve client static files in production
 if (process.env.NODE_ENV === 'production') {
+  const fs = require('fs');
   const clientPath = join(__dirname, '../../client/dist');
-  console.log('Serving static files from:', clientPath);
-  app.use(express.static(clientPath));
+  console.log('Client path:', clientPath);
+  console.log('Client path exists:', fs.existsSync(clientPath));
+  if (fs.existsSync(clientPath)) {
+    console.log('Client files:', fs.readdirSync(clientPath));
+    app.use(express.static(clientPath));
+  } else {
+    console.log('WARNING: Client dist folder not found!');
+  }
 }
 
-// Health check
+// Health check - Railway uses this to verify the app is running
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Root health check for Railway (responds before SPA fallback)
+app.get('/', (req, res, next) => {
+  // If in production and client files exist, let the static middleware handle it
+  if (process.env.NODE_ENV === 'production') {
+    return next();
+  }
+  res.json({ status: 'ok', message: 'API is running' });
 });
 
 // Debug endpoint (only in production for troubleshooting)
@@ -107,15 +123,26 @@ app.use('/api/users', usersRoutes);
 
 // Serve client app for all non-API routes in production (SPA fallback)
 if (process.env.NODE_ENV === 'production') {
+  const fs = require('fs');
   const indexPath = join(__dirname, '../../client/dist/index.html');
+  const indexExists = fs.existsSync(indexPath);
+  console.log('Index.html path:', indexPath);
+  console.log('Index.html exists:', indexExists);
+
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      res.sendFile(indexPath, (err) => {
-        if (err) {
-          console.error('Error serving index.html:', err.message);
-          res.status(500).send('Client files not found. Build may have failed.');
-        }
-      });
+      if (indexExists) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(200).send(`
+          <html>
+            <body>
+              <h1>API Server Running</h1>
+              <p>Client build not found. The API is working at <a href="/api/health">/api/health</a></p>
+            </body>
+          </html>
+        `);
+      }
     }
   });
 }
