@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import fs from 'fs';
 
 import { initializeDatabase } from './db/database.js';
 import authRoutes from './routes/auth.js';
@@ -72,8 +73,7 @@ app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
 // Serve client static files in production
 if (process.env.NODE_ENV === 'production') {
-  const fs = require('fs');
-  const clientPath = join(__dirname, '../../client/dist');
+    const clientPath = join(__dirname, '../../client/dist');
   console.log('Client path:', clientPath);
   console.log('Client path exists:', fs.existsSync(clientPath));
   if (fs.existsSync(clientPath)) {
@@ -100,8 +100,7 @@ app.get('/', (req, res, next) => {
 
 // Debug endpoint (only in production for troubleshooting)
 app.get('/api/debug', (req, res) => {
-  const fs = require('fs');
-  const clientPath = join(__dirname, '../../client/dist');
+    const clientPath = join(__dirname, '../../client/dist');
   const indexPath = join(clientPath, 'index.html');
   res.json({
     __dirname,
@@ -123,8 +122,7 @@ app.use('/api/users', usersRoutes);
 
 // Serve client app for all non-API routes in production (SPA fallback)
 if (process.env.NODE_ENV === 'production') {
-  const fs = require('fs');
-  const indexPath = join(__dirname, '../../client/dist/index.html');
+    const indexPath = join(__dirname, '../../client/dist/index.html');
   const indexExists = fs.existsSync(indexPath);
   console.log('Index.html path:', indexPath);
   console.log('Index.html exists:', indexExists);
