@@ -1,9 +1,147 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import db from '../db/database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const router = Router();
+
+// Configure multer for avatar uploads
+const avatarUploadDir = path.join(__dirname, '../../uploads/avatars');
+if (!fs.existsSync(avatarUploadDir)) {
+  fs.mkdirSync(avatarUploadDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, avatarUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `user-${req.user.id}-${Date.now()}${ext}`);
+  },
+});
+
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+    }
+  },
+});
+
+// ===== User Settings Endpoints =====
+
+// Get current user settings
+router.get('/me/settings', authenticateToken, (req, res) => {
+  try {
+    const user = db.get(
+      'SELECT id, email, name, profile_picture, theme_preference FROM users WHERE id = ?',
+      [req.user.id]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error('Get settings error:', err);
+    res.status(500).json({ error: 'Failed to get settings' });
+  }
+});
+
+// Update user settings (theme preference)
+router.patch('/me/settings', authenticateToken, (req, res) => {
+  try {
+    const { theme_preference } = req.body;
+
+    // Validate theme preference
+    if (theme_preference && !['light', 'dark', 'system'].includes(theme_preference)) {
+      return res.status(400).json({ error: 'Invalid theme preference' });
+    }
+
+    if (theme_preference) {
+      db.run('UPDATE users SET theme_preference = ? WHERE id = ?', [theme_preference, req.user.id]);
+    }
+
+    const user = db.get(
+      'SELECT id, email, name, profile_picture, theme_preference FROM users WHERE id = ?',
+      [req.user.id]
+    );
+
+    res.json(user);
+  } catch (err) {
+    console.error('Update settings error:', err);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// Upload profile picture
+router.post('/me/profile-picture', authenticateToken, avatarUpload.single('avatar'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Get old profile picture to delete
+    const user = db.get('SELECT profile_picture FROM users WHERE id = ?', [req.user.id]);
+
+    // Delete old profile picture if exists
+    if (user?.profile_picture) {
+      const oldPath = path.join(__dirname, '../..', user.profile_picture);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Save new profile picture path
+    const profilePicturePath = `/uploads/avatars/${req.file.filename}`;
+    db.run('UPDATE users SET profile_picture = ? WHERE id = ?', [profilePicturePath, req.user.id]);
+
+    const updatedUser = db.get(
+      'SELECT id, email, name, profile_picture, theme_preference FROM users WHERE id = ?',
+      [req.user.id]
+    );
+
+    res.json(updatedUser);
+  } catch (err) {
+    console.error('Upload profile picture error:', err);
+    res.status(500).json({ error: 'Failed to upload profile picture' });
+  }
+});
+
+// Delete profile picture
+router.delete('/me/profile-picture', authenticateToken, (req, res) => {
+  try {
+    const user = db.get('SELECT profile_picture FROM users WHERE id = ?', [req.user.id]);
+
+    if (user?.profile_picture) {
+      const picturePath = path.join(__dirname, '../..', user.profile_picture);
+      if (fs.existsSync(picturePath)) {
+        fs.unlinkSync(picturePath);
+      }
+    }
+
+    db.run('UPDATE users SET profile_picture = NULL WHERE id = ?', [req.user.id]);
+
+    res.json({ message: 'Profile picture deleted' });
+  } catch (err) {
+    console.error('Delete profile picture error:', err);
+    res.status(500).json({ error: 'Failed to delete profile picture' });
+  }
+});
 
 // Seed data for production
 const seedUsers = [

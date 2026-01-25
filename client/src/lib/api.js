@@ -151,4 +151,64 @@ export const users = {
     request(`/users/${id}`, {
       method: 'DELETE',
     }),
+
+  // User settings
+  getSettings: () => request('/users/me/settings'),
+
+  updateSettings: (data) =>
+    request('/users/me/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  uploadProfilePicture: (formData) =>
+    request('/users/me/profile-picture', {
+      method: 'POST',
+      body: formData,
+    }),
+
+  deleteProfilePicture: () =>
+    request('/users/me/profile-picture', {
+      method: 'DELETE',
+    }),
+
+  // Password change with verification
+  requestPasswordChange: (oldPassword, newPassword) =>
+    request('/auth/password/request-change', {
+      method: 'POST',
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    }),
+
+  changePassword: (code) =>
+    request('/auth/password/change', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+
+  // Seed data (admin only)
+  seedData: () =>
+    request('/users/seed', {
+      method: 'POST',
+    }),
+};
+
+// Registration with email verification
+export const registration = {
+  initiate: (email, password, name) =>
+    request('/auth/register/initiate', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, name }),
+    }),
+
+  verify: (email, code) =>
+    request('/auth/register/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }),
+
+  resend: (email) =>
+    request('/auth/register/resend', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
 };

@@ -1,10 +1,12 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { NewRequest } from './pages/NewRequest';
 import { MyRequests } from './pages/MyRequests';
 import { AdminPanel } from './pages/AdminPanel';
+import Settings from './pages/Settings';
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading, isAdmin } = useAuth();
@@ -58,7 +60,14 @@ export default function App() {
           </PublicRoute>
         }
       />
-      {/* Registration disabled - users added by admin only */}
+      <Route
+        path="/register"
+        element={
+          <PublicRoute>
+            <Register />
+          </PublicRoute>
+        }
+      />
 
       {/* Protected Routes */}
       <Route
@@ -90,6 +99,14 @@ export default function App() {
         element={
           <ProtectedRoute adminOnly>
             <AdminPanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
           </ProtectedRoute>
         }
       />

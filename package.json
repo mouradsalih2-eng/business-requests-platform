@@ -4,9 +4,16 @@
   "private": true,
   "scripts": {
     "build": "cd client && npm install && npm run build && cd ../server && npm install",
-    "start": "node server/src/index.js"
+    "start": "node server/src/index.js",
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "cd server && npm test",
+    "test:client": "cd client && npm test",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
   }
 }

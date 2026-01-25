@@ -154,20 +154,20 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
     <article
       onClick={onClick}
       className={`
-        relative group bg-white border rounded-lg p-4 sm:p-5 cursor-pointer
+        relative group bg-white dark:bg-[#161B22] border rounded-lg p-4 sm:p-5 cursor-pointer
         transition-all duration-300 ease-out
-        hover:border-neutral-200 hover:shadow-sm
-        active:scale-[0.99] active:bg-neutral-50
+        hover:border-neutral-200 dark:hover:border-[#484F58] hover:shadow-sm
+        active:scale-[0.99] active:bg-neutral-50 dark:active:bg-[#21262D]
         ${isUnread
-          ? 'border-blue-200 shadow-[0_0_12px_rgba(59,130,246,0.25)] ring-1 ring-blue-100'
-          : 'border-neutral-100'}
-        ${positionChange === 'up' ? 'animate-slide-up ring-2 ring-green-200' : ''}
-        ${positionChange === 'down' ? 'animate-slide-down ring-2 ring-amber-200' : ''}
+          ? 'border-[#4F46E5]/30 dark:border-[#6366F1]/40 shadow-[0_0_12px_rgba(99,102,241,0.2)] ring-1 ring-[#4F46E5]/20 dark:ring-[#6366F1]/30'
+          : 'border-neutral-100 dark:border-[#30363D]'}
+        ${positionChange === 'up' ? 'animate-slide-up ring-2 ring-green-200 dark:ring-green-500/30' : ''}
+        ${positionChange === 'down' ? 'animate-slide-down ring-2 ring-amber-200 dark:ring-amber-500/30' : ''}
       `}
     >
       {/* New badge for unread requests */}
       {isUnread && (
-        <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-semibold rounded-full shadow-md z-10">
+        <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs font-semibold rounded-full shadow-md z-10">
           New
         </div>
       )}
@@ -197,22 +197,22 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
       </div>
 
       {/* Title */}
-      <h3 className="text-sm sm:text-base font-medium text-neutral-900 mb-2 group-hover:text-neutral-700 transition-colors line-clamp-2">
+      <h3 className="text-sm sm:text-base font-medium text-neutral-900 dark:text-[#E6EDF3] mb-2 group-hover:text-neutral-700 dark:group-hover:text-[#8B949E] transition-colors line-clamp-2">
         {title}
       </h3>
 
       {/* Description preview - hidden on very small screens */}
       {previewText && (
-        <p className="hidden sm:block text-sm text-neutral-500 mb-4 line-clamp-2">
+        <p className="hidden sm:block text-sm text-neutral-500 dark:text-[#8B949E] mb-4 line-clamp-2">
           {previewText}{previewText.length >= 100 ? '...' : ''}
         </p>
       )}
 
       {/* Footer: Author, Date, Engagement */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-[#30363D]">
         {/* Author and date */}
-        <div className="text-xs text-neutral-400 truncate">
-          <span className="text-neutral-600">{author_name}</span>
+        <div className="text-xs text-neutral-400 dark:text-[#6E7681] truncate">
+          <span className="text-neutral-600 dark:text-[#8B949E]">{author_name}</span>
           <span className="mx-1.5">·</span>
           <span>{formatDate(created_at)}</span>
         </div>
@@ -230,8 +230,8 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
                 flex items-center gap-1.5 px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg sm:rounded text-xs font-medium
                 transition-all duration-200 ease-out min-w-[44px] sm:min-w-0 justify-center
                 ${hasUpvoted
-                  ? 'bg-neutral-900 text-white'
-                  : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 active:bg-neutral-300'
+                  ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
+                  : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-500 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] hover:text-neutral-900 dark:hover:text-[#E6EDF3] active:bg-neutral-300 dark:active:bg-[#3D444D]'
                 }
                 ${voting ? 'opacity-50' : ''}
               `}
@@ -254,9 +254,9 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
             </button>
             {/* Tooltip - desktop only, only show if there's content */}
             {showTooltip === 'upvote' && getTooltipContent('upvote') && (
-              <div className="hidden sm:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg whitespace-nowrap z-50">
+              <div className="hidden sm:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 dark:bg-[#2D333B] text-white dark:text-[#E6EDF3] text-xs rounded-lg whitespace-nowrap z-50 border border-transparent dark:border-[#484F58]">
                 {getTooltipContent('upvote')}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900" />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-[#2D333B]" />
               </div>
             )}
           </div>
@@ -272,8 +272,8 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
                 flex items-center gap-1.5 px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg sm:rounded text-xs font-medium
                 transition-all duration-200 ease-out min-w-[44px] sm:min-w-0 justify-center
                 ${hasLiked
-                  ? 'bg-neutral-900 text-white'
-                  : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 active:bg-neutral-300'
+                  ? 'bg-[#E11D48] dark:bg-[#F43F5E] text-white'
+                  : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-500 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] hover:text-neutral-900 dark:hover:text-[#E6EDF3] active:bg-neutral-300 dark:active:bg-[#3D444D]'
                 }
                 ${voting ? 'opacity-50' : ''}
               `}
@@ -296,9 +296,9 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
             </button>
             {/* Tooltip - desktop only, only show if there's content */}
             {showTooltip === 'like' && getTooltipContent('like') && (
-              <div className="hidden sm:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg whitespace-nowrap z-50">
+              <div className="hidden sm:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 dark:bg-[#2D333B] text-white dark:text-[#E6EDF3] text-xs rounded-lg whitespace-nowrap z-50 border border-transparent dark:border-[#484F58]">
                 {getTooltipContent('like')}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900" />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-[#2D333B]" />
               </div>
             )}
           </div>
@@ -308,7 +308,7 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
             <span
               onMouseEnter={() => handleTooltipEnter('comment')}
               onMouseLeave={handleTooltipLeave}
-              className="flex items-center gap-1.5 px-2.5 sm:px-2 py-1.5 sm:py-1 text-xs text-neutral-400 cursor-default min-w-[44px] sm:min-w-0 justify-center"
+              className="flex items-center gap-1.5 px-2.5 sm:px-2 py-1.5 sm:py-1 text-xs text-neutral-400 dark:text-[#6E7681] cursor-default min-w-[44px] sm:min-w-0 justify-center"
             >
               <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -317,9 +317,9 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
             </span>
             {/* Tooltip - desktop only, only show if there's content */}
             {showTooltip === 'comment' && getTooltipContent('comment') && (
-              <div className="hidden sm:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg whitespace-nowrap z-50">
+              <div className="hidden sm:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 dark:bg-[#2D333B] text-white dark:text-[#E6EDF3] text-xs rounded-lg whitespace-nowrap z-50 border border-transparent dark:border-[#484F58]">
                 {getTooltipContent('comment')}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900" />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-[#2D333B]" />
               </div>
             )}
           </div>

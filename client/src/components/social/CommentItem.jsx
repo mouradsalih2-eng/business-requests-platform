@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Button } from '../ui/Button';
 import { MentionText } from '../ui/MentionText';
 import { MentionDropdown } from '../ui/MentionDropdown';
+import Avatar from '../ui/Avatar';
 import { useAuth } from '../../context/AuthContext';
 import { useMention } from '../../hooks/useMention';
 
@@ -117,26 +118,22 @@ export function CommentItem({ comment, onEdit, onDelete }) {
     <div
       className={`
         flex gap-3 p-3 -mx-3 rounded-lg transition-colors duration-200
-        ${isHovered ? 'bg-neutral-50' : 'bg-transparent'}
+        ${isHovered ? 'bg-neutral-50 dark:bg-neutral-800' : 'bg-transparent'}
       `}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Avatar */}
-      <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center flex-shrink-0">
-        <span className="text-xs font-medium text-neutral-600">
-          {getInitials(comment.author_name)}
-        </span>
-      </div>
+      <Avatar name={comment.author_name} size="sm" />
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-neutral-900">
+          <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
             {comment.author_name}
           </span>
-          <span className="text-xs text-neutral-400">
+          <span className="text-xs text-neutral-400 dark:text-neutral-500">
             {formatDate(comment.created_at)}
           </span>
         </div>
@@ -151,8 +148,8 @@ export function CommentItem({ comment, onEdit, onDelete }) {
                 onChange={handleEditChange}
                 onKeyDown={handleKeyDown}
                 onBlur={() => setTimeout(closeDropdown, 150)}
-                className="w-full px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg
-                           text-neutral-900 focus:outline-none focus:border-neutral-400
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg
+                           text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-500
                            transition-colors duration-200 resize-none"
                 rows={2}
                 autoFocus
@@ -166,7 +163,7 @@ export function CommentItem({ comment, onEdit, onDelete }) {
               />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-neutral-400 dark:text-neutral-500">
                 Esc to cancel
               </span>
               <div className="flex gap-2">
@@ -190,7 +187,7 @@ export function CommentItem({ comment, onEdit, onDelete }) {
         ) : (
           <>
             {/* Comment text with highlighted mentions */}
-            <p className="mt-1 text-sm text-neutral-600 whitespace-pre-wrap">
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">
               <MentionText content={comment.content} mentions={comment.mentions} />
             </p>
 
@@ -205,7 +202,7 @@ export function CommentItem({ comment, onEdit, onDelete }) {
                 {canEdit && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="text-xs text-neutral-400 hover:text-neutral-900 transition-colors"
+                    className="text-xs text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
                   >
                     Edit
                   </button>
@@ -213,7 +210,7 @@ export function CommentItem({ comment, onEdit, onDelete }) {
                 {canDelete && (
                   <button
                     onClick={handleDelete}
-                    className="text-xs text-neutral-400 hover:text-neutral-900 transition-colors"
+                    className="text-xs text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
                     disabled={loading}
                   >
                     Delete

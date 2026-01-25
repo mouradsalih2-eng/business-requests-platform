@@ -6,7 +6,7 @@
 export function Skeleton({ className = '', ...props }) {
   return (
     <div
-      className={`animate-pulse bg-neutral-200 rounded ${className}`}
+      className={`animate-pulse bg-neutral-200 dark:bg-[#21262D] rounded ${className}`}
       {...props}
     />
   );
@@ -14,7 +14,7 @@ export function Skeleton({ className = '', ...props }) {
 
 export function SkeletonCard() {
   return (
-    <div className="bg-white border border-neutral-100 rounded-lg p-4 sm:p-5 space-y-4">
+    <div className="bg-white dark:bg-[#161B22] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-5 space-y-4">
       {/* Header badges */}
       <div className="flex items-center gap-2">
         <Skeleton className="h-6 w-16 rounded-md" />
@@ -34,7 +34,7 @@ export function SkeletonCard() {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
+      <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-[#30363D]">
         <Skeleton className="h-4 w-32" />
         <div className="flex items-center gap-2">
           <Skeleton className="h-8 w-14 rounded-lg" />

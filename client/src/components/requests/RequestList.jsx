@@ -15,13 +15,13 @@ export function RequestList({
   if (requests.length === 0) {
     return (
       <div className="text-center py-16 px-4">
-        <div className="w-16 h-16 mx-auto mb-4 bg-neutral-100 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-16 h-16 mx-auto mb-4 bg-neutral-100 dark:bg-neutral-700 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
         </div>
-        <p className="text-neutral-600 font-medium mb-1">{emptyMessage}</p>
-        <p className="text-sm text-neutral-400">Try adjusting your filters or search query</p>
+        <p className="text-neutral-600 dark:text-neutral-300 font-medium mb-1">{emptyMessage}</p>
+        <p className="text-sm text-neutral-400 dark:text-neutral-500">Try adjusting your filters or search query</p>
       </div>
     );
   }

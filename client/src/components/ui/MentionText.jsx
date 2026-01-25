@@ -61,7 +61,7 @@ export function MentionText({ content, mentions = [] }) {
         part.type === 'mention' ? (
           <span
             key={part.key}
-            className="text-blue-600 font-medium hover:text-blue-700
+            className="text-[#4F46E5] dark:text-[#818CF8] font-medium hover:text-[#4338CA] dark:hover:text-[#A5B4FC]
                        cursor-default transition-colors"
             title={`Mentioned: ${part.name}`}
           >

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { RequestList } from '../components/requests/RequestList';
 import { RequestDetail } from '../components/requests/RequestDetail';
@@ -57,22 +58,51 @@ function TrendChart({ data }) {
   // SVG viewBox dimensions
   const svgWidth = 1000;
   const svgHeight = 400;
-  const svgPadding = 10;
+  const svgPaddingX = 10;
+  const svgPaddingTop = 40; // Extra padding at top for circles and bezier overshoot
+  const svgPaddingBottom = 10;
 
   // Convert percentages to SVG coordinates
   const svgPoints = points.map(p => ({
-    x: svgPadding + (p.xPercent / 100) * (svgWidth - svgPadding * 2),
-    y: svgPadding + (p.yPercent / 100) * (svgHeight - svgPadding * 2),
+    x: svgPaddingX + (p.xPercent / 100) * (svgWidth - svgPaddingX * 2),
+    y: svgPaddingTop + (p.yPercent / 100) * (svgHeight - svgPaddingTop - svgPaddingBottom),
     ...p
   }));
 
-  // Create line path
-  const linePath = svgPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  // Create smooth bezier curve path using Catmull-Rom spline
+  const createSmoothPath = (points) => {
+    if (points.length < 2) return '';
+    if (points.length === 2) {
+      return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+    }
 
-  // Create area path
+    let path = `M ${points[0].x} ${points[0].y}`;
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? i : i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2 >= points.length ? i + 1 : i + 2];
+
+      // Catmull-Rom to Bezier conversion (lower tension = less overshoot)
+      const tension = 0.2;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+
+    return path;
+  };
+
+  const linePath = createSmoothPath(svgPoints);
+
+  // Create area path using the smooth curve
   const areaPath = linePath +
-    ` L ${svgPoints[svgPoints.length - 1].x} ${svgHeight - svgPadding}` +
-    ` L ${svgPadding} ${svgHeight - svgPadding} Z`;
+    ` L ${svgPoints[svgPoints.length - 1].x} ${svgHeight - svgPaddingBottom}` +
+    ` L ${svgPoints[0].x} ${svgHeight - svgPaddingBottom} Z`;
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -83,14 +113,14 @@ function TrendChart({ data }) {
         onMouseLeave={() => setHoveredPoint(null)}
       >
         {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-neutral-400 text-right pr-1">
+        <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-neutral-400 dark:text-neutral-500 text-right pr-1">
           <span>{maxCount}</span>
           <span>{Math.round(maxCount / 2)}</span>
           <span>0</span>
         </div>
 
         {/* Chart area */}
-        <div className="absolute left-8 right-0 top-0 bottom-6 bg-neutral-50/50 rounded border border-neutral-100 overflow-hidden">
+        <div className="absolute left-8 right-0 top-0 bottom-6 bg-neutral-50/50 dark:bg-neutral-800/50 rounded border border-neutral-100 dark:border-neutral-700">
           {/* SVG Chart */}
           <svg
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -101,10 +131,10 @@ function TrendChart({ data }) {
             {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => (
               <line
                 key={i}
-                x1={svgPadding}
-                y1={svgPadding + (svgHeight - svgPadding * 2) * ratio}
-                x2={svgWidth - svgPadding}
-                y2={svgPadding + (svgHeight - svgPadding * 2) * ratio}
+                x1={svgPaddingX}
+                y1={svgPaddingTop + (svgHeight - svgPaddingTop - svgPaddingBottom) * ratio}
+                x2={svgWidth - svgPaddingX}
+                y2={svgPaddingTop + (svgHeight - svgPaddingTop - svgPaddingBottom) * ratio}
                 stroke="#e5e5e5"
                 strokeWidth="1"
               />
@@ -166,13 +196,13 @@ function TrendChart({ data }) {
             }}
           >
             <div className="font-semibold text-sm">{hoveredPoint.count} request{hoveredPoint.count !== 1 ? 's' : ''}</div>
-            <div className="text-neutral-400">{hoveredPoint.label}</div>
+            <div className="text-neutral-400 dark:text-neutral-500">{hoveredPoint.label}</div>
             <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900" />
           </div>
         )}
 
         {/* X-axis labels */}
-        <div className="absolute left-8 right-0 bottom-0 h-6 flex justify-between items-center text-xs text-neutral-400">
+        <div className="absolute left-8 right-0 bottom-0 h-6 flex justify-between items-center text-xs text-neutral-400 dark:text-neutral-500">
           {data.length <= 7 ? (
             data.map((d, i) => (
               <span key={i} className="truncate max-w-[50px]" title={d.label}>
@@ -201,10 +231,10 @@ function BreakdownBar({ label, value, total, color }) {
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-neutral-700">{label}</span>
-        <span className="text-neutral-500">{value} ({percentage.toFixed(0)}%)</span>
+        <span className="text-neutral-700 dark:text-neutral-300">{label}</span>
+        <span className="text-neutral-500 dark:text-neutral-400">{value} ({percentage.toFixed(0)}%)</span>
       </div>
-      <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
         <div
           className={`h-full ${color} transition-all duration-500 ease-out rounded-full`}
           style={{ width: `${percentage}%` }}
@@ -227,6 +257,7 @@ const statusOptions = [
   { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'duplicate', label: 'Duplicate' },
+  { value: 'archived', label: 'Archived' },
 ];
 
 const categoryOptions = [
@@ -270,6 +301,7 @@ const roleOptions = [
 ];
 
 export function AdminPanel() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('requests');
   const [requestsList, setRequestsList] = useState([]);
   const [usersList, setUsersList] = useState([]);
@@ -300,6 +332,10 @@ export function AdminPanel() {
   });
   const [addUserError, setAddUserError] = useState('');
   const [addingUser, setAddingUser] = useState(false);
+
+  // Seed data state
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'requests') {
@@ -432,6 +468,35 @@ export function AdminPanel() {
     }
   };
 
+  const handleSeedData = async () => {
+    if (seeding) return;
+
+    const confirmed = window.confirm(
+      'This will generate test users and requests to populate the platform. Continue?'
+    );
+    if (!confirmed) return;
+
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const result = await usersApi.seedData();
+      setSeedResult(result);
+      // Reload data after seeding
+      if (activeTab === 'users') {
+        loadUsers();
+      } else if (activeTab === 'requests') {
+        loadRequests();
+      } else if (activeTab === 'analytics') {
+        loadAnalytics();
+      }
+    } catch (err) {
+      console.error('Seed error:', err);
+      setSeedResult({ error: err.message || 'Failed to seed data' });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   // Stats
   const stats = {
     total: requestsList.length,
@@ -449,27 +514,37 @@ export function AdminPanel() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900">Admin Panel</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage requests and users</p>
+          {/* Back button - mobile only */}
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="sm:hidden flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 mb-2 -ml-1 p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Dashboard
+          </button>
+          <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-neutral-100">Admin Panel</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage requests and users</p>
         </div>
 
         {/* Stats Grid - 2 cols mobile, 4 cols desktop */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white border border-neutral-100 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900">{stats.total}</div>
-            <div className="text-xs sm:text-sm text-neutral-500">Total</div>
+          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.total}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">Total</div>
           </div>
-          <div className="bg-white border border-neutral-100 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900">{stats.pending}</div>
-            <div className="text-xs sm:text-sm text-neutral-500">Pending</div>
+          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.pending}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">Pending</div>
           </div>
-          <div className="bg-white border border-neutral-100 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900">{stats.inProgress}</div>
-            <div className="text-xs sm:text-sm text-neutral-500">In Progress</div>
+          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.inProgress}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">In Progress</div>
           </div>
-          <div className="bg-white border border-neutral-100 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900">{stats.completed}</div>
-            <div className="text-xs sm:text-sm text-neutral-500">Completed</div>
+          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.completed}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">Completed</div>
           </div>
         </div>
 
@@ -480,14 +555,14 @@ export function AdminPanel() {
             className={`
               flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
               ${activeTab === 'requests'
-                ? 'bg-neutral-900 text-white'
-                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 active:bg-neutral-300'
+                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
+                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
               }
             `}
           >
             Requests
             {stats.unread > 0 && activeTab !== 'requests' && (
-              <span className="ml-2 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+              <span className="ml-2 px-1.5 py-0.5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs rounded-full">
                 {stats.unread}
               </span>
             )}
@@ -497,8 +572,8 @@ export function AdminPanel() {
             className={`
               flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
               ${activeTab === 'analytics'
-                ? 'bg-neutral-900 text-white'
-                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 active:bg-neutral-300'
+                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
+                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
               }
             `}
           >
@@ -509,8 +584,8 @@ export function AdminPanel() {
             className={`
               flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
               ${activeTab === 'users'
-                ? 'bg-neutral-900 text-white'
-                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 active:bg-neutral-300'
+                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
+                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
               }
             `}
           >
@@ -535,8 +610,8 @@ export function AdminPanel() {
                 className={`
                   relative flex items-center justify-center w-11 h-11 rounded-lg border transition-all duration-200
                   ${hasActiveFilters
-                    ? 'bg-neutral-900 border-neutral-900 text-white'
-                    : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                    ? 'bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900'
+                    : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
                   }
                 `}
                 title="Filters"
@@ -545,7 +620,7 @@ export function AdminPanel() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
                 </svg>
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 text-white text-xs font-medium rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs font-medium rounded-full flex items-center justify-center">
                     {activeFilterCount}
                   </span>
                 )}
@@ -553,7 +628,7 @@ export function AdminPanel() {
             </div>
 
             {/* Request count */}
-            <p className="text-sm text-neutral-500 mb-4">{requestsList.length} request{requestsList.length !== 1 ? 's' : ''}</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">{requestsList.length} request{requestsList.length !== 1 ? 's' : ''}</p>
 
             {/* Request List */}
             {loading ? (
@@ -640,7 +715,7 @@ export function AdminPanel() {
           <div className="space-y-6">
             {/* Period selector */}
             <div className="flex items-center justify-between">
-              <h3 className="font-medium text-neutral-900">Request Trends</h3>
+              <h3 className="font-medium text-neutral-900 dark:text-neutral-100">Request Trends</h3>
               <Select
                 value={analyticsPeriod}
                 onChange={(e) => setAnalyticsPeriod(e.target.value)}
@@ -651,39 +726,43 @@ export function AdminPanel() {
 
             {analyticsLoading ? (
               <div className="text-center py-12">
-                <div className="inline-block w-6 h-6 border-2 border-neutral-300 border-t-neutral-900 rounded-full animate-spin mb-2" />
-                <p className="text-neutral-500 text-sm">Loading analytics...</p>
+                <div className="inline-block w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin mb-2" />
+                <p className="text-neutral-500 dark:text-neutral-400 text-sm">Loading analytics...</p>
               </div>
             ) : analyticsData ? (
               <>
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-neutral-900">{analyticsData.summary.total}</div>
-                    <div className="text-xs text-neutral-500">Total Requests</div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{analyticsData.summary.total}</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Total Requests</div>
                   </div>
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-amber-600">{analyticsData.summary.pending}</div>
-                    <div className="text-xs text-neutral-500">Pending</div>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-amber-600 dark:text-amber-400">{analyticsData.summary.pending}</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Pending</div>
                   </div>
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-blue-600">{analyticsData.summary.inProgress}</div>
-                    <div className="text-xs text-neutral-500">In Progress</div>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-indigo-600 dark:text-indigo-400">{analyticsData.summary.inProgress}</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">In Progress</div>
                   </div>
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-green-600">{analyticsData.summary.completed}</div>
-                    <div className="text-xs text-neutral-500">Completed</div>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-green-600 dark:text-green-400">{analyticsData.summary.completed}</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Completed</div>
+                  </div>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-slate-500 dark:text-slate-400">{analyticsData.summary.archived || 0}</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Archived</div>
                   </div>
                 </div>
 
                 {/* Trend Chart */}
-                <div className="bg-white border border-neutral-100 rounded-lg p-4 sm:p-6">
-                  <h4 className="text-sm font-medium text-neutral-700 mb-4">Submissions Over Time</h4>
+                <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
+                  <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">Submissions Over Time</h4>
                   <div className="h-64 relative">
                     {analyticsData.trendData.length > 0 ? (
                       <TrendChart data={analyticsData.trendData} />
                     ) : (
-                      <div className="flex items-center justify-center h-full text-neutral-400">
+                      <div className="flex items-center justify-center h-full text-neutral-400 dark:text-neutral-500">
                         No data for this period
                       </div>
                     )}
@@ -693,18 +772,18 @@ export function AdminPanel() {
                 {/* Breakdowns - 2x2 grid */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   {/* Category Breakdown */}
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 mb-4">By Category</h4>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Category</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="Bug" value={analyticsData.categoryBreakdown.bug} total={analyticsData.summary.total} color="bg-red-500" />
-                      <BreakdownBar label="New Feature" value={analyticsData.categoryBreakdown.new_feature} total={analyticsData.summary.total} color="bg-blue-500" />
+                      <BreakdownBar label="New Feature" value={analyticsData.categoryBreakdown.new_feature} total={analyticsData.summary.total} color="bg-indigo-500" />
                       <BreakdownBar label="Optimization" value={analyticsData.categoryBreakdown.optimization} total={analyticsData.summary.total} color="bg-green-500" />
                     </div>
                   </div>
 
                   {/* Priority Breakdown */}
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 mb-4">By Priority</h4>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Priority</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="High" value={analyticsData.priorityBreakdown.high} total={analyticsData.summary.total} color="bg-red-500" />
                       <BreakdownBar label="Medium" value={analyticsData.priorityBreakdown.medium} total={analyticsData.summary.total} color="bg-amber-500" />
@@ -713,8 +792,8 @@ export function AdminPanel() {
                   </div>
 
                   {/* Team Breakdown */}
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 mb-4">By Team</h4>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Team</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="Manufacturing" value={analyticsData.teamBreakdown?.Manufacturing || 0} total={analyticsData.summary.total} color="bg-indigo-500" />
                       <BreakdownBar label="Sales" value={analyticsData.teamBreakdown?.Sales || 0} total={analyticsData.summary.total} color="bg-emerald-500" />
@@ -724,11 +803,11 @@ export function AdminPanel() {
                   </div>
 
                   {/* Region Breakdown */}
-                  <div className="bg-white border border-neutral-100 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 mb-4">By Region</h4>
+                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Region</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="EMEA" value={analyticsData.regionBreakdown?.EMEA || 0} total={analyticsData.summary.total} color="bg-violet-500" />
-                      <BreakdownBar label="North America" value={analyticsData.regionBreakdown?.['North America'] || 0} total={analyticsData.summary.total} color="bg-pink-500" />
+                      <BreakdownBar label="North America" value={analyticsData.regionBreakdown?.['North America'] || 0} total={analyticsData.summary.total} color="bg-rose-500" />
                       <BreakdownBar label="APAC" value={analyticsData.regionBreakdown?.APAC || 0} total={analyticsData.summary.total} color="bg-teal-500" />
                       <BreakdownBar label="Global" value={analyticsData.regionBreakdown?.Global || 0} total={analyticsData.summary.total} color="bg-slate-500" />
                     </div>
@@ -736,26 +815,75 @@ export function AdminPanel() {
                 </div>
               </>
             ) : (
-              <div className="text-center py-12 text-neutral-500">
+              <div className="text-center py-12 text-neutral-500 dark:text-neutral-400">
                 No analytics data available
               </div>
             )}
           </div>
         ) : (
           /* Users Section */
-          <div className="bg-white border border-neutral-100 rounded-lg">
-            {/* Users Header */}
-            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100">
-              <h3 className="font-medium text-neutral-900">Users ({usersList.length})</h3>
-              <Button onClick={() => setShowAddUserModal(true)} size="sm">
-                Add User
-              </Button>
+          <div className="space-y-4">
+            {/* Seed Data Card */}
+            <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h3 className="font-medium text-neutral-900 dark:text-neutral-100">Generate Test Data</h3>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+                    Populate the platform with sample users, requests, votes, and comments for testing.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleSeedData}
+                  disabled={seeding}
+                  variant="secondary"
+                  className="whitespace-nowrap"
+                >
+                  {seeding ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Generating...
+                    </span>
+                  ) : (
+                    'Generate Test Data'
+                  )}
+                </Button>
+              </div>
+
+              {seedResult && (
+                <div className={`mt-4 p-3 rounded-lg text-sm ${
+                  seedResult.error
+                    ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                }`}>
+                  {seedResult.error ? (
+                    <p>{seedResult.error}</p>
+                  ) : (
+                    <p>
+                      Generated: {seedResult.users} users, {seedResult.requests} requests,{' '}
+                      {seedResult.votes} votes, {seedResult.comments} comments
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Users Table */}
+            <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg">
+              {/* Users Header */}
+              <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100 dark:border-neutral-700">
+                <h3 className="font-medium text-neutral-900 dark:text-neutral-100">Users ({usersList.length})</h3>
+                <Button onClick={() => setShowAddUserModal(true)} size="sm">
+                  Add User
+                </Button>
+              </div>
 
             {loading ? (
               <div className="text-center py-12">
-                <div className="inline-block w-6 h-6 border-2 border-neutral-300 border-t-neutral-900 rounded-full animate-spin mb-2" />
-                <p className="text-neutral-500 text-sm">Loading users...</p>
+                <div className="inline-block w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin mb-2" />
+                <p className="text-neutral-500 dark:text-neutral-400 text-sm">Loading users...</p>
               </div>
             ) : (
               <>
@@ -763,32 +891,32 @@ export function AdminPanel() {
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-neutral-100">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Name</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Email</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Role</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Requests</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Joined</th>
+                      <tr className="border-b border-neutral-100 dark:border-neutral-700">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Name</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Email</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Role</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Requests</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Joined</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700">
                       {usersList.map((user) => (
-                        <tr key={user.id} className="hover:bg-neutral-50 transition-colors">
-                          <td className="px-6 py-4 text-sm text-neutral-900 font-medium">{user.name}</td>
-                          <td className="px-6 py-4 text-sm text-neutral-500">{user.email}</td>
+                        <tr key={user.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+                          <td className="px-6 py-4 text-sm text-neutral-900 dark:text-neutral-100 font-medium">{user.name}</td>
+                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-neutral-400">{user.email}</td>
                           <td className="px-6 py-4">
                             <select
                               value={user.role}
                               onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                              className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 bg-white
-                                         focus:outline-none focus:border-neutral-400 transition-colors"
+                              className="text-sm border border-neutral-200 dark:border-neutral-600 rounded-lg px-2 py-1.5 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100
+                                         focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-500 transition-colors"
                             >
                               <option value="employee">Employee</option>
                               <option value="admin">Admin</option>
                             </select>
                           </td>
-                          <td className="px-6 py-4 text-sm text-neutral-500">{user.request_count}</td>
-                          <td className="px-6 py-4 text-sm text-neutral-500">
+                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-neutral-400">{user.request_count}</td>
+                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-neutral-400">
                             {new Date(user.created_at).toLocaleDateString()}
                           </td>
                         </tr>
@@ -798,28 +926,28 @@ export function AdminPanel() {
                 </div>
 
                 {/* Mobile Card View */}
-                <div className="sm:hidden divide-y divide-neutral-100">
+                <div className="sm:hidden divide-y divide-neutral-100 dark:divide-neutral-700">
                   {usersList.map((user) => (
                     <div key={user.id} className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="font-medium text-neutral-900">{user.name}</p>
-                          <p className="text-sm text-neutral-500">{user.email}</p>
+                          <p className="font-medium text-neutral-900 dark:text-neutral-100">{user.name}</p>
+                          <p className="text-sm text-neutral-500 dark:text-neutral-400">{user.email}</p>
                         </div>
                         <span className={`
                           text-xs px-2 py-1 rounded-full font-medium
-                          ${user.role === 'admin' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600'}
+                          ${user.role === 'admin' ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900' : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}
                         `}>
                           {user.role}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-neutral-500">{user.request_count} requests</span>
+                        <span className="text-neutral-500 dark:text-neutral-400">{user.request_count} requests</span>
                         <select
                           value={user.role}
                           onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                          className="text-sm border border-neutral-200 rounded-lg px-3 py-1.5 bg-white
-                                     focus:outline-none focus:border-neutral-400"
+                          className="text-sm border border-neutral-200 dark:border-neutral-600 rounded-lg px-3 py-1.5 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100
+                                     focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-500"
                         >
                           <option value="employee">Employee</option>
                           <option value="admin">Admin</option>
@@ -830,6 +958,7 @@ export function AdminPanel() {
                 </div>
               </>
             )}
+            </div>
           </div>
         )}
 
@@ -855,7 +984,7 @@ export function AdminPanel() {
         >
           <form onSubmit={handleAddUser} className="space-y-4">
             {addUserError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
                 {addUserError}
               </div>
             )}

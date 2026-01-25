@@ -200,8 +200,8 @@ export function Dashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900">All Requests</h1>
-            <p className="text-sm text-neutral-500 mt-1">
+            <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">All Requests</h1>
+            <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
               {isAdmin ? 'View and manage all requests' : 'Browse and vote on requests'}
             </p>
           </div>
@@ -227,8 +227,8 @@ export function Dashboard() {
             className={`
               relative flex items-center justify-center w-11 h-11 rounded-lg border transition-all duration-200
               ${hasActiveFilters
-                ? 'bg-neutral-900 border-neutral-900 text-white'
-                : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                ? 'bg-[#4F46E5] dark:bg-[#6366F1] border-[#4F46E5] dark:border-[#6366F1] text-white'
+                : 'bg-white dark:bg-[#21262D] border-neutral-200 dark:border-[#30363D] text-neutral-600 dark:text-[#8B949E] hover:border-neutral-300 dark:hover:border-[#484F58] hover:bg-neutral-50 dark:hover:bg-[#2D333B]'
               }
             `}
             title="Filters"
@@ -237,7 +237,7 @@ export function Dashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
             </svg>
             {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 text-white text-xs font-medium rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs font-medium rounded-full flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -246,16 +246,16 @@ export function Dashboard() {
 
         {/* Request count and sort toggle */}
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-neutral-500 dark:text-[#8B949E]">
             {sortedRequests.length} request{sortedRequests.length !== 1 ? 's' : ''}
           </p>
           {/* Sort toggle */}
           <button
             onClick={toggleSort}
-            className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] transition-colors"
             title={filters.sort === 'recency' ? 'Sorted by recent' : 'Sorted by votes'}
           >
-            <span className="text-neutral-400">
+            <span className="text-neutral-400 dark:text-[#6E7681]">
               {filters.sort === 'recency' ? 'Recent' : 'Votes'}
             </span>
             <svg
@@ -304,7 +304,7 @@ export function Dashboard() {
             />
 
             {/* Actions */}
-            <div className="pt-4 border-t border-neutral-100 space-y-3">
+            <div className="pt-4 border-t border-neutral-100 dark:border-[#30363D] space-y-3">
               <Button
                 onClick={() => setShowFilters(false)}
                 className="w-full"
@@ -314,7 +314,7 @@ export function Dashboard() {
               {hasActiveFilters && (
                 <button
                   onClick={clearFilters}
-                  className="w-full text-sm text-neutral-500 hover:text-neutral-900 transition-colors py-2"
+                  className="w-full text-sm text-neutral-500 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] transition-colors py-2"
                 >
                   Clear all filters
                 </button>

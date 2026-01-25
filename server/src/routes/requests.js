@@ -149,6 +149,7 @@ router.get('/stats/analytics', authenticateToken, requireAdmin, (req, res) => {
     const pendingCount = requests.filter(r => r.status === 'pending').length;
     const completedCount = requests.filter(r => r.status === 'completed').length;
     const inProgressCount = requests.filter(r => r.status === 'in_progress').length;
+    const archivedCount = requests.filter(r => r.status === 'archived').length;
 
     // Category breakdown
     const categoryBreakdown = {
@@ -186,7 +187,8 @@ router.get('/stats/analytics', authenticateToken, requireAdmin, (req, res) => {
         total: totalRequests,
         pending: pendingCount,
         completed: completedCount,
-        inProgress: inProgressCount
+        inProgress: inProgressCount,
+        archived: archivedCount
       },
       categoryBreakdown,
       priorityBreakdown,
@@ -277,6 +279,12 @@ router.get('/', authenticateToken, (req, res) => {
     `;
 
     const params = [];
+
+    // Exclude archived requests unless specifically filtering for them
+    if (status !== 'archived') {
+      query += ' AND r.status != ?';
+      params.push('archived');
+    }
 
     // Only filter by user if explicitly requested (for My Requests page)
     if (myRequests === 'true') {

@@ -22,13 +22,13 @@ export function Layout({ children }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 dark:bg-[#010409]">
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
 
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/50 dark:bg-[#0D1117]/80 z-40 lg:hidden animate-in fade-in duration-200"
           onClick={() => setSidebarOpen(false)}
         />
       )}

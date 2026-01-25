@@ -50,7 +50,7 @@ describe('Button component', () => {
     it('applies primary variant by default', () => {
       render(<Button>Primary</Button>);
       const button = screen.getByRole('button');
-      expect(button.className).toContain('bg-neutral-900');
+      expect(button.className).toContain('bg-[#4F46E5]');
     });
 
     it('applies secondary variant', () => {

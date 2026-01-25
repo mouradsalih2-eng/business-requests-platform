@@ -4,16 +4,27 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
-      // Tesla-inspired monochrome palette
+      // Modern dark mode palette with CSS variables
       colors: {
-        background: '#FFFFFF',
-        surface: '#F5F5F5',
-        border: '#E5E5E5',
-        muted: '#737373',
-        primary: '#171717',
-        accent: '#171717', // Monochrome accent
+        background: 'var(--bg-primary)',
+        surface: 'var(--bg-secondary)',
+        elevated: 'var(--bg-elevated)',
+        border: 'var(--border-primary)',
+        muted: 'var(--text-secondary)',
+        primary: 'var(--text-primary)',
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          muted: 'var(--accent-muted)',
+        },
+        'accent-secondary': {
+          DEFAULT: 'var(--accent-secondary)',
+          hover: 'var(--accent-secondary-hover)',
+          muted: 'var(--accent-secondary-muted)',
+        },
       },
       fontFamily: {
         sans: [

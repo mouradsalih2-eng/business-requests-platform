@@ -2,6 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Light theme (default) */
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #FAFAFA;
+  --bg-tertiary: #F5F5F5;
+  --bg-elevated: #FFFFFF;
+  --text-primary: #171717;
+  --text-secondary: #525252;
+  --text-muted: #737373;
+  --border-primary: #E5E5E5;
+  --border-secondary: #D4D4D4;
+
+  /* Primary accent - deep indigo */
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-muted: rgba(79, 70, 229, 0.1);
+
+  /* Secondary accent - rose red for likes */
+  --accent-secondary: #E11D48;
+  --accent-secondary-hover: #BE123C;
+  --accent-secondary-muted: rgba(225, 29, 72, 0.1);
+}
+
+/* Dark theme - Inspired by WhatsApp, Netflix, Tesla */
+.dark {
+  /* Backgrounds - WhatsApp-inspired blue-gray */
+  --bg-primary: #0D1117;
+  --bg-secondary: #161B22;
+  --bg-tertiary: #21262D;
+  --bg-elevated: #2D333B;
+
+  /* Text - balanced contrast */
+  --text-primary: #E6EDF3;
+  --text-secondary: #8B949E;
+  --text-muted: #6E7681;
+
+  /* Borders - clearly visible */
+  --border-primary: #30363D;
+  --border-secondary: #484F58;
+
+  /* Primary accent - sophisticated indigo */
+  --accent: #6366F1;
+  --accent-hover: #818CF8;
+  --accent-muted: rgba(99, 102, 241, 0.15);
+
+  /* Secondary accent - premium rose red for likes */
+  --accent-secondary: #F43F5E;
+  --accent-secondary-hover: #FB7185;
+  --accent-secondary-muted: rgba(244, 63, 94, 0.15);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -10,10 +61,11 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #FAFAFA;
-  color: #1A1A1A;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Custom scrollbar */
@@ -23,17 +75,17 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--bg-tertiary);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--border-secondary);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: var(--text-muted);
 }
 
 /* Card position change animations */

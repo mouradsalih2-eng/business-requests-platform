@@ -118,7 +118,7 @@ export function CommentSection({ requestId }) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <h4 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+      <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
         Comments ({commentsList.length})
       </h4>
 
@@ -132,10 +132,10 @@ export function CommentSection({ requestId }) {
             onKeyDown={handleKeyDown}
             onBlur={() => setTimeout(closeDropdown, 150)}
             placeholder="Add a comment... Use @ to mention someone"
-            className="w-full px-3 py-2.5 text-sm bg-white border border-neutral-200 rounded-lg
-                       placeholder-neutral-400 text-neutral-900
-                       hover:border-neutral-300
-                       focus:outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10
+            className="w-full px-3 py-2.5 text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg
+                       placeholder-neutral-400 dark:placeholder-neutral-500 text-neutral-900 dark:text-neutral-100
+                       hover:border-neutral-300 dark:hover:border-neutral-600
+                       focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-400 focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-neutral-100/10
                        transition-all duration-200 resize-none"
             rows={2}
           />
@@ -148,7 +148,7 @@ export function CommentSection({ requestId }) {
           />
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-neutral-400">
+          <span className="text-xs text-neutral-400 dark:text-neutral-500">
             {newComment.trim() ? 'Cmd/Ctrl + Enter to submit' : ''}
           </span>
           <Button
@@ -164,18 +164,18 @@ export function CommentSection({ requestId }) {
       {/* Comments List */}
       {loading ? (
         <div className="py-6 flex items-center justify-center gap-2">
-          <div className="w-4 h-4 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
-          <span className="text-sm text-neutral-400">Loading comments...</span>
+          <div className="w-4 h-4 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-600 dark:border-t-neutral-300 rounded-full animate-spin" />
+          <span className="text-sm text-neutral-400 dark:text-neutral-500">Loading comments...</span>
         </div>
       ) : commentsList.length === 0 ? (
         <div className="text-center py-8">
-          <div className="w-10 h-10 mx-auto mb-2 bg-neutral-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-10 h-10 mx-auto mb-2 bg-neutral-100 dark:bg-neutral-700 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>
-          <p className="text-sm text-neutral-500">No comments yet</p>
-          <p className="text-xs text-neutral-400">Be the first to share your thoughts</p>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">No comments yet</p>
+          <p className="text-xs text-neutral-400 dark:text-neutral-500">Be the first to share your thoughts</p>
         </div>
       ) : (
         <div className="space-y-4">

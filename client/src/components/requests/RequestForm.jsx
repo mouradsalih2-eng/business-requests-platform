@@ -143,7 +143,7 @@ export function RequestForm({ onSubmit, loading = false }) {
 
       <Card>
         <CardBody className="space-y-4">
-          <h3 className="font-medium text-neutral-900 text-sm sm:text-base">Business Context</h3>
+          <h3 className="font-medium text-neutral-900 dark:text-neutral-100 text-sm sm:text-base">Business Context</h3>
 
           <Textarea
             label="Business Problem"
@@ -185,12 +185,12 @@ export function RequestForm({ onSubmit, loading = false }) {
 
       <Card>
         <CardBody>
-          <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+          <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-2">
             Attachments
           </label>
           <div className="flex flex-wrap items-center gap-3">
             <label className="cursor-pointer">
-              <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-neutral-100 text-neutral-600 rounded-lg hover:bg-neutral-200 active:bg-neutral-300 transition-colors text-sm">
+              <span className="inline-flex items-center gap-2 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 active:bg-neutral-300 dark:active:bg-neutral-500 transition-colors text-sm">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                 </svg>
@@ -204,7 +204,7 @@ export function RequestForm({ onSubmit, loading = false }) {
               />
             </label>
             {files.length > 0 && (
-              <span className="text-sm text-neutral-500">
+              <span className="text-sm text-neutral-500 dark:text-neutral-400">
                 {files.length} file(s) selected
               </span>
             )}
@@ -212,17 +212,17 @@ export function RequestForm({ onSubmit, loading = false }) {
           {files.length > 0 && (
             <div className="mt-3 space-y-2">
               {files.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-neutral-50 rounded-lg">
+                <div key={index} className="flex items-center justify-between p-2 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
                   <div className="flex items-center gap-2 min-w-0">
-                    <svg className="w-4 h-4 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-neutral-400 dark:text-neutral-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <span className="text-sm text-neutral-600 truncate">{file.name}</span>
+                    <span className="text-sm text-neutral-600 dark:text-neutral-400 truncate">{file.name}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeFile(index)}
-                    className="p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                    className="p-1 text-neutral-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -236,7 +236,7 @@ export function RequestForm({ onSubmit, loading = false }) {
       </Card>
 
       {/* Sticky submit button on mobile */}
-      <div className="sticky bottom-0 bg-neutral-50 -mx-4 px-4 py-4 sm:static sm:bg-transparent sm:mx-0 sm:px-0 sm:py-0 sm:flex sm:justify-end border-t border-neutral-100 sm:border-0">
+      <div className="sticky bottom-0 bg-neutral-50 dark:bg-neutral-900 -mx-4 px-4 py-4 sm:static sm:bg-transparent sm:mx-0 sm:px-0 sm:py-0 sm:flex sm:justify-end border-t border-neutral-100 dark:border-neutral-800 sm:border-0">
         <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full sm:w-auto">
           {loading ? 'Submitting...' : 'Submit Request'}
         </Button>

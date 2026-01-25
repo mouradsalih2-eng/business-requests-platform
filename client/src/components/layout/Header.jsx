@@ -1,19 +1,37 @@
+import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import Avatar from '../ui/Avatar';
 
-/**
- * Header component - minimal design with mobile hamburger menu
- */
 export function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const profilePictureUrl = user?.profile_picture
+    ? `${import.meta.env.VITE_API_URL || ''}${user.profile_picture}`
+    : null;
 
   return (
-    <header className="h-14 bg-white border-b border-neutral-100 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-14 bg-white dark:bg-[#0D1117] border-b border-neutral-100 dark:border-[#30363D] px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30">
       {/* Left: Menu button (mobile) + Logo */}
       <div className="flex items-center gap-3">
         {/* Hamburger menu - mobile only */}
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 -ml-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+          className="lg:hidden p-2 -ml-2 text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D] rounded-lg transition-colors"
           aria-label="Toggle menu"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -23,38 +41,83 @@ export function Header({ onMenuClick }) {
 
         {/* Logo and app name */}
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-neutral-900 rounded-lg flex items-center justify-center">
+          <div className="w-7 h-7 bg-[#4F46E5] dark:bg-[#6366F1] rounded-lg flex items-center justify-center">
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>
-          <span className="text-base font-semibold tracking-tight text-neutral-900 hidden sm:block">
+          <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-[#E6EDF3] hidden sm:block">
             User Voice
           </span>
         </div>
       </div>
 
-      {/* Right: User info and logout */}
-      <div className="flex items-center gap-2 sm:gap-4">
-        <div className="text-right hidden sm:block">
-          <p className="text-sm font-medium text-neutral-900">{user?.name}</p>
-          <p className="text-xs text-neutral-500 capitalize">{user?.role}</p>
-        </div>
-        {/* Mobile: Just show initial */}
-        <div className="sm:hidden w-8 h-8 bg-neutral-100 rounded-full flex items-center justify-center text-sm font-medium text-neutral-700">
-          {user?.name?.charAt(0) || '?'}
-        </div>
-        <div className="w-px h-8 bg-neutral-200 hidden sm:block" />
+      {/* Right: User menu */}
+      <div className="relative" ref={dropdownRef}>
         <button
-          onClick={logout}
-          className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors duration-200 p-2 sm:p-0"
-          title="Sign out"
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+          className="flex items-center gap-3 p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#21262D] transition-colors"
         >
-          <span className="hidden sm:inline">Sign out</span>
-          <svg className="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-medium text-neutral-900 dark:text-[#E6EDF3]">{user?.name}</p>
+            <p className="text-xs text-neutral-500 dark:text-[#8B949E] capitalize">{user?.role}</p>
+          </div>
+          <Avatar
+            src={profilePictureUrl}
+            name={user?.name}
+            size="sm"
+          />
+          <svg
+            className={`w-4 h-4 text-neutral-500 dark:text-[#8B949E] transition-transform hidden sm:block ${dropdownOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
+
+        {/* Dropdown menu */}
+        {dropdownOpen && (
+          <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#161B22] rounded-xl border border-neutral-200 dark:border-[#30363D] shadow-lg py-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            {/* User info (mobile) */}
+            <div className="px-4 py-3 border-b border-neutral-100 dark:border-[#30363D] sm:hidden">
+              <p className="text-sm font-medium text-neutral-900 dark:text-[#E6EDF3]">{user?.name}</p>
+              <p className="text-xs text-neutral-500 dark:text-[#8B949E]">{user?.email}</p>
+            </div>
+
+            {/* Menu items */}
+            <div className="py-1">
+              <Link
+                to="/settings"
+                onClick={() => setDropdownOpen(false)}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-700 dark:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Settings
+              </Link>
+            </div>
+
+            <div className="border-t border-neutral-100 dark:border-[#30363D] pt-1">
+              <button
+                onClick={() => {
+                  setDropdownOpen(false);
+                  logout();
+                }}
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

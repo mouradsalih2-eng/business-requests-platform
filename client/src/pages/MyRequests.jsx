@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { RequestList } from '../components/requests/RequestList';
 import { RequestDetail } from '../components/requests/RequestDetail';
@@ -14,6 +14,7 @@ import { requests as requestsApi } from '../lib/api';
  */
 
 export function MyRequests() {
+  const navigate = useNavigate();
   const [requestsList, setRequestsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -92,8 +93,18 @@ export function MyRequests() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900">My Requests</h1>
-            <p className="text-neutral-500 mt-1">Track your submitted requests</p>
+            {/* Back button - mobile only */}
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="sm:hidden flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 mb-2 -ml-1 p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Dashboard
+            </button>
+            <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-neutral-100">My Requests</h1>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Track your submitted requests</p>
           </div>
           <Link to="/new-request">
             <Button>New Request</Button>
@@ -117,8 +128,8 @@ export function MyRequests() {
             className={`
               px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
               ${statusFilter === ''
-                ? 'bg-neutral-900 text-white'
-                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
+                : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
               }
             `}
           >
@@ -134,8 +145,8 @@ export function MyRequests() {
                 className={`
                   px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
                   ${statusFilter === key
-                    ? 'bg-neutral-900 text-white'
-                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                    ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
+                    : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
                   }
                 `}
               >

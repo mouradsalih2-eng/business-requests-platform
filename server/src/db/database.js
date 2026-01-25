@@ -62,6 +62,58 @@ function runMigrations() {
     `);
   }
 
+  // Add profile_picture column to users if not exists
+  if (!columnExists('users', 'profile_picture')) {
+    console.log('Adding profile_picture column to users table...');
+    db.run("ALTER TABLE users ADD COLUMN profile_picture TEXT");
+  }
+
+  // Add theme_preference column to users if not exists
+  if (!columnExists('users', 'theme_preference')) {
+    console.log('Adding theme_preference column to users table...');
+    db.run("ALTER TABLE users ADD COLUMN theme_preference TEXT DEFAULT 'light'");
+  }
+
+  // Create verification_codes table if not exists
+  if (!tableExists('verification_codes')) {
+    console.log('Creating verification_codes table...');
+    db.run(`
+      CREATE TABLE IF NOT EXISTS verification_codes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        code TEXT NOT NULL,
+        type TEXT CHECK(type IN ('registration', 'password_change')),
+        expires_at DATETIME NOT NULL,
+        pending_data TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.run('CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email)');
+  }
+
+  // Add pending_data column to verification_codes if not exists
+  if (tableExists('verification_codes') && !columnExists('verification_codes', 'pending_data')) {
+    console.log('Adding pending_data column to verification_codes table...');
+    db.run("ALTER TABLE verification_codes ADD COLUMN pending_data TEXT");
+  }
+
+  // Create pending_registrations table if not exists
+  if (!tableExists('pending_registrations')) {
+    console.log('Creating pending_registrations table...');
+    db.run(`
+      CREATE TABLE IF NOT EXISTS pending_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        name TEXT NOT NULL,
+        verification_code TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.run('CREATE INDEX IF NOT EXISTS idx_pending_registrations_email ON pending_registrations(email)');
+  }
+
   // Add team column if not exists
   if (!columnExists('requests', 'team')) {
     console.log('Adding team column to requests table...');

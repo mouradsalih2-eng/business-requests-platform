@@ -7,10 +7,10 @@ const ToastContext = createContext(null);
  */
 function ToastItem({ toast, onRemove }) {
   const bgColor = {
-    success: 'bg-green-600',
-    error: 'bg-red-600',
-    info: 'bg-neutral-800',
-  }[toast.type] || 'bg-neutral-800';
+    success: 'bg-green-600 dark:bg-green-500',
+    error: 'bg-red-600 dark:bg-red-500',
+    info: 'bg-neutral-800 dark:bg-[#2D333B]',
+  }[toast.type] || 'bg-neutral-800 dark:bg-[#2D333B]';
 
   return (
     <div
@@ -18,6 +18,7 @@ function ToastItem({ toast, onRemove }) {
         ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg
         flex items-center gap-3 min-w-[280px] max-w-md
         animate-in slide-in-from-bottom-2 fade-in duration-200
+        dark:border dark:border-[#484F58]
       `}
     >
       {/* Icon */}
