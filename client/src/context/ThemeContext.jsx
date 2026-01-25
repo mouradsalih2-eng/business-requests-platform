@@ -52,10 +52,11 @@ export function ThemeProvider({ children }) {
       const token = localStorage.getItem('token');
       if (token) {
         await users.updateSettings({ theme_preference: newTheme });
+        console.log('Theme preference synced to server:', newTheme);
       }
     } catch (error) {
-      // Ignore server sync errors - local storage is the source of truth for theme
-      console.warn('Failed to sync theme preference:', error);
+      // Log server sync errors but don't block UI - localStorage is source of truth
+      console.error('Failed to sync theme preference to server:', error);
     }
   };
 

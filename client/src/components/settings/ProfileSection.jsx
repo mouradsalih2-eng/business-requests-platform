@@ -32,12 +32,15 @@ export default function ProfileSection({ user, onUpdate }) {
     try {
       const formData = new FormData();
       formData.append('avatar', file);
+      console.log('Uploading profile picture...');
       const updatedUser = await users.uploadProfilePicture(formData);
+      console.log('Upload response:', updatedUser);
       onUpdate(updatedUser);
       // Also update the global auth context so header updates immediately
       updateUser({ profile_picture: updatedUser.profile_picture });
       toast.success('Profile picture updated');
     } catch (error) {
+      console.error('Profile picture upload failed:', error);
       toast.error(error.message || 'Failed to upload image');
     } finally {
       setUploading(false);
