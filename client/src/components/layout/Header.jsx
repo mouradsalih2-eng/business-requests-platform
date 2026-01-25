@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../ui/Avatar';
 
@@ -7,6 +7,15 @@ export function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogoClick = (e) => {
+    if (location.pathname === '/dashboard') {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -39,8 +48,8 @@ export function Header({ onMenuClick }) {
           </svg>
         </button>
 
-        {/* Logo and app name - clickable to go home */}
-        <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+        {/* Logo and app name - clickable to go home, scrolls to top if already on dashboard */}
+        <Link to="/dashboard" onClick={handleLogoClick} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <div className="w-7 h-7 bg-[#4F46E5] dark:bg-[#6366F1] rounded-lg flex items-center justify-center">
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
