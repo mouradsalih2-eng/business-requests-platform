@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const sizeClasses = {
   xs: 'w-6 h-6 text-xs',
@@ -17,6 +17,11 @@ export default function Avatar({
   onClick,
 }) {
   const [imageError, setImageError] = useState(false);
+
+  // Reset error state when src changes (e.g., new image uploaded)
+  useEffect(() => {
+    setImageError(false);
+  }, [src]);
 
   const getInitials = (name) => {
     if (!name) return '?';
