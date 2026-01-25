@@ -187,7 +187,9 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="flex items-center gap-2 flex-wrap">
           <CategoryBadge category={category} />
-          <PriorityBadge priority={priority} />
+          <span className="hidden sm:inline-flex">
+            <PriorityBadge priority={priority} />
+          </span>
           {team && <TeamBadge team={team} />}
           {region && <RegionBadge region={region} />}
         </div>
