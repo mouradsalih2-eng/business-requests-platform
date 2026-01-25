@@ -305,6 +305,107 @@ describe('Requests API', () => {
       // Verify status update was called
       expect(mockDb.run).toHaveBeenCalled();
     });
+
+    it('allows admin to set status to backlog', async () => {
+      const mockRequest = { id: 1, user_id: 999, title: 'Request', status: 'pending' };
+
+      mockDb.get
+        .mockReturnValueOnce(mockRequest)
+        .mockReturnValueOnce({ ...mockRequest, status: 'backlog' });
+
+      mockDb.run.mockReturnValue({ changes: 1 });
+
+      const response = await request(app)
+        .patch('/api/requests/1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'backlog' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('allows admin to set status to completed', async () => {
+      const mockRequest = { id: 1, user_id: 999, title: 'Request', status: 'pending' };
+
+      mockDb.get
+        .mockReturnValueOnce(mockRequest)
+        .mockReturnValueOnce({ ...mockRequest, status: 'completed' });
+
+      mockDb.run.mockReturnValue({ changes: 1 });
+
+      const response = await request(app)
+        .patch('/api/requests/1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'completed' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('allows admin to set status to rejected', async () => {
+      const mockRequest = { id: 1, user_id: 999, title: 'Request', status: 'pending' };
+
+      mockDb.get
+        .mockReturnValueOnce(mockRequest)
+        .mockReturnValueOnce({ ...mockRequest, status: 'rejected' });
+
+      mockDb.run.mockReturnValue({ changes: 1 });
+
+      const response = await request(app)
+        .patch('/api/requests/1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'rejected' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('allows admin to set status to duplicate', async () => {
+      const mockRequest = { id: 1, user_id: 999, title: 'Request', status: 'pending' };
+
+      mockDb.get
+        .mockReturnValueOnce(mockRequest)
+        .mockReturnValueOnce({ ...mockRequest, status: 'duplicate' });
+
+      mockDb.run.mockReturnValue({ changes: 1 });
+
+      const response = await request(app)
+        .patch('/api/requests/1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'duplicate' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('allows admin to set status to archived', async () => {
+      const mockRequest = { id: 1, user_id: 999, title: 'Request', status: 'completed' };
+
+      mockDb.get
+        .mockReturnValueOnce(mockRequest)
+        .mockReturnValueOnce({ ...mockRequest, status: 'archived' });
+
+      mockDb.run.mockReturnValue({ changes: 1 });
+
+      const response = await request(app)
+        .patch('/api/requests/1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'archived' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('does not update status if same as current', async () => {
+      const mockRequest = { id: 1, user_id: 999, title: 'Request', status: 'pending' };
+
+      mockDb.get
+        .mockReturnValueOnce(mockRequest)
+        .mockReturnValueOnce(mockRequest);
+
+      const response = await request(app)
+        .patch('/api/requests/1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'pending' });
+
+      expect(response.status).toBe(200);
+      // db.run should not be called for status update when status is the same
+    });
   });
 
   describe('DELETE /api/requests/:id', () => {

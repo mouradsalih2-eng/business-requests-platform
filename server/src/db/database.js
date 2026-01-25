@@ -144,6 +144,67 @@ function runMigrations() {
     }
   }
 
+  // Migration: Add 'archived' to status CHECK constraint
+  // SQLite doesn't allow altering CHECK constraints, so we need to recreate the table
+  // Check if migration is needed by trying to update a status to 'archived'
+  try {
+    // First check if there's any row we can test with, or just check the schema
+    const schemaInfo = db.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name='requests'");
+    if (schemaInfo.length > 0 && schemaInfo[0].values.length > 0) {
+      const createStatement = schemaInfo[0].values[0][0];
+      // Check if 'archived' is NOT in the constraint
+      if (createStatement && !createStatement.includes("'archived'")) {
+        console.log('Migrating requests table to add archived status...');
+
+        // Create new table with correct constraint
+        db.run(`
+          CREATE TABLE requests_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL CHECK(category IN ('bug', 'new_feature', 'optimization')),
+            priority TEXT NOT NULL CHECK(priority IN ('low', 'medium', 'high')),
+            status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'backlog', 'in_progress', 'completed', 'rejected', 'duplicate', 'archived')),
+            team TEXT DEFAULT 'Manufacturing' CHECK(team IN ('Manufacturing', 'Sales', 'Service', 'Energy')),
+            region TEXT DEFAULT 'Global' CHECK(region IN ('EMEA', 'North America', 'APAC', 'Global')),
+            business_problem TEXT,
+            problem_size TEXT,
+            business_expectations TEXT,
+            expected_impact TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          )
+        `);
+
+        // Copy data from old table
+        db.run(`
+          INSERT INTO requests_new
+          SELECT id, user_id, title, category, priority, status, team, region,
+                 business_problem, problem_size, business_expectations, expected_impact,
+                 created_at, updated_at
+          FROM requests
+        `);
+
+        // Drop old table
+        db.run('DROP TABLE requests');
+
+        // Rename new table
+        db.run('ALTER TABLE requests_new RENAME TO requests');
+
+        // Recreate indexes
+        db.run('CREATE INDEX IF NOT EXISTS idx_requests_user_id ON requests(user_id)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_requests_category ON requests(category)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at)');
+
+        console.log('Requests table migration completed.');
+      }
+    }
+  } catch (err) {
+    console.error('Error checking/migrating requests table:', err);
+  }
+
   // Create activity_log table if not exists
   db.run(`
     CREATE TABLE IF NOT EXISTS activity_log (

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS requests (
   title TEXT NOT NULL,
   category TEXT NOT NULL CHECK(category IN ('bug', 'new_feature', 'optimization')),
   priority TEXT NOT NULL CHECK(priority IN ('low', 'medium', 'high')),
-  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'backlog', 'in_progress', 'completed', 'rejected', 'duplicate')),
+  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'backlog', 'in_progress', 'completed', 'rejected', 'duplicate', 'archived')),
   team TEXT DEFAULT 'Manufacturing' CHECK(team IN ('Manufacturing', 'Sales', 'Service', 'Energy')),
   region TEXT DEFAULT 'Global' CHECK(region IN ('EMEA', 'North America', 'APAC', 'Global')),
   business_problem TEXT,
