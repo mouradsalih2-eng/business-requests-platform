@@ -62,7 +62,7 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
 
   if (!request) return null;
 
-  // Handle status change - update and redirect for admin
+  // Handle status change - update without navigation (let parent handle any transitions)
   const handleStatusChange = async (e) => {
     const newStatus = e.target.value;
     setStatus(newStatus);
@@ -72,9 +72,11 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
       await requestsApi.update(request.id, { status: newStatus });
       onStatusUpdate?.(request.id, newStatus);
 
-      // Close modal and redirect to dashboard
-      onClose();
-      navigate('/dashboard');
+      // Only close modal for archived status (parent will handle the exit animation)
+      // For other statuses, keep the modal open so user can see the update
+      if (newStatus === 'archived') {
+        onClose();
+      }
     } catch (err) {
       console.error('Failed to update status:', err);
       setStatus(request.status); // Revert on error

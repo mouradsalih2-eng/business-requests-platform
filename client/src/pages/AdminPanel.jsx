@@ -337,6 +337,9 @@ export function AdminPanel() {
   const [seeding, setSeeding] = useState(false);
   const [seedResult, setSeedResult] = useState(null);
 
+  // Archive animation state
+  const [archivingIds, setArchivingIds] = useState(new Set());
+
   useEffect(() => {
     if (activeTab === 'requests') {
       loadRequests();
@@ -419,11 +422,28 @@ export function AdminPanel() {
   };
 
   const handleStatusUpdate = (requestId, newStatus) => {
-    setRequestsList((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
-    );
-    if (selectedRequest?.id === requestId) {
-      setSelectedRequest((prev) => ({ ...prev, status: newStatus }));
+    // If archiving and not filtering by archived status, animate out then remove
+    if (newStatus === 'archived' && filters.status !== 'archived') {
+      // Start exit animation
+      setArchivingIds((prev) => new Set([...prev, requestId]));
+      // Close the modal
+      setSelectedRequest(null);
+      // Remove from list after animation completes
+      setTimeout(() => {
+        setRequestsList((prev) => prev.filter((r) => r.id !== requestId));
+        setArchivingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(requestId);
+          return next;
+        });
+      }, 300);
+    } else {
+      setRequestsList((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
+      );
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest((prev) => ({ ...prev, status: newStatus }));
+      }
     }
   };
 
@@ -512,20 +532,21 @@ export function AdminPanel() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          {/* Back button - mobile only */}
+        {/* Header with back button */}
+        <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate('/dashboard')}
-            className="sm:hidden flex items-center gap-1 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 mb-2 -ml-1 p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            onClick={() => navigate(-1)}
+            className="p-2 -ml-2 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+            aria-label="Go back"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            Dashboard
           </button>
-          <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-neutral-100">Admin Panel</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage requests and users</p>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-neutral-100">Admin Panel</h1>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Manage requests and users</p>
+          </div>
         </div>
 
         {/* Stats Grid - 2 cols mobile, 4 cols desktop */}
@@ -638,6 +659,7 @@ export function AdminPanel() {
                 requests={requestsList}
                 onRequestClick={handleRequestClick}
                 onVoteChange={handleVoteChange}
+                exitingIds={archivingIds}
                 emptyMessage="No requests found"
                 showUnreadBadge={true}
               />

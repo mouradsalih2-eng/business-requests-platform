@@ -55,6 +55,9 @@ export function Dashboard() {
   const [positionChanges, setPositionChanges] = useState({});
   const previousOrderRef = useRef([]);
 
+  // Track items being archived for exit animation
+  const [archivingIds, setArchivingIds] = useState(new Set());
+
   // Check if any filters are active (excluding search which is separate)
   const hasActiveFilters = filters.status || filters.category;
   const activeFilterCount = [filters.status, filters.category].filter(Boolean).length;
@@ -181,11 +184,30 @@ export function Dashboard() {
   };
 
   const handleStatusUpdate = (requestId, newStatus) => {
-    setRequestsList((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
-    );
-    if (selectedRequest?.id === requestId) {
-      setSelectedRequest((prev) => ({ ...prev, status: newStatus }));
+    // If archiving, animate out then remove from list
+    if (newStatus === 'archived') {
+      // Start exit animation
+      setArchivingIds((prev) => new Set([...prev, requestId]));
+
+      // Close the modal
+      setSelectedRequest(null);
+
+      // Remove from list after animation completes
+      setTimeout(() => {
+        setRequestsList((prev) => prev.filter((r) => r.id !== requestId));
+        setArchivingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(requestId);
+          return next;
+        });
+      }, 300); // Match animation duration
+    } else {
+      setRequestsList((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
+      );
+      if (selectedRequest?.id === requestId) {
+        setSelectedRequest((prev) => ({ ...prev, status: newStatus }));
+      }
     }
   };
 
@@ -279,6 +301,7 @@ export function Dashboard() {
             onRequestClick={handleRequestClick}
             onVoteChange={handleVoteChange}
             positionChanges={positionChanges}
+            exitingIds={archivingIds}
             emptyMessage="No requests found"
           />
         )}

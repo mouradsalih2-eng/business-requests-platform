@@ -3,11 +3,13 @@ import { Button } from '../ui/Button';
 import Avatar from '../ui/Avatar';
 import { users } from '../../lib/api';
 import { useToast } from '../ui/Toast';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ProfileSection({ user, onUpdate }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const toast = useToast();
+  const { updateUser } = useAuth();
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
@@ -32,6 +34,8 @@ export default function ProfileSection({ user, onUpdate }) {
       formData.append('avatar', file);
       const updatedUser = await users.uploadProfilePicture(formData);
       onUpdate(updatedUser);
+      // Also update the global auth context so header updates immediately
+      updateUser({ profile_picture: updatedUser.profile_picture });
       toast.success('Profile picture updated');
     } catch (error) {
       toast.error(error.message || 'Failed to upload image');
@@ -51,6 +55,8 @@ export default function ProfileSection({ user, onUpdate }) {
     try {
       await users.deleteProfilePicture();
       onUpdate({ ...user, profile_picture: null });
+      // Also update the global auth context so header updates immediately
+      updateUser({ profile_picture: null });
       toast.success('Profile picture removed');
     } catch (error) {
       toast.error(error.message || 'Failed to remove image');

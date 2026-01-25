@@ -3,12 +3,14 @@ import { RequestCard } from './RequestCard';
 /**
  * RequestList - Displays a grid of request cards with position change animations
  * Supports real-time vote updates via onVoteChange callback
+ * Supports exit animations for archived/deleted items via exitingIds
  */
 export function RequestList({
   requests,
   onRequestClick,
   onVoteChange,
   positionChanges = {},
+  exitingIds = new Set(),
   emptyMessage = 'No requests found',
   showUnreadBadge = false
 }) {
@@ -28,20 +30,26 @@ export function RequestList({
 
   return (
     <div className="grid gap-4">
-      {requests.map((request) => (
-        <div
-          key={request.id}
-          className="relative transition-all duration-500 ease-out"
-        >
-          <RequestCard
-            request={request}
-            onClick={() => onRequestClick(request)}
-            onVoteChange={onVoteChange}
-            positionChange={positionChanges[request.id]}
-            showUnreadBadge={showUnreadBadge}
-          />
-        </div>
-      ))}
+      {requests.map((request) => {
+        const isExiting = exitingIds.has(request.id);
+        return (
+          <div
+            key={request.id}
+            className={`
+              relative transition-all duration-300 ease-out
+              ${isExiting ? 'opacity-0 scale-95 -translate-x-4' : 'opacity-100 scale-100 translate-x-0'}
+            `}
+          >
+            <RequestCard
+              request={request}
+              onClick={() => onRequestClick(request)}
+              onVoteChange={onVoteChange}
+              positionChange={positionChanges[request.id]}
+              showUnreadBadge={showUnreadBadge}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

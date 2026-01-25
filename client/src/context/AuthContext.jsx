@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { auth as authApi } from '../lib/api';
 
 const AuthContext = createContext(null);
@@ -40,10 +40,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // Update user data (e.g., after profile picture change)
+  const updateUser = useCallback((updates) => {
+    setUser((prev) => prev ? { ...prev, ...updates } : null);
+  }, []);
+
   const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
