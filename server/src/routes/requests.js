@@ -593,6 +593,101 @@ router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+// Merge request into another (admin only) - marks source as duplicate
+router.post('/:id/merge', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const sourceId = parseInt(req.params.id, 10);
+    const { target_id, merge_votes = true, merge_comments = false } = req.body;
+
+    if (!target_id) {
+      return res.status(400).json({ error: 'Target request ID is required' });
+    }
+
+    const targetId = parseInt(target_id, 10);
+
+    if (sourceId === targetId) {
+      return res.status(400).json({ error: 'Cannot merge request into itself' });
+    }
+
+    // Check source request exists
+    const sourceRequest = db.get('SELECT * FROM requests WHERE id = ?', [sourceId]);
+    if (!sourceRequest) {
+      return res.status(404).json({ error: 'Source request not found' });
+    }
+
+    // Check target request exists
+    const targetRequest = db.get('SELECT * FROM requests WHERE id = ?', [targetId]);
+    if (!targetRequest) {
+      return res.status(404).json({ error: 'Target request not found' });
+    }
+
+    // Check source isn't already merged
+    if (sourceRequest.merged_into_id) {
+      return res.status(400).json({ error: 'Source request is already merged' });
+    }
+
+    // Transfer votes if requested
+    if (merge_votes) {
+      // Get votes from source that don't already exist on target
+      const sourceVotes = db.all('SELECT user_id, type FROM votes WHERE request_id = ?', [sourceId]);
+
+      for (const vote of sourceVotes) {
+        // Check if this user already voted on target
+        const existingVote = db.get(
+          'SELECT id FROM votes WHERE request_id = ? AND user_id = ? AND type = ?',
+          [targetId, vote.user_id, vote.type]
+        );
+
+        if (!existingVote) {
+          // Transfer the vote
+          db.run(
+            'INSERT INTO votes (request_id, user_id, type) VALUES (?, ?, ?)',
+            [targetId, vote.user_id, vote.type]
+          );
+        }
+      }
+
+      // Delete source votes
+      db.run('DELETE FROM votes WHERE request_id = ?', [sourceId]);
+    }
+
+    // Transfer comments if requested
+    if (merge_comments) {
+      db.run('UPDATE comments SET request_id = ? WHERE request_id = ?', [targetId, sourceId]);
+    }
+
+    // Mark source as duplicate and set merged_into_id
+    db.run(
+      'UPDATE requests SET status = ?, merged_into_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      ['duplicate', targetId, sourceId]
+    );
+
+    // Log the merge activity
+    db.run(
+      'INSERT INTO activity_log (request_id, user_id, action, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
+      [sourceId, req.user.id, 'merge', sourceRequest.status, `Merged into #${targetId}`]
+    );
+
+    // Also log on target
+    db.run(
+      'INSERT INTO activity_log (request_id, user_id, action, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
+      [targetId, req.user.id, 'merge_received', null, `Merged from #${sourceId}`]
+    );
+
+    const updatedSource = db.get('SELECT * FROM requests WHERE id = ?', [sourceId]);
+    res.json({
+      message: 'Request merged successfully',
+      source: updatedSource,
+      target_id: targetId,
+      votes_transferred: merge_votes,
+      comments_transferred: merge_comments
+    });
+  } catch (err) {
+    console.error('Merge request error:', err);
+    res.status(500).json({ error: 'Failed to merge request' });
+  }
+});
+
 // Mark request as read (admin only)
 router.post('/:id/read', authenticateToken, requireAdmin, (req, res) => {
   try {

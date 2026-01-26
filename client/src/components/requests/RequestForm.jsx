@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Input, Textarea } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
 import { Card, CardBody } from '../ui/Card';
+import { StatusBadge } from '../ui/Badge';
+import { requests as requestsApi } from '../../lib/api';
+import { debounce } from '../../lib/utils';
 
 const categoryOptions = [
   { value: 'bug', label: 'Bug' },
@@ -31,6 +35,7 @@ const regionOptions = [
 ];
 
 export function RequestForm({ onSubmit, loading = false }) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -45,12 +50,69 @@ export function RequestForm({ onSubmit, loading = false }) {
   const [files, setFiles] = useState([]);
   const [errors, setErrors] = useState({});
 
+  // Duplicate detection state
+  const [similarRequests, setSimilarRequests] = useState([]);
+  const [searchingDuplicates, setSearchingDuplicates] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const titleInputRef = useRef(null);
+
+  // Debounced search for similar requests
+  const searchSimilar = useCallback(
+    debounce(async (title) => {
+      if (title.length < 5) {
+        setSimilarRequests([]);
+        return;
+      }
+
+      setSearchingDuplicates(true);
+      try {
+        const results = await requestsApi.search(title, 5);
+        setSimilarRequests(results);
+        setShowSuggestions(results.length > 0);
+      } catch (err) {
+        console.error('Failed to search similar requests:', err);
+        setSimilarRequests([]);
+      } finally {
+        setSearchingDuplicates(false);
+      }
+    }, 500),
+    []
+  );
+
+  // Search when title changes
+  useEffect(() => {
+    if (formData.title.length >= 5) {
+      searchSimilar(formData.title);
+    } else {
+      setSimilarRequests([]);
+      setShowSuggestions(false);
+    }
+  }, [formData.title, searchSimilar]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
+  };
+
+  const handleTitleFocus = () => {
+    if (similarRequests.length > 0) {
+      setShowSuggestions(true);
+    }
+  };
+
+  const handleTitleBlur = () => {
+    // Delay to allow click on suggestion
+    setTimeout(() => {
+      setShowSuggestions(false);
+    }, 200);
+  };
+
+  const handleSuggestionClick = (request) => {
+    setShowSuggestions(false);
+    navigate(`/requests/${request.id}`);
   };
 
   const handleFileChange = (e) => {
@@ -89,14 +151,63 @@ export function RequestForm({ onSubmit, loading = false }) {
     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
       <Card>
         <CardBody className="space-y-4">
-          <Input
-            label="Title"
-            name="title"
-            value={formData.title}
-            onChange={handleChange}
-            placeholder="Brief summary of your request"
-            error={errors.title}
-          />
+          {/* Title with duplicate detection */}
+          <div className="relative">
+            <Input
+              ref={titleInputRef}
+              label="Title"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              onFocus={handleTitleFocus}
+              onBlur={handleTitleBlur}
+              placeholder="Brief summary of your request"
+              error={errors.title}
+            />
+
+            {/* Similar requests dropdown */}
+            {showSuggestions && similarRequests.length > 0 && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg overflow-hidden">
+                <div className="px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 border-b border-neutral-200 dark:border-neutral-700">
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">
+                    Similar requests found - click to view instead of creating duplicate
+                  </p>
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {similarRequests.map((request) => (
+                    <button
+                      key={request.id}
+                      type="button"
+                      onClick={() => handleSuggestionClick(request)}
+                      className="w-full px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors border-b border-neutral-100 dark:border-neutral-700 last:border-b-0"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                            {request.title}
+                          </p>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                            by {request.author_name}
+                          </p>
+                        </div>
+                        <StatusBadge status={request.status} size="sm" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Loading indicator */}
+            {searchingDuplicates && formData.title.length >= 5 && (
+              <div className="absolute right-3 top-8 text-neutral-400">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            )}
+          </div>
 
           {/* Stack on mobile, side by side on desktop */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

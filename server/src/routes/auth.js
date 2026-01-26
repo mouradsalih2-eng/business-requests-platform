@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import db from '../db/database.js';
 import { authenticateToken, JWT_SECRET } from '../middleware/auth.js';
-import { sendVerificationEmail, generateVerificationCode, getCodeExpiration } from '../services/email.js';
+import { sendVerificationEmail, sendPasswordResetEmail, generateVerificationCode, getCodeExpiration } from '../services/email.js';
+import { validateBody } from '../middleware/validate.js';
+import { forgotPasswordSchema, resetPasswordSchema } from '../validation/schemas.js';
 
 const router = Router();
 
@@ -295,6 +298,82 @@ router.get('/me', authenticateToken, (req, res) => {
   } catch (err) {
     console.error('Get user error:', err);
     res.status(500).json({ error: 'Failed to get user' });
+  }
+});
+
+// Forgot password - request reset email
+router.post('/forgot-password', validateBody(forgotPasswordSchema), async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Find user by email
+    const user = db.get('SELECT id, email, name FROM users WHERE email = ?', [email]);
+
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
+    }
+
+    // Generate a secure token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+
+    // Delete any existing tokens for this user
+    db.run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+
+    // Store the token
+    db.run(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
+      [user.id, token, expiresAt]
+    );
+
+    // Send password reset email
+    await sendPasswordResetEmail(email, token, user.name);
+
+    res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+// Reset password - set new password with token
+router.post('/reset-password', validateBody(resetPasswordSchema), async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    // Find the token
+    const resetToken = db.get(
+      'SELECT * FROM password_reset_tokens WHERE token = ?',
+      [token]
+    );
+
+    if (!resetToken) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    // Check if token has expired
+    if (new Date(resetToken.expires_at) < new Date()) {
+      db.run('DELETE FROM password_reset_tokens WHERE id = ?', [resetToken.id]);
+      return res.status(400).json({ error: 'Reset token has expired. Please request a new one.' });
+    }
+
+    // Hash the new password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Update user's password
+    db.run('UPDATE users SET password = ? WHERE id = ?', [passwordHash, resetToken.user_id]);
+
+    // Delete the used token
+    db.run('DELETE FROM password_reset_tokens WHERE id = ?', [resetToken.id]);
+
+    // Also delete all tokens for this user (invalidate all reset attempts)
+    db.run('DELETE FROM password_reset_tokens WHERE user_id = ?', [resetToken.user_id]);
+
+    res.json({ message: 'Password reset successfully. You can now log in with your new password.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

@@ -220,6 +220,64 @@ function runMigrations() {
     )
   `);
 
+  // Create password_reset_tokens table if not exists
+  if (!tableExists('password_reset_tokens')) {
+    console.log('Creating password_reset_tokens table...');
+    db.run(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    db.run('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id)');
+  }
+
+  // Create roadmap_items table if not exists
+  if (!tableExists('roadmap_items')) {
+    console.log('Creating roadmap_items table...');
+    db.run(`
+      CREATE TABLE IF NOT EXISTS roadmap_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_id INTEGER,
+        title TEXT NOT NULL,
+        description TEXT,
+        category TEXT,
+        priority TEXT,
+        team TEXT,
+        region TEXT,
+        column_status TEXT NOT NULL DEFAULT 'backlog'
+          CHECK(column_status IN ('backlog', 'discovery', 'in_progress', 'released')),
+        position INTEGER DEFAULT 0,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE SET NULL,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    `);
+    db.run('CREATE INDEX IF NOT EXISTS idx_roadmap_items_column ON roadmap_items(column_status)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_roadmap_items_request ON roadmap_items(request_id)');
+  }
+
+  // Add merged_into_id column to requests if not exists
+  if (!columnExists('requests', 'merged_into_id')) {
+    console.log('Adding merged_into_id column to requests table...');
+    db.run("ALTER TABLE requests ADD COLUMN merged_into_id INTEGER REFERENCES requests(id)");
+  }
+
+  // Add is_discovery column to roadmap_items if not exists
+  if (tableExists('roadmap_items') && !columnExists('roadmap_items', 'is_discovery')) {
+    console.log('Adding is_discovery column to roadmap_items table...');
+    db.run("ALTER TABLE roadmap_items ADD COLUMN is_discovery INTEGER DEFAULT 0");
+    // Migrate existing discovery items
+    db.run("UPDATE roadmap_items SET is_discovery = 1, column_status = 'backlog' WHERE column_status = 'discovery'");
+  }
+
   // Create admin_read_requests table if not exists
   if (!tableExists('admin_read_requests')) {
     console.log('Creating admin_read_requests table...');

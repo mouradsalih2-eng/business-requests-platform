@@ -22,7 +22,7 @@ export function Layout({ children }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-[#010409]">
+    <div className="h-screen flex flex-col bg-neutral-50 dark:bg-[#010409] overflow-hidden">
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
 
       {/* Mobile overlay */}
@@ -33,9 +33,9 @@ export function Layout({ children }) {
         />
       )}
 
-      <div className="flex">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 p-4 lg:p-6 w-full min-w-0">
+        <main className="flex-1 p-4 lg:p-6 min-w-0 overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>

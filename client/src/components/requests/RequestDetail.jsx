@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { StatusBadge, CategoryBadge, PriorityBadge, TeamBadge, RegionBadge } from '../ui/Badge';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 import { VoteButtons } from '../social/VoteButtons';
 import { CommentSection } from '../social/CommentSection';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../ui/Toast';
 import { requests as requestsApi } from '../../lib/api';
 
 /**
@@ -28,12 +30,22 @@ const statusOptions = [
 export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDelete }) {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [status, setStatus] = useState(request?.status || '');
   const [updating, setUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activityLog, setActivityLog] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+
+  // Merge state
+  const [showMergeUI, setShowMergeUI] = useState(false);
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeSearchResults, setMergeSearchResults] = useState([]);
+  const [selectedMergeTarget, setSelectedMergeTarget] = useState(null);
+  const [mergeOptions, setMergeOptions] = useState({ mergeVotes: true, mergeComments: false });
+  const [merging, setMerging] = useState(false);
+  const [searchingMerge, setSearchingMerge] = useState(false);
 
   // Sync status when request changes
   useEffect(() => {
@@ -53,12 +65,40 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
     }
   }, [request, isOpen]);
 
-  // Reset delete confirm when modal closes
+  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setShowDeleteConfirm(false);
+      setShowMergeUI(false);
+      setMergeSearch('');
+      setMergeSearchResults([]);
+      setSelectedMergeTarget(null);
+      setMergeOptions({ mergeVotes: true, mergeComments: false });
     }
   }, [isOpen]);
+
+  // Search for merge targets
+  useEffect(() => {
+    if (!mergeSearch || mergeSearch.length < 2) {
+      setMergeSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearchingMerge(true);
+      try {
+        const results = await requestsApi.search(mergeSearch, 10);
+        // Filter out current request
+        setMergeSearchResults(results.filter(r => r.id !== request?.id));
+      } catch (err) {
+        console.error('Failed to search requests:', err);
+      } finally {
+        setSearchingMerge(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [mergeSearch, request?.id]);
 
   if (!request) return null;
 
@@ -66,11 +106,19 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
   const handleStatusChange = async (e) => {
     const newStatus = e.target.value;
     setStatus(newStatus);
+
+    // Show merge UI when changing to duplicate
+    if (newStatus === 'duplicate') {
+      setShowMergeUI(true);
+      return; // Don't update status yet - wait for merge
+    }
+
     setUpdating(true);
 
     try {
       await requestsApi.update(request.id, { status: newStatus });
       onStatusUpdate?.(request.id, newStatus);
+      toast.success('Status updated');
 
       // Only close modal for archived status (parent will handle the exit animation)
       // For other statuses, keep the modal open so user can see the update
@@ -79,10 +127,42 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
       }
     } catch (err) {
       console.error('Failed to update status:', err);
+      toast.error('Failed to update status');
       setStatus(request.status); // Revert on error
     } finally {
       setUpdating(false);
     }
+  };
+
+  // Handle merge
+  const handleMerge = async () => {
+    if (!selectedMergeTarget) {
+      toast.error('Please select a request to merge into');
+      return;
+    }
+
+    setMerging(true);
+    try {
+      await requestsApi.merge(request.id, selectedMergeTarget.id, mergeOptions);
+      toast.success(`Merged into request #${selectedMergeTarget.id}`);
+      onStatusUpdate?.(request.id, 'duplicate');
+      onClose();
+    } catch (err) {
+      console.error('Failed to merge:', err);
+      toast.error(err.message || 'Failed to merge request');
+      setStatus(request.status); // Revert status
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  // Cancel merge - revert status
+  const handleCancelMerge = () => {
+    setShowMergeUI(false);
+    setStatus(request.status);
+    setMergeSearch('');
+    setMergeSearchResults([]);
+    setSelectedMergeTarget(null);
   };
 
   // Handle delete request
@@ -150,6 +230,135 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
             initialUserVotes={request.userVotes || []}
           />
         </div>
+
+        {/* Merged Into Indicator */}
+        {request.merged_into_id && (
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+              </svg>
+              <span className="text-sm">
+                This request was merged into{' '}
+                <Link
+                  to={`/requests/${request.merged_into_id}`}
+                  className="font-medium underline hover:no-underline"
+                  onClick={onClose}
+                >
+                  Request #{request.merged_into_id}
+                </Link>
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Merge UI - shown when admin changes status to duplicate */}
+        {showMergeUI && isAdmin && (
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-4">
+            <div>
+              <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                Merge into another request
+              </h4>
+              <p className="text-xs text-blue-600 dark:text-blue-300 mb-3">
+                Search for the original request to merge this duplicate into.
+              </p>
+              <Input
+                placeholder="Search by title..."
+                value={mergeSearch}
+                onChange={(e) => setMergeSearch(e.target.value)}
+                className="mb-2"
+              />
+              {/* Search Results */}
+              {mergeSearchResults.length > 0 && (
+                <div className="max-h-40 overflow-y-auto border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-neutral-800">
+                  {mergeSearchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      onClick={() => {
+                        setSelectedMergeTarget(result);
+                        setMergeSearch('');
+                        setMergeSearchResults([]);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800 last:border-b-0"
+                    >
+                      <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                        #{result.id} - {result.title}
+                      </div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {result.author_name} • {result.status}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchingMerge && (
+                <p className="text-xs text-blue-600 dark:text-blue-300">Searching...</p>
+              )}
+            </div>
+
+            {/* Selected Target */}
+            {selectedMergeTarget && (
+              <div className="p-3 bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-700 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Merge into:</p>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                      #{selectedMergeTarget.id} - {selectedMergeTarget.title}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedMergeTarget(null)}
+                    className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Merge Options */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
+                <input
+                  type="checkbox"
+                  checked={mergeOptions.mergeVotes}
+                  onChange={(e) => setMergeOptions(prev => ({ ...prev, mergeVotes: e.target.checked }))}
+                  className="rounded border-blue-300 dark:border-blue-600 text-blue-600 focus:ring-blue-500"
+                />
+                Transfer votes to target request
+              </label>
+              <label className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
+                <input
+                  type="checkbox"
+                  checked={mergeOptions.mergeComments}
+                  onChange={(e) => setMergeOptions(prev => ({ ...prev, mergeComments: e.target.checked }))}
+                  className="rounded border-blue-300 dark:border-blue-600 text-blue-600 focus:ring-blue-500"
+                />
+                Transfer comments to target request
+              </label>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button
+                onClick={handleMerge}
+                disabled={!selectedMergeTarget || merging}
+                size="sm"
+              >
+                {merging ? 'Merging...' : 'Merge Request'}
+              </Button>
+              <Button
+                onClick={handleCancelMerge}
+                variant="secondary"
+                size="sm"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Business Context */}
         <div className="space-y-4">
@@ -248,6 +457,16 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
                           <span className="font-medium text-neutral-500 dark:text-neutral-400">{activity.old_value}</span>
                           {' '}to{' '}
                           <span className="font-medium text-neutral-900 dark:text-neutral-100">{activity.new_value}</span>
+                        </>
+                      )}
+                      {activity.action === 'merge' && (
+                        <>
+                          {' '}{activity.new_value}
+                        </>
+                      )}
+                      {activity.action === 'merge_received' && (
+                        <>
+                          {' '}{activity.new_value}
                         </>
                       )}
                     </p>

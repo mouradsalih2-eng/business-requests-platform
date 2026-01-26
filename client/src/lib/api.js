@@ -1,8 +1,25 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+
+let csrfToken = null;
 
 function getToken() {
   return localStorage.getItem('token');
 }
+
+async function fetchCsrfToken() {
+  try {
+    const response = await fetch(`${API_BASE}/csrf-token`);
+    if (response.ok) {
+      const data = await response.json();
+      csrfToken = data.csrfToken;
+    }
+  } catch (error) {
+    console.warn('Failed to fetch CSRF token:', error);
+  }
+}
+
+// Fetch CSRF token on load
+fetchCsrfToken();
 
 async function request(endpoint, options = {}) {
   const token = getToken();
@@ -18,6 +35,11 @@ async function request(endpoint, options = {}) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // Add CSRF token for state-changing requests
+  if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(options.method?.toUpperCase())) {
+    config.headers['X-CSRF-Token'] = csrfToken;
+  }
+
   // Don't set Content-Type for FormData (let browser set it with boundary)
   if (!(options.body instanceof FormData)) {
     config.headers['Content-Type'] = 'application/json';
@@ -27,6 +49,12 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
+
+    // Refresh CSRF token on 403
+    if (response.status === 403 && error.error?.includes('CSRF')) {
+      await fetchCsrfToken();
+    }
+
     throw new Error(error.error || 'Request failed');
   }
 
@@ -35,11 +63,15 @@ async function request(endpoint, options = {}) {
 
 // Auth
 export const auth = {
-  login: (email, password) =>
-    request('/auth/login', {
+  login: async (email, password) => {
+    const result = await request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
-    }),
+    });
+    // Refresh CSRF token after login
+    await fetchCsrfToken();
+    return result;
+  },
 
   register: (email, password, name) =>
     request('/auth/register', {
@@ -48,6 +80,22 @@ export const auth = {
     }),
 
   me: () => request('/auth/me'),
+
+  forgotPassword: (email) =>
+    request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token, password) =>
+    request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    }),
+
+  logout: () => {
+    csrfToken = null;
+  },
 };
 
 // Requests
@@ -88,6 +136,16 @@ export const requests = {
   delete: (id) =>
     request(`/requests/${id}`, {
       method: 'DELETE',
+    }),
+
+  merge: (id, targetId, options = {}) =>
+    request(`/requests/${id}/merge`, {
+      method: 'POST',
+      body: JSON.stringify({
+        target_id: targetId,
+        merge_votes: options.mergeVotes ?? true,
+        merge_comments: options.mergeComments ?? false,
+      }),
     }),
 };
 
@@ -212,3 +270,40 @@ export const registration = {
       body: JSON.stringify({ email }),
     }),
 };
+
+// Roadmap
+export const roadmap = {
+  getAll: () => request('/roadmap'),
+
+  create: (data) =>
+    request('/roadmap', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id, data) =>
+    request(`/roadmap/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  move: (id, column_status, position) =>
+    request(`/roadmap/${id}/move`, {
+      method: 'PATCH',
+      body: JSON.stringify({ column_status, position }),
+    }),
+
+  promote: (request_id, column_status, position) =>
+    request('/roadmap/promote', {
+      method: 'POST',
+      body: JSON.stringify({ request_id, column_status, position }),
+    }),
+
+  delete: (id) =>
+    request(`/roadmap/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Export CSRF refresh function for use after auth state changes
+export const refreshCsrfToken = fetchCsrfToken;

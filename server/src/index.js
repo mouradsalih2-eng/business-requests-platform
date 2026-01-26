@@ -12,6 +12,8 @@ import requestsRoutes from './routes/requests.js';
 import votesRoutes from './routes/votes.js';
 import commentsRoutes from './routes/comments.js';
 import usersRoutes from './routes/users.js';
+import roadmapRoutes from './routes/roadmap.js';
+import { csrfProvider, csrfProtection } from './middleware/csrf.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,6 +47,15 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Very strict rate limiting for password reset
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per 15 minutes
+  message: { error: 'Too many password reset attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // CORS configuration - restrict to known origins
 const allowedOrigins = [
   'http://localhost:5173',      // Vite dev server
@@ -70,6 +81,7 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  exposedHeaders: ['X-CSRF-Token'],
 }));
 
 // Apply general rate limiting to all requests
@@ -77,6 +89,9 @@ app.use(generalLimiter);
 
 // JSON parsing with size limit
 app.use(express.json({ limit: '1mb' }));
+
+// CSRF provider middleware
+app.use(csrfProvider);
 
 // Serve uploaded files
 app.use('/uploads', express.static(join(__dirname, '../uploads')));
@@ -97,6 +112,19 @@ if (process.env.NODE_ENV === 'production') {
 // Health check - Railway uses this to verify the app is running
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+app.get('/api/v1/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// CSRF token endpoint
+app.get('/api/csrf-token', (req, res) => {
+  const token = res.getCsrfToken();
+  res.json({ csrfToken: token });
+});
+app.get('/api/v1/csrf-token', (req, res) => {
+  const token = res.getCsrfToken();
+  res.json({ csrfToken: token });
 });
 
 // Root health check for Railway (responds before SPA fallback)
@@ -122,13 +150,42 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
-// Routes
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/requests', requestsRoutes);
-app.use('/api/requests', votesRoutes);
-app.use('/api/requests', commentsRoutes);
-app.use('/api/comments', commentsRoutes);
-app.use('/api/users', usersRoutes);
+// Create v1 router
+const v1Router = express.Router();
+
+// Apply CSRF protection to state-changing routes
+v1Router.use(csrfProtection);
+
+// Mount routes on v1 router
+v1Router.use('/auth', authLimiter, authRoutes);
+v1Router.use('/requests', requestsRoutes);
+v1Router.use('/requests', votesRoutes);
+v1Router.use('/requests', commentsRoutes);
+v1Router.use('/comments', commentsRoutes);
+v1Router.use('/users', usersRoutes);
+v1Router.use('/roadmap', roadmapRoutes);
+
+// Mount v1 router under /api/v1
+app.use('/api/v1', v1Router);
+
+// Backward compatibility: mount same routes under /api
+// Create separate router to avoid middleware duplication
+const legacyRouter = express.Router();
+legacyRouter.use(csrfProtection);
+legacyRouter.use('/auth', authLimiter, authRoutes);
+legacyRouter.use('/requests', requestsRoutes);
+legacyRouter.use('/requests', votesRoutes);
+legacyRouter.use('/requests', commentsRoutes);
+legacyRouter.use('/comments', commentsRoutes);
+legacyRouter.use('/users', usersRoutes);
+legacyRouter.use('/roadmap', roadmapRoutes);
+app.use('/api', legacyRouter);
+
+// Stricter rate limit for password reset endpoints specifically
+app.use('/api/v1/auth/forgot-password', passwordResetLimiter);
+app.use('/api/v1/auth/reset-password', passwordResetLimiter);
+app.use('/api/auth/forgot-password', passwordResetLimiter);
+app.use('/api/auth/reset-password', passwordResetLimiter);
 
 // Serve client app for all non-API routes in production (SPA fallback)
 if (process.env.NODE_ENV === 'production') {

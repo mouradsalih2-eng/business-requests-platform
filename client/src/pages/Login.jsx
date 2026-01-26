@@ -80,8 +80,18 @@ export function Login() {
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Password"
+              showPasswordToggle
               required
             />
+
+            <div className="flex justify-end">
+              <Link
+                to="/forgot-password"
+                className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
+              >
+                Forgot password?
+              </Link>
+            </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}

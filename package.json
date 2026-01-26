@@ -8,12 +8,16 @@
     "test": "npm run test:server && npm run test:client",
     "test:server": "cd server && npm test",
     "test:client": "cd client && npm test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
     "prepare": "husky"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.0",
     "husky": "^9.1.7"
   }
 }

@@ -183,9 +183,9 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
         </div>
       )}
 
-      {/* Header: Category, Priority, Team, Region, Status - responsive wrap */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* Header: Category, Priority, Team, Region, Status - responsive */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
           <CategoryBadge category={category} />
           <span className="hidden sm:inline-flex">
             <PriorityBadge priority={priority} />
@@ -193,7 +193,20 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
           {team && <TeamBadge team={team} />}
           {region && <RegionBadge region={region} />}
         </div>
-        <div className="sm:ml-auto">
+        {/* Status: dot on mobile, badge on desktop */}
+        <div className="sm:hidden flex-shrink-0" title={status?.replace('_', ' ')}>
+          <span className={`
+            w-2.5 h-2.5 rounded-full inline-block
+            ${status === 'pending' ? 'bg-neutral-400' : ''}
+            ${status === 'backlog' ? 'bg-neutral-500' : ''}
+            ${status === 'in_progress' ? 'bg-amber-500' : ''}
+            ${status === 'completed' ? 'bg-green-500' : ''}
+            ${status === 'rejected' ? 'bg-red-500' : ''}
+            ${status === 'duplicate' ? 'bg-neutral-400' : ''}
+            ${status === 'archived' ? 'bg-slate-400' : ''}
+          `} />
+        </div>
+        <div className="hidden sm:block">
           <StatusBadge status={status} />
         </div>
       </div>

@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Business Requests Platform - A full-stack web application for submitting, tracking, and managing business feature requests with voting, commenting, and admin approval workflows.
 
+**Requirements:** Node.js >= 18.0.0
+
 ## Commands
 
 ### Development
@@ -88,3 +90,5 @@ Uses SQL.js (SQLite compiled to WebAssembly) with file persistence at `server/da
 - Client tests use Vitest with jsdom and mock localStorage/fetch in `setupTests.js`
 - API base URL configurable via `VITE_API_URL` env var (defaults to `/api`)
 - Production build serves client static files from server with SPA fallback
+- Husky pre-commit hook runs `npm test` before every commit
+- Test credentials for development are in `TEST_USERS.md`

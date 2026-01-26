@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+
+// Wrapper component that provides Router context
+function TestWrapper({ children }) {
+  return (
+    <MemoryRouter>
+      {children}
+    </MemoryRouter>
+  );
+}
 
 // Mock the API module
 vi.mock('../lib/api', () => ({
@@ -9,6 +19,7 @@ vi.mock('../lib/api', () => ({
     login: vi.fn(),
     register: vi.fn(),
     me: vi.fn(),
+    logout: vi.fn(),
   },
 }));
 
@@ -45,9 +56,11 @@ describe('AuthContext', () => {
     authApi.me.mockReturnValue(new Promise(() => {})); // Never resolves
 
     render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
+      <TestWrapper>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </TestWrapper>
     );
 
     expect(screen.getByText('Loading...')).toBeInTheDocument();
@@ -57,9 +70,11 @@ describe('AuthContext', () => {
     localStorage.getItem.mockReturnValue(null);
 
     render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
+      <TestWrapper>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </TestWrapper>
     );
 
     await waitFor(() => {
@@ -72,9 +87,11 @@ describe('AuthContext', () => {
     authApi.me.mockResolvedValue({ id: 1, name: 'Test User', role: 'user' });
 
     render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
+      <TestWrapper>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </TestWrapper>
     );
 
     await waitFor(() => {
@@ -88,9 +105,11 @@ describe('AuthContext', () => {
     authApi.me.mockResolvedValue({ id: 1, name: 'Admin User', role: 'admin' });
 
     render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
+      <TestWrapper>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </TestWrapper>
     );
 
     await waitFor(() => {
@@ -106,9 +125,11 @@ describe('AuthContext', () => {
     });
 
     render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
+      <TestWrapper>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </TestWrapper>
     );
 
     await waitFor(() => {
@@ -129,9 +150,11 @@ describe('AuthContext', () => {
     authApi.me.mockResolvedValue({ id: 1, name: 'Test User', role: 'user' });
 
     render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
+      <TestWrapper>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </TestWrapper>
     );
 
     await waitFor(() => {
@@ -151,9 +174,11 @@ describe('AuthContext', () => {
     authApi.me.mockRejectedValue(new Error('Unauthorized'));
 
     render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
+      <TestWrapper>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </TestWrapper>
     );
 
     await waitFor(() => {

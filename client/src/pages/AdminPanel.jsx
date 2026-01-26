@@ -551,21 +551,21 @@ export function AdminPanel() {
 
         {/* Stats Grid - 2 cols mobile, 4 cols desktop */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.total}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">Total</div>
+          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.total}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Total</div>
           </div>
-          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.pending}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">Pending</div>
+          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.pending}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Pending</div>
           </div>
-          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.inProgress}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">In Progress</div>
+          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.inProgress}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">In Progress</div>
           </div>
-          <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{stats.completed}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">Completed</div>
+          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.completed}</div>
+            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Completed</div>
           </div>
         </div>
 
@@ -755,36 +755,36 @@ export function AdminPanel() {
               <>
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{analyticsData.summary.total}</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Total Requests</div>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{analyticsData.summary.total}</div>
+                    <div className="text-xs text-neutral-500 dark:text-[#8B949E]">Total Requests</div>
                   </div>
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-amber-600 dark:text-amber-400">{analyticsData.summary.pending}</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Pending</div>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-amber-600 dark:text-[#E3B341]">{analyticsData.summary.pending}</div>
+                    <div className="text-xs text-neutral-500 dark:text-[#8B949E]">Pending</div>
                   </div>
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-indigo-600 dark:text-indigo-400">{analyticsData.summary.inProgress}</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">In Progress</div>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-indigo-600 dark:text-[#A5B4FC]">{analyticsData.summary.inProgress}</div>
+                    <div className="text-xs text-neutral-500 dark:text-[#8B949E]">In Progress</div>
                   </div>
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-green-600 dark:text-green-400">{analyticsData.summary.completed}</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Completed</div>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-green-600 dark:text-[#3FB950]">{analyticsData.summary.completed}</div>
+                    <div className="text-xs text-neutral-500 dark:text-[#8B949E]">Completed</div>
                   </div>
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold text-slate-500 dark:text-slate-400">{analyticsData.summary.archived || 0}</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">Archived</div>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold text-slate-500 dark:text-[#8B949E]">{analyticsData.summary.archived || 0}</div>
+                    <div className="text-xs text-neutral-500 dark:text-[#8B949E]">Archived</div>
                   </div>
                 </div>
 
                 {/* Trend Chart */}
-                <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
-                  <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">Submissions Over Time</h4>
+                <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                  <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">Submissions Over Time</h4>
                   <div className="h-64 relative">
                     {analyticsData.trendData.length > 0 ? (
                       <TrendChart data={analyticsData.trendData} />
                     ) : (
-                      <div className="flex items-center justify-center h-full text-neutral-400 dark:text-neutral-500">
+                      <div className="flex items-center justify-center h-full text-neutral-400 dark:text-[#8B949E]">
                         No data for this period
                       </div>
                     )}
@@ -794,8 +794,8 @@ export function AdminPanel() {
                 {/* Breakdowns - 2x2 grid */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   {/* Category Breakdown */}
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Category</h4>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Category</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="Bug" value={analyticsData.categoryBreakdown.bug} total={analyticsData.summary.total} color="bg-red-500" />
                       <BreakdownBar label="New Feature" value={analyticsData.categoryBreakdown.new_feature} total={analyticsData.summary.total} color="bg-indigo-500" />
@@ -804,8 +804,8 @@ export function AdminPanel() {
                   </div>
 
                   {/* Priority Breakdown */}
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Priority</h4>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Priority</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="High" value={analyticsData.priorityBreakdown.high} total={analyticsData.summary.total} color="bg-red-500" />
                       <BreakdownBar label="Medium" value={analyticsData.priorityBreakdown.medium} total={analyticsData.summary.total} color="bg-amber-500" />
@@ -814,8 +814,8 @@ export function AdminPanel() {
                   </div>
 
                   {/* Team Breakdown */}
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Team</h4>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Team</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="Manufacturing" value={analyticsData.teamBreakdown?.Manufacturing || 0} total={analyticsData.summary.total} color="bg-indigo-500" />
                       <BreakdownBar label="Sales" value={analyticsData.teamBreakdown?.Sales || 0} total={analyticsData.summary.total} color="bg-emerald-500" />
@@ -825,8 +825,8 @@ export function AdminPanel() {
                   </div>
 
                   {/* Region Breakdown */}
-                  <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">By Region</h4>
+                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Region</h4>
                     <div className="space-y-3">
                       <BreakdownBar label="EMEA" value={analyticsData.regionBreakdown?.EMEA || 0} total={analyticsData.summary.total} color="bg-violet-500" />
                       <BreakdownBar label="North America" value={analyticsData.regionBreakdown?.['North America'] || 0} total={analyticsData.summary.total} color="bg-rose-500" />
@@ -846,11 +846,11 @@ export function AdminPanel() {
           /* Users Section */
           <div className="space-y-4">
             {/* Seed Data Card */}
-            <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg p-4 sm:p-6">
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h3 className="font-medium text-neutral-900 dark:text-neutral-100">Generate Test Data</h3>
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+                  <h3 className="font-medium text-neutral-900 dark:text-[#E6EDF3]">Generate Test Data</h3>
+                  <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
                     Populate the platform with sample users, requests, votes, and comments for testing.
                   </p>
                 </div>
@@ -877,8 +877,8 @@ export function AdminPanel() {
               {seedResult && (
                 <div className={`mt-4 p-3 rounded-lg text-sm ${
                   seedResult.error
-                    ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
-                    : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                    ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/50'
+                    : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-[#3FB950] border border-green-200 dark:border-green-800/50'
                 }`}>
                   {seedResult.error ? (
                     <p>{seedResult.error}</p>
@@ -893,10 +893,10 @@ export function AdminPanel() {
             </div>
 
             {/* Users Table */}
-            <div className="bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-lg">
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg">
               {/* Users Header */}
-              <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100 dark:border-neutral-700">
-                <h3 className="font-medium text-neutral-900 dark:text-neutral-100">Users ({usersList.length})</h3>
+              <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-100 dark:border-[#30363D]">
+                <h3 className="font-medium text-neutral-900 dark:text-[#E6EDF3]">Users ({usersList.length})</h3>
                 <Button onClick={() => setShowAddUserModal(true)} size="sm">
                   Add User
                 </Button>
@@ -913,32 +913,32 @@ export function AdminPanel() {
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-neutral-100 dark:border-neutral-700">
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Name</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Email</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Role</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Requests</th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Joined</th>
+                      <tr className="border-b border-neutral-100 dark:border-[#30363D]">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-[#8B949E] uppercase tracking-wider">Name</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-[#8B949E] uppercase tracking-wider">Email</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-[#8B949E] uppercase tracking-wider">Role</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-[#8B949E] uppercase tracking-wider">Requests</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-neutral-500 dark:text-[#8B949E] uppercase tracking-wider">Joined</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700">
+                    <tbody className="divide-y divide-neutral-100 dark:divide-[#30363D]">
                       {usersList.map((user) => (
-                        <tr key={user.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
-                          <td className="px-6 py-4 text-sm text-neutral-900 dark:text-neutral-100 font-medium">{user.name}</td>
-                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-neutral-400">{user.email}</td>
+                        <tr key={user.id} className="hover:bg-neutral-50 dark:hover:bg-[#161B22] transition-colors">
+                          <td className="px-6 py-4 text-sm text-neutral-900 dark:text-[#E6EDF3] font-medium">{user.name}</td>
+                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-[#8B949E]">{user.email}</td>
                           <td className="px-6 py-4">
                             <select
                               value={user.role}
                               onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                              className="text-sm border border-neutral-200 dark:border-neutral-600 rounded-lg px-2 py-1.5 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100
-                                         focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-500 transition-colors"
+                              className="text-sm border border-neutral-200 dark:border-[#30363D] rounded-lg px-2 py-1.5 bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3]
+                                         focus:outline-none focus:border-neutral-400 dark:focus:border-[#484F58] transition-colors"
                             >
                               <option value="employee">Employee</option>
                               <option value="admin">Admin</option>
                             </select>
                           </td>
-                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-neutral-400">{user.request_count}</td>
-                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-neutral-400">
+                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-[#8B949E]">{user.request_count}</td>
+                          <td className="px-6 py-4 text-sm text-neutral-500 dark:text-[#8B949E]">
                             {new Date(user.created_at).toLocaleDateString()}
                           </td>
                         </tr>
@@ -948,28 +948,28 @@ export function AdminPanel() {
                 </div>
 
                 {/* Mobile Card View */}
-                <div className="sm:hidden divide-y divide-neutral-100 dark:divide-neutral-700">
+                <div className="sm:hidden divide-y divide-neutral-100 dark:divide-[#30363D]">
                   {usersList.map((user) => (
                     <div key={user.id} className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="font-medium text-neutral-900 dark:text-neutral-100">{user.name}</p>
-                          <p className="text-sm text-neutral-500 dark:text-neutral-400">{user.email}</p>
+                          <p className="font-medium text-neutral-900 dark:text-[#E6EDF3]">{user.name}</p>
+                          <p className="text-sm text-neutral-500 dark:text-[#8B949E]">{user.email}</p>
                         </div>
                         <span className={`
                           text-xs px-2 py-1 rounded-full font-medium
-                          ${user.role === 'admin' ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900' : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'}
+                          ${user.role === 'admin' ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white' : 'bg-neutral-100 dark:bg-[#30363D] text-neutral-600 dark:text-[#8B949E]'}
                         `}>
                           {user.role}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-neutral-500 dark:text-neutral-400">{user.request_count} requests</span>
+                        <span className="text-neutral-500 dark:text-[#8B949E]">{user.request_count} requests</span>
                         <select
                           value={user.role}
                           onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                          className="text-sm border border-neutral-200 dark:border-neutral-600 rounded-lg px-3 py-1.5 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100
-                                     focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-500"
+                          className="text-sm border border-neutral-200 dark:border-[#30363D] rounded-lg px-3 py-1.5 bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3]
+                                     focus:outline-none focus:border-neutral-400 dark:focus:border-[#484F58]"
                         >
                           <option value="employee">Employee</option>
                           <option value="admin">Admin</option>

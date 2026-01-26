@@ -149,12 +149,12 @@ export function MyRequests() {
           />
         </div>
 
-        {/* Status Summary - Monochrome pills */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        {/* Status Summary - Horizontal scroll on mobile */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible scrollbar-hide">
           <button
             onClick={() => setStatusFilter('')}
             className={`
-              px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
+              px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0
               ${statusFilter === ''
                 ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
                 : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
@@ -171,7 +171,7 @@ export function MyRequests() {
                 key={key}
                 onClick={() => setStatusFilter(statusFilter === key ? '' : key)}
                 className={`
-                  px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
+                  px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0
                   ${statusFilter === key
                     ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
                     : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'

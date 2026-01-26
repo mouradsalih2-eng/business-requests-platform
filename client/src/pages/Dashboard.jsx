@@ -3,11 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { RequestList } from '../components/requests/RequestList';
 import { RequestDetail } from '../components/requests/RequestDetail';
+import { KanbanBoard } from '../components/roadmap/KanbanBoard';
 import { SideSheet } from '../components/ui/SideSheet';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { SearchInput } from '../components/ui/SearchInput';
 import { SkeletonList } from '../components/ui/Skeleton';
+import { FilterChips } from '../components/ui/FilterChips';
 import { requests as requestsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,6 +41,9 @@ export function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
 
+  // Tab state: 'requests' or 'roadmap'
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'requests');
+
   // Initialize filters from URL params
   const [filters, setFilters] = useState({
     status: searchParams.get('status') || '',
@@ -62,15 +67,16 @@ export function Dashboard() {
   const hasActiveFilters = filters.status || filters.category;
   const activeFilterCount = [filters.status, filters.category].filter(Boolean).length;
 
-  // Sync filters to URL
+  // Sync filters and tab to URL
   useEffect(() => {
     const params = new URLSearchParams();
+    if (activeTab !== 'requests') params.set('tab', activeTab);
     if (filters.status) params.set('status', filters.status);
     if (filters.category) params.set('category', filters.category);
     if (filters.sort && filters.sort !== 'recency') params.set('sort', filters.sort);
     if (filters.search) params.set('search', filters.search);
     setSearchParams(params, { replace: true });
-  }, [filters, setSearchParams]);
+  }, [filters, activeTab, setSearchParams]);
 
   // Load requests from API
   useEffect(() => {
@@ -219,23 +225,52 @@ export function Dashboard() {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
+        {/* Header with Tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">All Requests</h1>
-            <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
-              {isAdmin ? 'View and manage all requests' : 'Browse and vote on requests'}
+            {/* Tabs */}
+            <div className="flex items-center gap-1 mb-2">
+              <button
+                onClick={() => setActiveTab('requests')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  activeTab === 'requests'
+                    ? 'bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8]'
+                    : 'text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
+                }`}
+              >
+                Requests
+              </button>
+              <button
+                onClick={() => setActiveTab('roadmap')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  activeTab === 'roadmap'
+                    ? 'bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8]'
+                    : 'text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
+                }`}
+              >
+                Roadmap
+              </button>
+            </div>
+            <p className="text-sm text-neutral-500 dark:text-[#8B949E]">
+              {activeTab === 'requests'
+                ? (isAdmin ? 'View and manage all requests' : 'Browse and vote on requests')
+                : 'Track feature progress across development stages'}
             </p>
           </div>
 
           {/* New Request CTA */}
-          <Link to="/new-request">
-            <Button>New Request</Button>
-          </Link>
+          {activeTab === 'requests' && (
+            <Link to="/new-request">
+              <Button>New Request</Button>
+            </Link>
+          )}
         </div>
 
-        {/* Search and Filter Row */}
-        <div className="flex items-center gap-3 mb-6">
+        {/* Requests Tab Content */}
+        {activeTab === 'requests' && (
+          <>
+            {/* Search and Filter Row */}
+            <div className="flex items-center gap-3 mb-4">
           <div className="flex-1">
             <SearchInput
               value={filters.search}
@@ -265,6 +300,13 @@ export function Dashboard() {
             )}
           </button>
         </div>
+
+        {/* Active Filter Chips */}
+        <FilterChips
+          filters={filters}
+          onRemove={(key) => handleFilterChange(key, '')}
+          onClearAll={clearFilters}
+        />
 
         {/* Request count and sort toggle */}
         <div className="flex items-center justify-between mb-4">
@@ -354,6 +396,15 @@ export function Dashboard() {
           onStatusUpdate={handleStatusUpdate}
           onDelete={handleDelete}
         />
+          </>
+        )}
+
+        {/* Roadmap Tab Content */}
+        {activeTab === 'roadmap' && (
+          <div className="mt-2">
+            <KanbanBoard />
+          </div>
+        )}
       </div>
     </Layout>
   );

@@ -55,3 +55,83 @@ export function SkeletonList({ count = 3 }) {
     </div>
   );
 }
+
+/**
+ * Skeleton for request detail page
+ */
+export function RequestDetailSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Back button placeholder */}
+      <Skeleton className="h-4 w-32" />
+
+      {/* Main card */}
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-sm p-6 space-y-6">
+        {/* Title */}
+        <Skeleton className="h-7 w-3/4" />
+
+        {/* Header: Author, Date, Badges */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-20 rounded-md" />
+            <Skeleton className="h-6 w-16 rounded-md" />
+            <Skeleton className="h-6 w-24 rounded-md" />
+          </div>
+        </div>
+
+        {/* Status bar */}
+        <div className="p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-9 w-32 rounded-lg" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-16 rounded-lg" />
+              <Skeleton className="h-8 w-16 rounded-lg" />
+            </div>
+          </div>
+        </div>
+
+        {/* Content sections */}
+        <div className="space-y-4">
+          <div>
+            <Skeleton className="h-3 w-28 mb-2" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+          </div>
+          <div>
+            <Skeleton className="h-3 w-24 mb-2" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Comments section */}
+        <div className="pt-4 border-t border-neutral-100 dark:border-neutral-700">
+          <Skeleton className="h-3 w-20 mb-4" />
+          <Skeleton className="h-20 w-full rounded-lg mb-4" />
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -79,6 +79,36 @@ const emailTemplates = {
     `,
     text: `Password change request\n\nYou requested to change your password. Your verification code is: ${code}\n\nThis code will expire in 15 minutes. If you didn't request this password change, please secure your account immediately.`,
   }),
+
+  passwordReset: (resetLink, name) => ({
+    subject: 'Reset your password - Business Requests Platform',
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <h1 style="color: #171717; font-size: 24px; font-weight: 600; margin-bottom: 24px;">Reset your password</h1>
+        <p style="color: #525252; font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
+          Hi${name ? ` ${name}` : ''},
+        </p>
+        <p style="color: #525252; font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
+          We received a request to reset your password. Click the button below to choose a new password:
+        </p>
+        <div style="text-align: center; margin-bottom: 24px;">
+          <a href="${resetLink}" style="display: inline-block; background-color: #171717; color: white; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+            Reset Password
+          </a>
+        </div>
+        <p style="color: #737373; font-size: 14px; line-height: 1.5; margin-bottom: 16px;">
+          Or copy and paste this link into your browser:
+        </p>
+        <p style="color: #3B82F6; font-size: 14px; line-height: 1.5; word-break: break-all; margin-bottom: 24px;">
+          ${resetLink}
+        </p>
+        <p style="color: #737373; font-size: 14px; line-height: 1.5;">
+          This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.
+        </p>
+      </div>
+    `,
+    text: `Reset your password\n\nHi${name ? ` ${name}` : ''},\n\nWe received a request to reset your password. Click the link below to choose a new password:\n\n${resetLink}\n\nThis link will expire in 1 hour. If you didn't request this, you can safely ignore this email.`,
+  }),
 };
 
 // Send verification email
@@ -108,6 +138,38 @@ export async function sendVerificationEmail(email, code, type) {
   } catch (error) {
     console.error('Failed to send email:', error);
     throw new Error('Failed to send verification email');
+  }
+}
+
+// Send password reset email
+export async function sendPasswordResetEmail(email, token, name) {
+  const transport = getTransporter();
+
+  // Build reset link
+  const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const resetLink = `${baseUrl}/reset-password?token=${token}`;
+
+  if (!transport) {
+    // In development without SMTP, log the link
+    console.log(`[DEV] Password reset link for ${email}: ${resetLink}`);
+    return { success: true, dev: true };
+  }
+
+  const template = emailTemplates.passwordReset(resetLink, name);
+
+  try {
+    await transport.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send password reset email:', error);
+    throw new Error('Failed to send password reset email');
   }
 }
 
