@@ -294,6 +294,30 @@ function runMigrations() {
     `);
     db.run('CREATE INDEX IF NOT EXISTS idx_admin_read_requests ON admin_read_requests(request_id, admin_id)');
   }
+
+  // Create feature_flags table if not exists
+  if (!tableExists('feature_flags')) {
+    console.log('Creating feature_flags table...');
+    db.run(`
+      CREATE TABLE IF NOT EXISTS feature_flags (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        enabled INTEGER DEFAULT 1,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed default feature flags
+    console.log('Seeding default feature flags...');
+    db.run(`INSERT INTO feature_flags (name, enabled, description) VALUES (?, 1, ?)`,
+      ['roadmap_kanban', 'Roadmap Kanban board view and request-roadmap sync']);
+    db.run(`INSERT INTO feature_flags (name, enabled, description) VALUES (?, 1, ?)`,
+      ['request_merging', 'Merge duplicate requests']);
+    db.run(`INSERT INTO feature_flags (name, enabled, description) VALUES (?, 1, ?)`,
+      ['duplicate_detection', 'Suggest similar requests when creating']);
+  }
 }
 
 // Initialize database

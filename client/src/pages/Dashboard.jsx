@@ -12,6 +12,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { FilterChips } from '../components/ui/FilterChips';
 import { requests as requestsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlag } from '../context/FeatureFlagContext';
 
 /**
  * Dashboard - Main view for browsing all requests
@@ -38,6 +39,7 @@ const categoryOptions = [
 
 export function Dashboard() {
   const { isAdmin } = useAuth();
+  const roadmapEnabled = useFeatureFlag('roadmap_kanban');
   const [searchParams, setSearchParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
 
@@ -240,16 +242,18 @@ export function Dashboard() {
               >
                 Requests
               </button>
-              <button
-                onClick={() => setActiveTab('roadmap')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  activeTab === 'roadmap'
-                    ? 'bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8]'
-                    : 'text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
-                }`}
-              >
-                Roadmap
-              </button>
+              {roadmapEnabled && (
+                <button
+                  onClick={() => setActiveTab('roadmap')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    activeTab === 'roadmap'
+                      ? 'bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8]'
+                      : 'text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
+                  }`}
+                >
+                  Roadmap
+                </button>
+              )}
             </div>
             <p className="text-sm text-neutral-500 dark:text-[#8B949E]">
               {activeTab === 'requests'
@@ -400,7 +404,7 @@ export function Dashboard() {
         )}
 
         {/* Roadmap Tab Content */}
-        {activeTab === 'roadmap' && (
+        {activeTab === 'roadmap' && roadmapEnabled && (
           <div className="mt-2">
             <KanbanBoard />
           </div>

@@ -305,5 +305,16 @@ export const roadmap = {
     }),
 };
 
+// Feature Flags
+export const featureFlags = {
+  getAll: () => request('/feature-flags'),
+
+  toggle: (name, enabled) =>
+    request(`/feature-flags/${name}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
+};
+
 // Export CSRF refresh function for use after auth state changes
 export const refreshCsrfToken = fetchCsrfToken;

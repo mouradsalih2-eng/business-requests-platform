@@ -10,7 +10,9 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { SearchInput } from '../components/ui/SearchInput';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { requests as requestsApi, users as usersApi } from '../lib/api';
+import { requests as requestsApi, users as usersApi, featureFlags as featureFlagsApi } from '../lib/api';
+import { Toggle } from '../components/ui/Toggle';
+import { useFeatureFlags } from '../context/FeatureFlagContext';
 
 /**
  * TrendChart - Simple line chart for displaying trends with hover tooltips
@@ -302,6 +304,7 @@ const roleOptions = [
 
 export function AdminPanel() {
   const navigate = useNavigate();
+  const { refresh: refreshFeatureFlags } = useFeatureFlags();
   const [activeTab, setActiveTab] = useState('requests');
   const [requestsList, setRequestsList] = useState([]);
   const [usersList, setUsersList] = useState([]);
@@ -316,6 +319,11 @@ export function AdminPanel() {
     timePeriod: '',
     search: '',
   });
+
+  // Feature flags state
+  const [flagsList, setFlagsList] = useState([]);
+  const [flagsLoading, setFlagsLoading] = useState(false);
+  const [togglingFlag, setTogglingFlag] = useState(null);
 
   // Analytics state
   const [analyticsData, setAnalyticsData] = useState(null);
@@ -347,6 +355,8 @@ export function AdminPanel() {
       loadUsers();
     } else if (activeTab === 'analytics') {
       loadAnalytics();
+    } else if (activeTab === 'flags') {
+      loadFlags();
     }
   }, [activeTab, filters, analyticsPeriod]);
 
@@ -397,6 +407,42 @@ export function AdminPanel() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadFlags = async () => {
+    setFlagsLoading(true);
+    try {
+      const data = await featureFlagsApi.getAll();
+      setFlagsList(data);
+    } catch (err) {
+      console.error('Failed to load feature flags:', err);
+    } finally {
+      setFlagsLoading(false);
+    }
+  };
+
+  const handleToggleFlag = async (name, enabled) => {
+    setTogglingFlag(name);
+    try {
+      await featureFlagsApi.toggle(name, enabled);
+      setFlagsList((prev) =>
+        prev.map((f) => (f.name === name ? { ...f, enabled: enabled ? 1 : 0 } : f))
+      );
+      // Refresh the global feature flags context
+      refreshFeatureFlags();
+    } catch (err) {
+      console.error('Failed to toggle flag:', err);
+    } finally {
+      setTogglingFlag(null);
+    }
+  };
+
+  // Format flag name for display (snake_case to Title Case)
+  const formatFlagName = (name) => {
+    return name
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const handleFilterChange = (key, value) => {
@@ -611,6 +657,18 @@ export function AdminPanel() {
             `}
           >
             Users
+          </button>
+          <button
+            onClick={() => setActiveTab('flags')}
+            className={`
+              flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
+              ${activeTab === 'flags'
+                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
+                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
+              }
+            `}
+          >
+            Flags
           </button>
         </div>
 
@@ -842,8 +900,10 @@ export function AdminPanel() {
               </div>
             )}
           </div>
-        ) : (
-          /* Users Section */
+        ) : null}
+
+        {/* Users Section */}
+        {activeTab === 'users' && (
           <div className="space-y-4">
             {/* Seed Data Card */}
             <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
@@ -981,6 +1041,46 @@ export function AdminPanel() {
               </>
             )}
             </div>
+          </div>
+        )}
+
+        {/* Feature Flags Section */}
+        {activeTab === 'flags' && (
+          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-xl p-4 sm:p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3]">Feature Flags</h2>
+              <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
+                Toggle features on/off to control the platform experience.
+              </p>
+            </div>
+
+            {flagsLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin mb-2" />
+                <p className="text-neutral-500 dark:text-neutral-400 text-sm">Loading feature flags...</p>
+              </div>
+            ) : flagsList.length === 0 ? (
+              <div className="text-center py-12 text-neutral-500 dark:text-neutral-400">
+                No feature flags found
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {flagsList.map((flag) => (
+                  <div
+                    key={flag.name}
+                    className="p-4 bg-neutral-50 dark:bg-[#161B22] rounded-lg border border-neutral-100 dark:border-[#30363D]"
+                  >
+                    <Toggle
+                      label={formatFlagName(flag.name)}
+                      description={flag.description}
+                      checked={flag.enabled === 1}
+                      onChange={(enabled) => handleToggleFlag(flag.name, enabled)}
+                      disabled={togglingFlag === flag.name}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

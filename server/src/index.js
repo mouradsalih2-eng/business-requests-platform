@@ -13,6 +13,7 @@ import votesRoutes from './routes/votes.js';
 import commentsRoutes from './routes/comments.js';
 import usersRoutes from './routes/users.js';
 import roadmapRoutes from './routes/roadmap.js';
+import featureFlagsRoutes from './routes/feature-flags.js';
 import { csrfProvider, csrfProtection } from './middleware/csrf.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -164,6 +165,7 @@ v1Router.use('/requests', commentsRoutes);
 v1Router.use('/comments', commentsRoutes);
 v1Router.use('/users', usersRoutes);
 v1Router.use('/roadmap', roadmapRoutes);
+v1Router.use('/feature-flags', featureFlagsRoutes);
 
 // Mount v1 router under /api/v1
 app.use('/api/v1', v1Router);
@@ -179,6 +181,7 @@ legacyRouter.use('/requests', commentsRoutes);
 legacyRouter.use('/comments', commentsRoutes);
 legacyRouter.use('/users', usersRoutes);
 legacyRouter.use('/roadmap', roadmapRoutes);
+legacyRouter.use('/feature-flags', featureFlagsRoutes);
 app.use('/api', legacyRouter);
 
 // Stricter rate limit for password reset endpoints specifically

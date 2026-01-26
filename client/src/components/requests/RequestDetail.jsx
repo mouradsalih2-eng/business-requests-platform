@@ -9,6 +9,7 @@ import { VoteButtons } from '../social/VoteButtons';
 import { CommentSection } from '../social/CommentSection';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/Toast';
+import { useFeatureFlag } from '../../context/FeatureFlagContext';
 import { requests as requestsApi } from '../../lib/api';
 
 /**
@@ -31,6 +32,7 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
+  const mergingEnabled = useFeatureFlag('request_merging');
   const [status, setStatus] = useState(request?.status || '');
   const [updating, setUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -215,7 +217,7 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
               <Select
                 value={status}
                 onChange={handleStatusChange}
-                options={statusOptions}
+                options={mergingEnabled ? statusOptions : statusOptions.filter(opt => opt.value !== 'duplicate')}
                 className="w-full sm:w-36"
                 disabled={updating}
               />
@@ -253,7 +255,7 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
         )}
 
         {/* Merge UI - shown when admin changes status to duplicate */}
-        {showMergeUI && isAdmin && (
+        {showMergeUI && isAdmin && mergingEnabled && (
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-4">
             <div>
               <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">

@@ -7,6 +7,7 @@ import { Card, CardBody } from '../ui/Card';
 import { StatusBadge } from '../ui/Badge';
 import { requests as requestsApi } from '../../lib/api';
 import { debounce } from '../../lib/utils';
+import { useFeatureFlag } from '../../context/FeatureFlagContext';
 
 const categoryOptions = [
   { value: 'bug', label: 'Bug' },
@@ -36,6 +37,7 @@ const regionOptions = [
 
 export function RequestForm({ onSubmit, loading = false }) {
   const navigate = useNavigate();
+  const duplicateDetectionEnabled = useFeatureFlag('duplicate_detection');
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -79,15 +81,15 @@ export function RequestForm({ onSubmit, loading = false }) {
     []
   );
 
-  // Search when title changes
+  // Search when title changes (only if duplicate detection is enabled)
   useEffect(() => {
-    if (formData.title.length >= 5) {
+    if (duplicateDetectionEnabled && formData.title.length >= 5) {
       searchSimilar(formData.title);
     } else {
       setSimilarRequests([]);
       setShowSuggestions(false);
     }
-  }, [formData.title, searchSimilar]);
+  }, [formData.title, searchSimilar, duplicateDetectionEnabled]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

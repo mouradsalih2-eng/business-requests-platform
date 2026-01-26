@@ -3,8 +3,17 @@ import { run, get, all } from '../db/database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { roadmapItemSchema, roadmapMoveSchema } from '../validation/schemas.js';
+import { isFeatureEnabled } from './feature-flags.js';
 
 const router = express.Router();
+
+// Middleware to check if roadmap feature is enabled
+router.use((req, res, next) => {
+  if (!isFeatureEnabled('roadmap_kanban')) {
+    return res.status(403).json({ error: 'Roadmap feature is currently disabled' });
+  }
+  next();
+});
 
 // Get all roadmap items grouped by column
 // Also includes requests that aren't explicitly added to roadmap
