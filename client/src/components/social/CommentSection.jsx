@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { CommentItem } from './CommentItem';
 import { Button } from '../ui/Button';
+import { Spinner } from '../ui/Spinner';
 import { MentionDropdown } from '../ui/MentionDropdown';
 import { comments as commentsApi } from '../../lib/api';
 import { useMention } from '../../hooks/useMention';
@@ -164,13 +165,13 @@ export function CommentSection({ requestId }) {
       {/* Comments List */}
       {loading ? (
         <div className="py-6 flex items-center justify-center gap-2">
-          <div className="w-4 h-4 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-600 dark:border-t-neutral-300 rounded-full animate-spin" />
+          <Spinner size="sm" />
           <span className="text-sm text-neutral-400 dark:text-neutral-500">Loading comments...</span>
         </div>
       ) : commentsList.length === 0 ? (
         <div className="text-center py-8">
-          <div className="w-10 h-10 mx-auto mb-2 bg-neutral-100 dark:bg-neutral-700 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-12 h-12 mx-auto mb-2 bg-neutral-100 dark:bg-neutral-700 rounded-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>

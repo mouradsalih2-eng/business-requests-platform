@@ -15,10 +15,10 @@ export function EmptyState({
   return (
     <div className="text-center py-12 px-4">
       {/* Icon/Illustration */}
-      <div className="w-16 h-16 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
         {icon || (
           <svg
-            className="w-8 h-8 text-neutral-400 dark:text-neutral-500"
+            className="w-6 h-6 text-neutral-400 dark:text-neutral-500"
             fill="none"
             stroke="currentColor"
             strokeWidth={1.5}
@@ -68,7 +68,7 @@ export function NoRequestsEmptyState({ onCreateNew }) {
     <EmptyState
       icon={
         <svg
-          className="w-8 h-8 text-neutral-400 dark:text-neutral-500"
+          className="w-6 h-6 text-neutral-400 dark:text-neutral-500"
           fill="none"
           stroke="currentColor"
           strokeWidth={1.5}
@@ -97,7 +97,7 @@ export function NoMatchesEmptyState({ onClearFilters }) {
     <EmptyState
       icon={
         <svg
-          className="w-8 h-8 text-neutral-400 dark:text-neutral-500"
+          className="w-6 h-6 text-neutral-400 dark:text-neutral-500"
           fill="none"
           stroke="currentColor"
           strokeWidth={1.5}

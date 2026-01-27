@@ -39,10 +39,10 @@ export default function Settings() {
       <Layout>
         <div className="max-w-2xl mx-auto">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 w-32 bg-neutral-200 dark:bg-neutral-700 rounded" />
-            <div className="h-48 bg-neutral-200 dark:bg-neutral-700 rounded-xl" />
-            <div className="h-48 bg-neutral-200 dark:bg-neutral-700 rounded-xl" />
-            <div className="h-32 bg-neutral-200 dark:bg-neutral-700 rounded-xl" />
+            <div className="h-8 w-32 bg-neutral-200 dark:bg-[#21262D] rounded" />
+            <div className="h-48 bg-neutral-200 dark:bg-[#21262D] rounded-xl" />
+            <div className="h-48 bg-neutral-200 dark:bg-[#21262D] rounded-xl" />
+            <div className="h-32 bg-neutral-200 dark:bg-[#21262D] rounded-xl" />
           </div>
         </div>
       </Layout>

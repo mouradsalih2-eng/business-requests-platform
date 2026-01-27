@@ -10,6 +10,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { SearchInput } from '../components/ui/SearchInput';
 import { SkeletonList } from '../components/ui/Skeleton';
+import { Spinner } from '../components/ui/Spinner';
 import { requests as requestsApi, users as usersApi, featureFlags as featureFlagsApi } from '../lib/api';
 import { Toggle } from '../components/ui/Toggle';
 import { useFeatureFlags } from '../context/FeatureFlagContext';
@@ -129,6 +130,20 @@ function TrendChart({ data }) {
             className="w-full h-full"
             preserveAspectRatio="none"
           >
+            {/* Definitions for gradients */}
+            <defs>
+              {/* Area gradient - light theme (subtle) */}
+              <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.12" />
+                <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+              </linearGradient>
+              {/* Area gradient - dark theme (subtle) */}
+              <linearGradient id="chartGradientDark" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#818cf8" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+
             {/* Grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => (
               <line
@@ -137,28 +152,23 @@ function TrendChart({ data }) {
                 y1={svgPaddingTop + (svgHeight - svgPaddingTop - svgPaddingBottom) * ratio}
                 x2={svgWidth - svgPaddingX}
                 y2={svgPaddingTop + (svgHeight - svgPaddingTop - svgPaddingBottom) * ratio}
-                stroke="#e5e5e5"
+                className="stroke-neutral-200 dark:stroke-neutral-700"
                 strokeWidth="1"
               />
             ))}
 
-            {/* Gradient definition */}
-            <defs>
-              <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
-              </linearGradient>
-            </defs>
-
-            {/* Area fill */}
-            <path d={areaPath} fill="url(#chartGradient)" />
+            {/* Area fill - uses CSS class to switch gradient based on theme */}
+            <path
+              d={areaPath}
+              className="fill-[url(#chartGradient)] dark:fill-[url(#chartGradientDark)]"
+            />
 
             {/* Line */}
             <path
               d={linePath}
               fill="none"
-              stroke="#3b82f6"
-              strokeWidth="3"
+              className="stroke-indigo-500 dark:stroke-indigo-400"
+              strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
@@ -170,8 +180,13 @@ function TrendChart({ data }) {
                 key={i}
                 cx={p.x}
                 cy={p.y}
-                r={hoveredPoint?.index === i ? 8 : 5}
-                fill={hoveredPoint?.index === i ? '#1d4ed8' : '#3b82f6'}
+                r={hoveredPoint?.index === i ? 6 : 4}
+                className={`
+                  transition-all duration-150
+                  ${hoveredPoint?.index === i
+                    ? 'fill-indigo-600 dark:fill-indigo-300'
+                    : 'fill-indigo-500 dark:fill-indigo-400'}
+                `}
                 stroke="white"
                 strokeWidth="2"
               />
@@ -181,25 +196,25 @@ function TrendChart({ data }) {
           {/* Hover vertical line using CSS (overlay) */}
           {hoveredPoint && (
             <div
-              className="absolute top-0 bottom-0 w-0.5 bg-blue-400/50 pointer-events-none"
+              className="absolute top-0 bottom-0 w-0.5 bg-indigo-400/60 dark:bg-indigo-400/50 pointer-events-none"
               style={{ left: `${hoveredPoint.xPercent}%` }}
             />
           )}
         </div>
 
-        {/* Tooltip */}
+        {/* Tooltip with frosted glass effect */}
         {hoveredPoint && (
           <div
-            className="absolute z-20 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg shadow-lg pointer-events-none whitespace-nowrap"
+            className="absolute z-20 px-4 py-2.5 backdrop-blur-md bg-neutral-900/90 dark:bg-[#1c1f26]/95 text-white text-xs rounded-xl shadow-xl border border-neutral-700/50 pointer-events-none whitespace-nowrap"
             style={{
               left: Math.min(Math.max(tooltipPos.x, 60), window.innerWidth - 120),
-              top: Math.max(10, tooltipPos.y - 70),
+              top: Math.max(10, tooltipPos.y - 75),
               transform: 'translateX(-50%)'
             }}
           >
-            <div className="font-semibold text-sm">{hoveredPoint.count} request{hoveredPoint.count !== 1 ? 's' : ''}</div>
-            <div className="text-neutral-400 dark:text-neutral-500">{hoveredPoint.label}</div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900" />
+            <div className="font-semibold text-sm text-white">{hoveredPoint.count} request{hoveredPoint.count !== 1 ? 's' : ''}</div>
+            <div className="text-neutral-400">{hoveredPoint.label}</div>
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-neutral-900/90 dark:border-t-[#1c1f26]/95" />
           </div>
         )}
 
@@ -236,7 +251,7 @@ function BreakdownBar({ label, value, total, color }) {
         <span className="text-neutral-700 dark:text-neutral-300">{label}</span>
         <span className="text-neutral-500 dark:text-neutral-400">{value} ({percentage.toFixed(0)}%)</span>
       </div>
-      <div className="h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
+      <div className="h-2 bg-neutral-100 dark:bg-neutral-700/50 rounded-full overflow-hidden">
         <div
           className={`h-full ${color} transition-all duration-500 ease-out rounded-full`}
           style={{ width: `${percentage}%` }}
@@ -806,7 +821,7 @@ export function AdminPanel() {
 
             {analyticsLoading ? (
               <div className="text-center py-12">
-                <div className="inline-block w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin mb-2" />
+                <Spinner size="md" className="mx-auto mb-2" />
                 <p className="text-neutral-500 dark:text-neutral-400 text-sm">Loading analytics...</p>
               </div>
             ) : analyticsData ? (
@@ -922,10 +937,7 @@ export function AdminPanel() {
                 >
                   {seeding ? (
                     <span className="flex items-center gap-2">
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
+                      <Spinner size="sm" />
                       Generating...
                     </span>
                   ) : (
@@ -964,7 +976,7 @@ export function AdminPanel() {
 
             {loading ? (
               <div className="text-center py-12">
-                <div className="inline-block w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin mb-2" />
+                <Spinner size="md" className="mx-auto mb-2" />
                 <p className="text-neutral-500 dark:text-neutral-400 text-sm">Loading users...</p>
               </div>
             ) : (
@@ -1056,7 +1068,7 @@ export function AdminPanel() {
 
             {flagsLoading ? (
               <div className="text-center py-12">
-                <div className="inline-block w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin mb-2" />
+                <Spinner size="md" className="mx-auto mb-2" />
                 <p className="text-neutral-500 dark:text-neutral-400 text-sm">Loading feature flags...</p>
               </div>
             ) : flagsList.length === 0 ? (

@@ -66,7 +66,7 @@ export function RequestDetailSkeleton() {
       <Skeleton className="h-4 w-32" />
 
       {/* Main card */}
-      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-sm p-6 space-y-6">
+      <div className="bg-white dark:bg-[#161B22] rounded-xl border border-neutral-200 dark:border-[#30363D] shadow-sm p-6 space-y-6">
         {/* Title */}
         <Skeleton className="h-7 w-3/4" />
 
@@ -84,7 +84,7 @@ export function RequestDetailSkeleton() {
         </div>
 
         {/* Status bar */}
-        <div className="p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
+        <div className="p-4 bg-neutral-50 dark:bg-[#0D1117] rounded-lg">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Skeleton className="h-4 w-12" />
@@ -117,7 +117,7 @@ export function RequestDetailSkeleton() {
         </div>
 
         {/* Comments section */}
-        <div className="pt-4 border-t border-neutral-100 dark:border-neutral-700">
+        <div className="pt-4 border-t border-neutral-100 dark:border-[#30363D]">
           <Skeleton className="h-3 w-20 mb-4" />
           <Skeleton className="h-20 w-full rounded-lg mb-4" />
           <div className="space-y-3">
