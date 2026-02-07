@@ -36,6 +36,8 @@ export const requestSchema = z.object({
   problem_size: z.string().optional(),
   business_expectations: z.string().optional(),
   expected_impact: z.string().optional(),
+  on_behalf_of_user_id: z.coerce.number().int().positive().optional(),
+  on_behalf_of_name: z.string().max(200).optional(),
 });
 
 export const requestUpdateSchema = z.object({

@@ -197,7 +197,20 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              Submitted by <span className="text-neutral-900 dark:text-neutral-100">{request.author_name}</span>
+              {request.posted_by_admin_id ? (
+                <>
+                  Submitted by{' '}
+                  <span className="text-neutral-900 dark:text-neutral-100">{request.posted_by_admin_name}</span>
+                  {' '}on behalf of{' '}
+                  <span className="text-neutral-900 dark:text-neutral-100">
+                    {request.on_behalf_of_name || request.author_name}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Submitted by <span className="text-neutral-900 dark:text-neutral-100">{request.author_name}</span>
+                </>
+              )}
             </p>
             <p className="text-sm text-neutral-400 dark:text-neutral-500">{formattedDate}</p>
           </div>

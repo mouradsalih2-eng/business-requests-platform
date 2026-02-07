@@ -6,9 +6,10 @@ import { Button } from '../ui/Button';
 import { Spinner } from '../ui/Spinner';
 import { Card, CardBody } from '../ui/Card';
 import { StatusBadge } from '../ui/Badge';
-import { requests as requestsApi } from '../../lib/api';
+import { requests as requestsApi, users as usersApi } from '../../lib/api';
 import { debounce } from '../../lib/utils';
 import { useFeatureFlag } from '../../context/FeatureFlagContext';
+import { useAuth } from '../../context/AuthContext';
 
 const categoryOptions = [
   { value: 'bug', label: 'Bug' },
@@ -38,7 +39,18 @@ const regionOptions = [
 
 export function RequestForm({ onSubmit, loading = false }) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const duplicateDetectionEnabled = useFeatureFlag('duplicate_detection');
+
+  // On-behalf-of state (admin only)
+  const [onBehalfEnabled, setOnBehalfEnabled] = useState(false);
+  const [behalfMode, setBehalfMode] = useState('user'); // 'user' or 'external'
+  const [userSearch, setUserSearch] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [externalName, setExternalName] = useState('');
+
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -91,6 +103,26 @@ export function RequestForm({ onSubmit, loading = false }) {
       setShowSuggestions(false);
     }
   }, [formData.title, searchSimilar, duplicateDetectionEnabled]);
+
+  // Search users for on-behalf-of
+  useEffect(() => {
+    if (!onBehalfEnabled || behalfMode !== 'user' || userSearch.length < 2) {
+      setUserSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchingUsers(true);
+      try {
+        const results = await usersApi.search(userSearch);
+        setUserSearchResults(results);
+      } catch (err) {
+        console.error('Failed to search users:', err);
+      } finally {
+        setSearchingUsers(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearch, onBehalfEnabled, behalfMode]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -146,6 +178,15 @@ export function RequestForm({ onSubmit, loading = false }) {
     files.forEach((file) => {
       data.append('attachments', file);
     });
+
+    // Append on-behalf-of fields
+    if (onBehalfEnabled) {
+      if (behalfMode === 'user' && selectedUser) {
+        data.append('on_behalf_of_user_id', selectedUser.id);
+      } else if (behalfMode === 'external' && externalName.trim()) {
+        data.append('on_behalf_of_name', externalName.trim());
+      }
+    }
 
     onSubmit(data);
   };
@@ -251,6 +292,127 @@ export function RequestForm({ onSubmit, loading = false }) {
           </div>
         </CardBody>
       </Card>
+
+      {/* On Behalf Of — admin only */}
+      {isAdmin && (
+        <Card>
+          <CardBody className="space-y-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={onBehalfEnabled}
+                onChange={(e) => {
+                  setOnBehalfEnabled(e.target.checked);
+                  if (!e.target.checked) {
+                    setSelectedUser(null);
+                    setExternalName('');
+                    setUserSearch('');
+                    setUserSearchResults([]);
+                  }
+                }}
+                className="rounded border-neutral-300 dark:border-neutral-600 text-[#4F46E5] focus:ring-[#4F46E5]"
+              />
+              <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                Post on behalf of someone
+              </span>
+            </label>
+
+            {onBehalfEnabled && (
+              <div className="space-y-3 pl-1">
+                {/* Mode toggle */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setBehalfMode('user'); setExternalName(''); }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      behalfMode === 'user'
+                        ? 'bg-[#4F46E5] text-white'
+                        : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+                    }`}
+                  >
+                    Existing User
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setBehalfMode('external'); setSelectedUser(null); setUserSearch(''); setUserSearchResults([]); }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      behalfMode === 'external'
+                        ? 'bg-[#4F46E5] text-white'
+                        : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+                    }`}
+                  >
+                    External Stakeholder
+                  </button>
+                </div>
+
+                {behalfMode === 'user' && (
+                  <div className="relative">
+                    {selectedUser ? (
+                      <div className="flex items-center justify-between p-3 bg-[#4F46E5]/5 dark:bg-[#6366F1]/10 border border-[#4F46E5]/20 dark:border-[#6366F1]/30 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{selectedUser.name}</p>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400">{selectedUser.email}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedUser(null); setUserSearch(''); }}
+                          className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Input
+                          label="Search user"
+                          value={userSearch}
+                          onChange={(e) => setUserSearch(e.target.value)}
+                          placeholder="Type a name or email..."
+                        />
+                        {searchingUsers && (
+                          <div className="absolute right-3 top-8">
+                            <Spinner size="sm" />
+                          </div>
+                        )}
+                        {userSearchResults.length > 0 && (
+                          <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                            {userSearchResults.map((user) => (
+                              <button
+                                key={user.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setUserSearch('');
+                                  setUserSearchResults([]);
+                                }}
+                                className="w-full px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors border-b border-neutral-100 dark:border-neutral-700 last:border-b-0"
+                              >
+                                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{user.name}</p>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400">{user.email}</p>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {behalfMode === 'external' && (
+                  <Input
+                    label="Stakeholder name"
+                    value={externalName}
+                    onChange={(e) => setExternalName(e.target.value)}
+                    placeholder="e.g. John Smith (ACME Corp)"
+                  />
+                )}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <CardBody className="space-y-4">

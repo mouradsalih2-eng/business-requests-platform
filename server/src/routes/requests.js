@@ -10,7 +10,8 @@ import { adminReadRepository } from '../repositories/adminReadRepository.js';
 import { requestService } from '../services/requestService.js';
 import { storageService } from '../services/storageService.js';
 import { commentRepository } from '../repositories/commentRepository.js';
-import { ValidationError, ForbiddenError } from '../errors/AppError.js';
+import { userRepository } from '../repositories/userRepository.js';
+import { ValidationError, ForbiddenError, NotFoundError } from '../errors/AppError.js';
 
 const router = Router();
 
@@ -93,15 +94,44 @@ router.get('/:id/interactions', authenticateToken, asyncHandler(async (req, res)
 
 // Create request
 router.post('/', authenticateToken, upload.array('attachments', 5), asyncHandler(async (req, res) => {
-  const { title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact } = req.body;
+  const { title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact, on_behalf_of_user_id, on_behalf_of_name } = req.body;
   if (!title?.trim() || !category || !priority) throw new ValidationError('Title, category, and priority are required');
 
-  const request = await requestRepository.create({
-    user_id: req.user.id, title, category, priority,
+  // On-behalf-of: admin-only feature
+  const isOnBehalf = on_behalf_of_user_id || on_behalf_of_name;
+  if (isOnBehalf && req.user.role !== 'admin') {
+    throw new ForbiddenError('Only admins can post on behalf of others');
+  }
+
+  let userId = req.user.id;
+  let postedByAdminId = null;
+  let onBehalfOfUserId = null;
+  let onBehalfOfName = null;
+
+  if (on_behalf_of_user_id) {
+    const parsedId = parseInt(on_behalf_of_user_id, 10);
+    const targetUser = await userRepository.findById(parsedId);
+    if (!targetUser) throw new NotFoundError('Target user');
+    userId = parsedId;
+    postedByAdminId = req.user.id;
+    onBehalfOfUserId = parsedId;
+  } else if (on_behalf_of_name) {
+    postedByAdminId = req.user.id;
+    onBehalfOfName = on_behalf_of_name.trim();
+  }
+
+  const insertData = {
+    user_id: userId, title, category, priority,
     team: team || 'Manufacturing', region: region || 'Global',
     business_problem: business_problem || '', problem_size: problem_size || '',
     business_expectations: business_expectations || '', expected_impact: expected_impact || '',
-  });
+  };
+
+  if (postedByAdminId) insertData.posted_by_admin_id = postedByAdminId;
+  if (onBehalfOfUserId) insertData.on_behalf_of_user_id = onBehalfOfUserId;
+  if (onBehalfOfName) insertData.on_behalf_of_name = onBehalfOfName;
+
+  const request = await requestRepository.create(insertData);
 
   if (req.files?.length) {
     for (const file of req.files) {

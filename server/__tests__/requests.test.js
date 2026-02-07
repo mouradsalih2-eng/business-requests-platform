@@ -67,6 +67,12 @@ const mockMentionRepository = {
   findUserIdsByNames: jest.fn(),
 };
 
+const mockUserRepository = {
+  findById: jest.fn(),
+  findByIdOrFail: jest.fn(),
+  search: jest.fn(),
+};
+
 const mockRequestService = {
   merge: jest.fn(),
   getAnalytics: jest.fn(),
@@ -96,6 +102,10 @@ jest.unstable_mockModule('../src/repositories/adminReadRepository.js', () => ({
 jest.unstable_mockModule('../src/repositories/commentRepository.js', () => ({
   commentRepository: mockCommentRepository,
   mentionRepository: mockMentionRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
+  userRepository: mockUserRepository,
 }));
 
 jest.unstable_mockModule('../src/services/requestService.js', () => ({
@@ -408,6 +418,108 @@ describe('Requests API', () => {
         .send(validPayload);
 
       expect(res.status).toBe(401);
+    });
+
+    // ── On Behalf Of ──
+
+    it('admin can create request on behalf of existing user', async () => {
+      const targetUser = { id: 3, name: 'Other User', email: 'other@example.com', role: 'employee' };
+      mockUserRepository.findById.mockResolvedValue(targetUser);
+
+      const createdRequest = {
+        id: 10, title: 'New Request', category: 'bug', priority: 'high',
+        status: 'pending', user_id: 3, posted_by_admin_id: 2, on_behalf_of_user_id: 3,
+      };
+      mockRequestRepository.create.mockResolvedValue(createdRequest);
+      mockAttachmentRepository.findByRequest.mockResolvedValue([]);
+
+      const res = await request(app)
+        .post('/api/requests')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ ...validPayload, on_behalf_of_user_id: 3 });
+
+      expect(res.status).toBe(201);
+      expect(mockRequestRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 3,
+          posted_by_admin_id: 2,
+          on_behalf_of_user_id: 3,
+        }),
+      );
+    });
+
+    it('admin can create request on behalf of external stakeholder', async () => {
+      const createdRequest = {
+        id: 11, title: 'New Request', category: 'bug', priority: 'high',
+        status: 'pending', user_id: 2, posted_by_admin_id: 2, on_behalf_of_name: 'John External',
+      };
+      mockRequestRepository.create.mockResolvedValue(createdRequest);
+      mockAttachmentRepository.findByRequest.mockResolvedValue([]);
+
+      const res = await request(app)
+        .post('/api/requests')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ ...validPayload, on_behalf_of_name: 'John External' });
+
+      expect(res.status).toBe(201);
+      expect(mockRequestRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 2,
+          posted_by_admin_id: 2,
+          on_behalf_of_name: 'John External',
+        }),
+      );
+    });
+
+    it('non-admin cannot use on_behalf_of_user_id', async () => {
+      const res = await request(app)
+        .post('/api/requests')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ ...validPayload, on_behalf_of_user_id: 3 });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/admin/i);
+    });
+
+    it('non-admin cannot use on_behalf_of_name', async () => {
+      const res = await request(app)
+        .post('/api/requests')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ ...validPayload, on_behalf_of_name: 'External Person' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/admin/i);
+    });
+
+    it('returns 404 when target user does not exist', async () => {
+      mockUserRepository.findById.mockResolvedValue(null);
+
+      const res = await request(app)
+        .post('/api/requests')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ ...validPayload, on_behalf_of_user_id: 999 });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/not found/i);
+    });
+
+    it('normal request does not set on-behalf fields', async () => {
+      const createdRequest = {
+        id: 12, title: 'New Request', category: 'bug', priority: 'high',
+        status: 'pending', user_id: 1,
+      };
+      mockRequestRepository.create.mockResolvedValue(createdRequest);
+      mockAttachmentRepository.findByRequest.mockResolvedValue([]);
+
+      await request(app)
+        .post('/api/requests')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(validPayload);
+
+      const createArg = mockRequestRepository.create.mock.calls[0][0];
+      expect(createArg.posted_by_admin_id).toBeUndefined();
+      expect(createArg.on_behalf_of_user_id).toBeUndefined();
+      expect(createArg.on_behalf_of_name).toBeUndefined();
     });
   });
 

@@ -81,6 +81,12 @@ const mockAdminReadRepository = {
   markRead: jest.fn(),
 };
 
+const mockUserRepository = {
+  findById: jest.fn(),
+  findByIdOrFail: jest.fn(),
+  search: jest.fn(),
+};
+
 const mockRequestService = {
   search: jest.fn(),
   merge: jest.fn(),
@@ -110,6 +116,10 @@ jest.unstable_mockModule('../src/repositories/activityRepository.js', () => ({
 
 jest.unstable_mockModule('../src/repositories/adminReadRepository.js', () => ({
   adminReadRepository: mockAdminReadRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
+  userRepository: mockUserRepository,
 }));
 
 jest.unstable_mockModule('../src/services/requestService.js', () => ({

@@ -227,7 +227,16 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-[#30363D]">
         {/* Author and date */}
         <div className="text-xs text-neutral-400 dark:text-[#6E7681] truncate">
-          <span className="text-neutral-600 dark:text-[#8B949E]">{author_name}</span>
+          <span className="text-neutral-600 dark:text-[#8B949E]">
+            {request.posted_by_admin_id
+              ? (request.on_behalf_of_name || author_name)
+              : author_name}
+          </span>
+          {request.posted_by_admin_id && (
+            <span className="text-neutral-400 dark:text-[#6E7681] italic">
+              {' '}via {request.posted_by_admin_name}
+            </span>
+          )}
           <span className="mx-1.5">·</span>
           <span>{formatDate(created_at)}</span>
         </div>

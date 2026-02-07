@@ -67,6 +67,12 @@ const mockMentionRepository = {
   findUserIdsByNames: jest.fn(),
 };
 
+const mockUserRepository = {
+  findById: jest.fn(),
+  findByIdOrFail: jest.fn(),
+  search: jest.fn(),
+};
+
 const mockRequestService = {
   merge: jest.fn(),
   getAnalytics: jest.fn(),
@@ -75,6 +81,10 @@ const mockRequestService = {
 
 jest.unstable_mockModule('../src/repositories/requestRepository.js', () => ({
   requestRepository: mockRequestRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
+  userRepository: mockUserRepository,
 }));
 
 jest.unstable_mockModule('../src/repositories/voteRepository.js', () => ({
