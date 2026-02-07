@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useProject } from '../../context/ProjectContext';
 
 /**
  * Sidebar navigation - responsive with slide-out on mobile
@@ -56,11 +57,40 @@ const adminItems = [
       </svg>
     ),
   },
+  {
+    to: '/project-settings',
+    label: 'Project Settings',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.1-3.26m0 0l-.563-.152A1.125 1.125 0 013.67 10.6v-.01c0-.45.267-.862.68-1.044l9.764-4.303a1.125 1.125 0 01.922 0l9.764 4.303c.413.182.68.594.68 1.044v.01c0 .449-.267.86-.68 1.043l-.563.152m-6.588 3.263l6.588-3.263m-6.588 3.263L12 21.019l-5.58-2.586m11.16-5.173l.563-.152a1.125 1.125 0 00.68-1.043V10.6a1.125 1.125 0 00-.68-1.044L12.922 5.253a1.125 1.125 0 00-.922 0L2.236 9.556a1.125 1.125 0 00-.68 1.044v.01c0 .449.267.86.68 1.043l.563.152" />
+      </svg>
+    ),
+  },
+];
+
+const superAdminItems = [
+  {
+    to: '/super-admin',
+    label: 'Super Admin',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 003 12c0-1.605.42-3.113 1.157-4.418" />
+      </svg>
+    ),
+  },
 ];
 
 export function Sidebar({ isOpen, onClose }) {
-  const { isAdmin } = useAuth();
-  const allItems = isAdmin ? [...navItems, ...adminItems] : navItems;
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const { currentProject } = useProject();
+
+  // Show admin items if global admin/super_admin OR project admin
+  const isProjectAdmin = currentProject?.memberRole === 'admin';
+  const showAdmin = isAdmin || isProjectAdmin;
+
+  let allItems = [...navItems];
+  if (showAdmin) allItems = [...allItems, ...adminItems];
+  if (isSuperAdmin) allItems = [...allItems, ...superAdminItems];
 
   return (
     <>

@@ -114,7 +114,7 @@ export function AuthProvider({ children }) {
 
     initAuth();
 
-    // Listen for auth state changes (token refresh, sign out, etc.)
+    // Listen for auth state changes (token refresh, sign out, OAuth redirect, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
@@ -122,6 +122,17 @@ export function AuthProvider({ children }) {
         setUser(null);
         setSessionWarning(false);
         warningShownRef.current = false;
+      } else if (event === 'SIGNED_IN' && session && !user) {
+        // OAuth redirect or fresh sign-in — fetch app user data
+        try {
+          const userData = await authApi.me();
+          if (mounted) {
+            setUser(userData);
+            updateActivity();
+          }
+        } catch {
+          // User not provisioned yet or error — will be handled on next page load
+        }
       } else if (event === 'TOKEN_REFRESHED' && session && !user) {
         // Token was refreshed but we lost the user state — refetch
         try {
@@ -172,7 +183,8 @@ export function AuthProvider({ children }) {
     setUser((prev) => prev ? { ...prev, ...updates } : null);
   }, []);
 
-  const isAdmin = user?.role === 'admin';
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || isSuperAdmin;
 
   return (
     <AuthContext.Provider value={{
@@ -182,6 +194,7 @@ export function AuthProvider({ children }) {
       register,
       logout,
       isAdmin,
+      isSuperAdmin,
       updateUser,
       sessionWarning,
       extendSession,

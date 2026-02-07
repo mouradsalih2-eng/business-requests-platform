@@ -7,14 +7,16 @@ function handleError(error, context) {
 }
 
 export const roadmapRepository = {
-  async findAll() {
-    const { data, error } = await supabase
+  async findAll(projectId) {
+    let query = supabase
       .from('roadmap_items')
       .select(`
         *,
         requests!request_id(title, status, category, priority, team, region),
         users!created_by(name)
-      `)
+      `);
+    if (projectId) query = query.eq('project_id', projectId);
+    const { data, error } = await query
       .order('position')
       .order('created_at');
     if (error) handleError(error, 'findAll');
@@ -34,12 +36,13 @@ export const roadmapRepository = {
     }));
   },
 
-  async findSyncableRequests(excludeIds) {
+  async findSyncableRequests(excludeIds, projectId) {
     let query = supabase
       .from('requests')
       .select('id, title, business_problem, category, priority, team, region, status, created_at, updated_at, users!user_id(name)')
-      .not('status', 'in', '(rejected,duplicate,archived)')
-      .order('created_at', { ascending: false });
+      .not('status', 'in', '(rejected,duplicate,archived)');
+    if (projectId) query = query.eq('project_id', projectId);
+    query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
     if (error) handleError(error, 'findSyncableRequests');

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
-import { RequestForm } from '../components/requests/RequestForm';
+import { DynamicRequestForm } from '../components/requests/DynamicRequestForm';
 import { Card, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { requests as requestsApi } from '../lib/api';
@@ -85,7 +85,7 @@ export function NewRequest() {
           </div>
         )}
 
-        <RequestForm onSubmit={handleSubmit} loading={loading} />
+        <DynamicRequestForm onSubmit={handleSubmit} loading={loading} />
       </div>
     </Layout>
   );

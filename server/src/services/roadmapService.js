@@ -13,14 +13,14 @@ export const roadmapService = {
   /**
    * Get all roadmap items grouped by column, including auto-synced requests.
    */
-  async getGrouped() {
-    const roadmapItems = await roadmapRepository.findAll();
+  async getGrouped(projectId) {
+    const roadmapItems = await roadmapRepository.findAll(projectId);
 
     const linkedRequestIds = roadmapItems
       .filter(i => i.request_id)
       .map(i => i.request_id);
 
-    const requests = await roadmapRepository.findSyncableRequests(linkedRequestIds);
+    const requests = await roadmapRepository.findSyncableRequests(linkedRequestIds, projectId);
 
     const statusToColumn = { pending: 'backlog', backlog: 'backlog', in_progress: 'in_progress', completed: 'released' };
 
@@ -56,7 +56,7 @@ export const roadmapService = {
     return grouped;
   },
 
-  async create(body, adminUserId) {
+  async create(body, adminUserId, projectId) {
     const { request_id, title, description, category, priority, team, region, column_status = 'backlog', is_discovery = false } = body;
 
     const validColumns = ['backlog', 'in_progress', 'released'];
@@ -75,6 +75,7 @@ export const roadmapService = {
       column_status: finalColumn,
       position: maxPos + 1,
       created_by: adminUserId,
+      project_id: projectId,
       is_discovery: is_discovery ? 1 : 0,
     });
 
@@ -118,7 +119,7 @@ export const roadmapService = {
     return item;
   },
 
-  async promote(requestId, columnStatus, position, adminUserId) {
+  async promote(requestId, columnStatus, position, adminUserId, projectId) {
     if (!requestId) throw new ValidationError('request_id is required');
 
     const request = await requestRepository.findByIdOrFail(requestId);
@@ -142,6 +143,7 @@ export const roadmapService = {
       column_status: targetColumn,
       position: targetPosition,
       created_by: adminUserId,
+      project_id: projectId,
     });
 
     if (STATUS_MAP[targetColumn]) {

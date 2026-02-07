@@ -6,6 +6,7 @@ import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { FeatureFlagProvider } from './context/FeatureFlagContext'
+import { ProjectProvider } from './context/ProjectContext'
 import { ToastProvider } from './components/ui/Toast'
 import { queryClient } from './lib/queryClient'
 import './index.css'
@@ -15,13 +16,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <FeatureFlagProvider>
-            <AuthProvider>
-              <ToastProvider>
-                <App />
-              </ToastProvider>
-            </AuthProvider>
-          </FeatureFlagProvider>
+          <AuthProvider>
+            <ProjectProvider>
+              <FeatureFlagProvider>
+                <ToastProvider>
+                  <App />
+                </ToastProvider>
+              </FeatureFlagProvider>
+            </ProjectProvider>
+          </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>

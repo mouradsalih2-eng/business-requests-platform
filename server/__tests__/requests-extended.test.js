@@ -138,6 +138,33 @@ jest.unstable_mockModule('../src/middleware/auth.js', () => ({
   },
 }));
 
+jest.unstable_mockModule('../src/middleware/project.js', () => ({
+  requireProject: (req, res, next) => {
+    req.project = { id: 1, name: 'Default Project', slug: 'default' };
+    req.projectRole = req.user?.role === 'admin' || req.user?.role === 'super_admin' ? 'admin' : 'member';
+    next();
+  },
+  requireProjectAdmin: (req, res, next) => {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'super_admin' && req.projectRole !== 'admin') {
+      return res.status(403).json({ error: 'Project admin access required' });
+    }
+    next();
+  },
+  requireSuperAdmin: (req, res, next) => {
+    if (req.user?.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    next();
+  },
+}));
+
+jest.unstable_mockModule('../src/repositories/customFieldValueRepository.js', () => ({
+  customFieldValueRepository: {
+    findByRequest: jest.fn().mockResolvedValue([]),
+    upsertValues: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 // Dynamic imports AFTER all mocks are registered
 const { default: requestsRoutes } = await import('../src/routes/requests.js');
 const { errorHandler } = await import('../src/middleware/errorHandler.js');
@@ -213,7 +240,7 @@ describe('Requests Extended API', () => {
       expect(res.body.priorityBreakdown).toBeDefined();
       expect(res.body.teamBreakdown).toBeDefined();
       expect(res.body.regionBreakdown).toBeDefined();
-      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('7days');
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('7days', 1);
     });
 
     it('returns analytics data for 30 days period', async () => {
@@ -234,7 +261,7 @@ describe('Requests Extended API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.summary.total).toBe(0);
-      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('30days');
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('30days', 1);
     });
 
     it('returns analytics data for 90 days period', async () => {
@@ -252,7 +279,7 @@ describe('Requests Extended API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.summary.total).toBe(5);
-      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('90days');
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('90days', 1);
     });
 
     it('returns analytics data for all time (default period)', async () => {
@@ -270,7 +297,7 @@ describe('Requests Extended API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.summary.total).toBe(100);
-      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('all');
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('all', 1);
     });
 
     it('passes undefined period when no query param given', async () => {
@@ -287,7 +314,7 @@ describe('Requests Extended API', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
-      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith(undefined);
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith(undefined, 1);
     });
 
     it('returns 500 when the service throws an unexpected error', async () => {

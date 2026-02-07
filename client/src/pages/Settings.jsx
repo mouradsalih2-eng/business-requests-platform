@@ -70,7 +70,26 @@ export default function Settings() {
 
         <div className="space-y-6">
           <ProfileSection user={user} onUpdate={handleUserUpdate} />
-          <PasswordSection />
+
+          {/* Show auth provider badge for OAuth users */}
+          {user?.auth_provider && user.auth_provider !== 'email' && (
+            <div className="bg-white dark:bg-[#161B22] rounded-xl border border-neutral-200 dark:border-[#30363D] p-5">
+              <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">Authentication</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2.5 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-full capitalize">
+                  {user.auth_provider}
+                </span>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Signed in via {user.auth_provider === 'google' ? 'Google' : 'Microsoft'} OAuth
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Hide password section for OAuth users */}
+          {(!user?.auth_provider || user.auth_provider === 'email') && (
+            <PasswordSection />
+          )}
           <ThemeSection />
         </div>
       </div>

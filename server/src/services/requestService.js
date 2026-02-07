@@ -59,7 +59,7 @@ export const requestService = {
   /**
    * Compute analytics data for the admin dashboard.
    */
-  async getAnalytics(period) {
+  async getAnalytics(period, projectId) {
     const now = new Date();
     let days, groupBy;
 
@@ -71,7 +71,7 @@ export const requestService = {
     }
 
     const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const requests = await requestRepository.findForAnalytics(startDate);
+    const requests = await requestRepository.findForAnalytics(startDate, projectId);
 
     // Group by time period
     const grouped = {};
@@ -135,10 +135,10 @@ export const requestService = {
   /**
    * Search requests for autocomplete.
    */
-  async search(query, limit = 10) {
+  async search(query, limit = 10, projectId) {
     if (!query || query.length < 2) return [];
 
-    const requests = await requestRepository.findAllBasic();
+    const requests = await requestRepository.findAllBasic(projectId);
     const term = query.toLowerCase();
     const limitNum = Math.min(parseInt(limit, 10) || 10, 20);
 

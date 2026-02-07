@@ -11,9 +11,11 @@ import { AdminPanel } from './pages/AdminPanel';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import Settings from './pages/Settings';
 import { Roadmap } from './pages/Roadmap';
+import ProjectSettings from './pages/ProjectSettings';
+import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 
-function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, loading, isAdmin } = useAuth();
+function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false }) {
+  const { user, loading, isAdmin, isSuperAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -25,6 +27,10 @@ function ProtectedRoute({ children, adminOnly = false }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (superAdminOnly && !isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (adminOnly && !isAdmin) {
@@ -143,6 +149,23 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Settings />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/project-settings"
+        element={
+          <ProtectedRoute adminOnly>
+            <ProjectSettings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/super-admin"
+        element={
+          <ProtectedRoute superAdminOnly>
+            <SuperAdminDashboard />
           </ProtectedRoute>
         }
       />

@@ -67,14 +67,15 @@ Core functionality for first usable version.
 
 ---
 
-## Phase 3: Foundation — In Progress
+## Phase 3: Foundation — Done
 
-### F2 — Supabase Migration — In Progress
+### F2 — Supabase Migration — Done
 - **Size**: XL | **Dependencies**: None (foundational)
-- Migrate SQL.js → Supabase PostgreSQL
-- Replace custom JWT auth → Supabase Auth
-- Local file storage → Supabase Storage buckets
-- Add Realtime subscriptions (requests, comments, votes)
+- ~~Migrate SQL.js → Supabase PostgreSQL~~ ✓
+- ~~Replace custom JWT auth → Supabase Auth~~ ✓
+- ~~Local file storage → Supabase Storage buckets~~ ✓
+- ~~Deployed to Railway with multi-stage Dockerfile~~ ✓
+- Realtime subscriptions deferred to Phase 4
 - Spec: `agent-os/specs/supabase-migration/shape.md`
 
 ---
@@ -95,11 +96,11 @@ Core functionality for first usable version.
 - Field visibility control: submitter vs admin_only (max 4-5 submitter fields)
 - Spec: `agent-os/specs/multi-project-saas/shape.md`
 
-### F3 — Move Roadmap to Sidebar — Future
+### F3 — Move Roadmap to Sidebar — Done
 - **Size**: S | **Dependencies**: None
-- Dedicated sidebar nav item + `/roadmap` route
-- Remove from Dashboard tabs
-- Files: `Sidebar.jsx`, `App.jsx`, `Dashboard.jsx`
+- ~~Dedicated sidebar nav item + `/roadmap` route~~ ✓
+- ~~Remove from Dashboard tabs~~ ✓
+- Files: `Sidebar.jsx`, `App.jsx`, `Dashboard.jsx`, `pages/Roadmap.jsx`
 - Spec: `agent-os/specs/roadmap-sidebar/shape.md`
 
 ### F4 — AI Assistant (Anthropic Claude) — Future
@@ -167,3 +168,5 @@ Core functionality for first usable version.
 | Roadmap Kanban View | 2 | Jan 2026 |
 | Request Merging | 2 | Jan 2026 |
 | Feature Flags | 2 | Feb 2026 |
+| Supabase Migration (DB + Auth + Storage + Deploy) | 3 | Feb 2026 |
+| F3 — Move Roadmap to Sidebar | 4 | Feb 2026 |

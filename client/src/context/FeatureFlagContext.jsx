@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { featureFlags } from '../lib/api';
+import { useProject } from './ProjectContext';
 
 const FeatureFlagContext = createContext({
   flags: {},
@@ -11,6 +12,7 @@ const FeatureFlagContext = createContext({
 export function FeatureFlagProvider({ children }) {
   const [flags, setFlags] = useState({});
   const [loading, setLoading] = useState(true);
+  const { currentProject } = useProject();
 
   const loadFlags = useCallback(async () => {
     try {
@@ -29,9 +31,10 @@ export function FeatureFlagProvider({ children }) {
     }
   }, []);
 
+  // Re-fetch flags when project changes
   useEffect(() => {
     loadFlags();
-  }, [loadFlags]);
+  }, [loadFlags, currentProject?.id]);
 
   // Check if a specific feature is enabled
   // Defaults to true if flag doesn't exist (permissive default)

@@ -2,6 +2,8 @@ import { supabase } from './supabase';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
+const STORAGE_KEY = 'selectedProjectId';
+
 /**
  * Get the current Supabase access token.
  * Returns null if no active session.
@@ -9,6 +11,10 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 async function getToken() {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token || null;
+}
+
+function getProjectId() {
+  return localStorage.getItem(STORAGE_KEY) || null;
 }
 
 async function request(endpoint, options = {}) {
@@ -23,6 +29,12 @@ async function request(endpoint, options = {}) {
 
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  // Attach project ID header
+  const projectId = getProjectId();
+  if (projectId) {
+    config.headers['X-Project-Id'] = projectId;
   }
 
   // Don't set Content-Type for FormData (let browser set it with boundary)
@@ -291,5 +303,85 @@ export const featureFlags = {
     request(`/feature-flags/${name}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
+    }),
+};
+
+// Form Config
+export const formConfig = {
+  get: () => request('/form-config'),
+
+  update: (data) =>
+    request('/form-config', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  createField: (data) =>
+    request('/form-config/fields', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateField: (fieldId, data) =>
+    request(`/form-config/fields/${fieldId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteField: (fieldId) =>
+    request(`/form-config/fields/${fieldId}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Super Admin
+export const superAdmin = {
+  getProjects: () => request('/super-admin/projects'),
+  getStats: () => request('/super-admin/stats'),
+  getTrends: (days = 30) => request(`/super-admin/trends?days=${days}`),
+  getStatusBreakdown: () => request('/super-admin/status-breakdown'),
+};
+
+// Projects
+export const projects = {
+  getAll: () => request('/projects'),
+
+  getOne: (id) => request(`/projects/${id}`),
+
+  create: (data) =>
+    request('/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id, data) =>
+    request(`/projects/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id) =>
+    request(`/projects/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Members
+  getMembers: (id) => request(`/projects/${id}/members`),
+
+  addMember: (id, userId, role = 'member') =>
+    request(`/projects/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, role }),
+    }),
+
+  updateMemberRole: (id, userId, role) =>
+    request(`/projects/${id}/members/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeMember: (id, userId) =>
+    request(`/projects/${id}/members/${userId}`, {
+      method: 'DELETE',
     }),
 };

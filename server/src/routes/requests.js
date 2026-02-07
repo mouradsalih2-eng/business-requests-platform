@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { requireProject, requireProjectAdmin } from '../middleware/project.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requestRepository } from '../repositories/requestRepository.js';
 import { voteRepository } from '../repositories/voteRepository.js';
@@ -11,6 +12,7 @@ import { requestService } from '../services/requestService.js';
 import { storageService } from '../services/storageService.js';
 import { commentRepository } from '../repositories/commentRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
+import { customFieldValueRepository } from '../repositories/customFieldValueRepository.js';
 import { ValidationError, ForbiddenError, NotFoundError } from '../errors/AppError.js';
 
 const router = Router();
@@ -41,21 +43,21 @@ const upload = multer({
 // ── Routes ───────────────────────────────────────────────────
 
 // Analytics (admin only) — before /:id
-router.get('/stats/analytics', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
-  const data = await requestService.getAnalytics(req.query.period);
+router.get('/stats/analytics', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
+  const data = await requestService.getAnalytics(req.query.period, req.project.id);
   res.json(data);
 }));
 
 // Search autocomplete — before /:id
-router.get('/search', authenticateToken, asyncHandler(async (req, res) => {
-  const results = await requestService.search(req.query.q, req.query.limit);
+router.get('/search', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+  const results = await requestService.search(req.query.q, req.query.limit, req.project.id);
   res.json(results);
 }));
 
 // List all requests
-router.get('/', authenticateToken, asyncHandler(async (req, res) => {
-  const requests = await requestRepository.findAll({ ...req.query, userId: req.user.id });
-  const isAdmin = req.user.role === 'admin';
+router.get('/', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+  const requests = await requestRepository.findAll({ ...req.query, userId: req.user.id, projectId: req.project.id });
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin' || req.projectRole === 'admin';
 
   // Enrich with user votes and read status
   const enriched = await Promise.all(requests.map(async (request) => {
@@ -73,12 +75,13 @@ router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
   const request = await requestRepository.findByIdWithCounts(req.params.id);
   if (!request) return res.status(404).json({ error: 'Request not found' });
 
-  const [attachments, userVotes] = await Promise.all([
+  const [attachments, userVotes, customFieldValues] = await Promise.all([
     attachmentRepository.findByRequest(req.params.id),
     voteRepository.getUserVoteTypes(req.params.id, req.user.id),
+    customFieldValueRepository.findByRequest(req.params.id),
   ]);
 
-  res.json({ ...request, attachments, userVotes });
+  res.json({ ...request, attachments, userVotes, customFieldValues });
 }));
 
 // Get interactions (upvoters, likers, commenters)
@@ -93,13 +96,13 @@ router.get('/:id/interactions', authenticateToken, asyncHandler(async (req, res)
 }));
 
 // Create request
-router.post('/', authenticateToken, upload.array('attachments', 5), asyncHandler(async (req, res) => {
+router.post('/', authenticateToken, requireProject, upload.array('attachments', 5), asyncHandler(async (req, res) => {
   const { title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact, on_behalf_of_user_id, on_behalf_of_name } = req.body;
   if (!title?.trim() || !category || !priority) throw new ValidationError('Title, category, and priority are required');
 
   // On-behalf-of: admin-only feature
   const isOnBehalf = on_behalf_of_user_id || on_behalf_of_name;
-  if (isOnBehalf && req.user.role !== 'admin') {
+  if (isOnBehalf && req.user.role !== 'admin' && req.user.role !== 'super_admin' && req.projectRole !== 'admin') {
     throw new ForbiddenError('Only admins can post on behalf of others');
   }
 
@@ -122,6 +125,7 @@ router.post('/', authenticateToken, upload.array('attachments', 5), asyncHandler
 
   const insertData = {
     user_id: userId, title, category, priority,
+    project_id: req.project.id,
     team: team || 'Manufacturing', region: region || 'Global',
     business_problem: business_problem || '', problem_size: problem_size || '',
     business_expectations: business_expectations || '', expected_impact: expected_impact || '',
@@ -133,6 +137,19 @@ router.post('/', authenticateToken, upload.array('attachments', 5), asyncHandler
 
   const request = await requestRepository.create(insertData);
 
+  // Save custom field values if provided
+  const customFieldsRaw = req.body.custom_fields;
+  if (customFieldsRaw) {
+    try {
+      const customFields = typeof customFieldsRaw === 'string' ? JSON.parse(customFieldsRaw) : customFieldsRaw;
+      if (Array.isArray(customFields) && customFields.length > 0) {
+        await customFieldValueRepository.upsertValues(request.id, customFields);
+      }
+    } catch {
+      // Ignore invalid custom_fields JSON — don't fail the whole request
+    }
+  }
+
   if (req.files?.length) {
     for (const file of req.files) {
       const { publicUrl } = await storageService.uploadAttachment(
@@ -143,14 +160,15 @@ router.post('/', authenticateToken, upload.array('attachments', 5), asyncHandler
   }
 
   const attachments = await attachmentRepository.findByRequest(request.id);
-  res.status(201).json({ ...request, attachments });
+  const customFieldValues = await customFieldValueRepository.findByRequest(request.id);
+  res.status(201).json({ ...request, attachments, customFieldValues });
 }));
 
 // Update request
-router.patch('/:id', authenticateToken, asyncHandler(async (req, res) => {
+router.patch('/:id', authenticateToken, requireProject, asyncHandler(async (req, res) => {
   const request = await requestRepository.findByIdOrFail(req.params.id);
   const isOwner = request.user_id === req.user.id;
-  const isAdmin = req.user.role === 'admin';
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin' || req.projectRole === 'admin';
   if (!isOwner && !isAdmin) throw new ForbiddenError('Not authorized to update this request');
 
   const { status, title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact } = req.body;
@@ -193,14 +211,14 @@ router.get('/:id/activity', authenticateToken, asyncHandler(async (req, res) => 
 }));
 
 // Delete request (admin)
-router.delete('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+router.delete('/:id', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
   await requestRepository.findByIdOrFail(req.params.id);
   await requestRepository.delete(req.params.id);
   res.json({ message: 'Request deleted successfully' });
 }));
 
 // Merge requests (admin)
-router.post('/:id/merge', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+router.post('/:id/merge', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
   const sourceId = parseInt(req.params.id, 10);
   const { target_id, merge_votes = true, merge_comments = false } = req.body;
   if (!target_id) throw new ValidationError('Target request ID is required');
@@ -214,7 +232,7 @@ router.post('/:id/merge', authenticateToken, requireAdmin, asyncHandler(async (r
 }));
 
 // Mark as read (admin)
-router.post('/:id/read', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+router.post('/:id/read', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
   await requestRepository.findByIdOrFail(req.params.id);
   await adminReadRepository.markRead(req.params.id, req.user.id);
   res.json({ message: 'Request marked as read' });

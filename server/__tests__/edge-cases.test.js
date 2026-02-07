@@ -152,6 +152,33 @@ jest.unstable_mockModule('../src/middleware/auth.js', () => ({
   },
 }));
 
+jest.unstable_mockModule('../src/middleware/project.js', () => ({
+  requireProject: (req, res, next) => {
+    req.project = { id: 1, name: 'Default Project', slug: 'default' };
+    req.projectRole = req.user?.role === 'admin' || req.user?.role === 'super_admin' ? 'admin' : 'member';
+    next();
+  },
+  requireProjectAdmin: (req, res, next) => {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'super_admin' && req.projectRole !== 'admin') {
+      return res.status(403).json({ error: 'Project admin access required' });
+    }
+    next();
+  },
+  requireSuperAdmin: (req, res, next) => {
+    if (req.user?.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    next();
+  },
+}));
+
+jest.unstable_mockModule('../src/repositories/customFieldValueRepository.js', () => ({
+  customFieldValueRepository: {
+    findByRequest: jest.fn().mockResolvedValue([]),
+    upsertValues: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 // ── Import routes and error infrastructure AFTER mocks ───────
 
 const { default: requestsRoutes } = await import('../src/routes/requests.js');
@@ -845,7 +872,7 @@ describe('Edge Cases - Input Validation', () => {
         .get('/api/requests/search?q=test&limit=5')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(mockRequestService.search).toHaveBeenCalledWith('test', '5');
+      expect(mockRequestService.search).toHaveBeenCalledWith('test', '5', 1);
     });
   });
 

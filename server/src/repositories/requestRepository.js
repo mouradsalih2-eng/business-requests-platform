@@ -46,8 +46,10 @@ export const requestRepository = {
   /**
    * Builds and runs a filtered, sorted query against the requests_with_counts view.
    */
-  async findAll({ status, category, priority, sort, order, myRequests, timePeriod, search, userId }) {
+  async findAll({ status, category, priority, sort, order, myRequests, timePeriod, search, userId, projectId }) {
     let query = supabase.from('requests_with_counts').select('*');
+
+    if (projectId) query = query.eq('project_id', projectId);
 
     // Exclude archived unless specifically filtering for them
     if (status !== 'archived') {
@@ -87,21 +89,23 @@ export const requestRepository = {
     return data;
   },
 
-  async findForAnalytics(startDate) {
-    const { data, error } = await supabase
+  async findForAnalytics(startDate, projectId) {
+    let query = supabase
       .from('requests')
       .select('id, created_at, status, category, priority, team, region')
-      .gte('created_at', startDate.toISOString())
-      .order('created_at');
+      .gte('created_at', startDate.toISOString());
+    if (projectId) query = query.eq('project_id', projectId);
+    const { data, error } = await query.order('created_at');
     if (error) handleError(error, 'findForAnalytics');
     return data;
   },
 
-  async findAllBasic() {
-    const { data, error } = await supabase
+  async findAllBasic(projectId) {
+    let query = supabase
       .from('requests')
-      .select('id, title, status, category, user_id, users!user_id(name)')
-      .order('created_at', { ascending: false });
+      .select('id, title, status, category, user_id, users!user_id(name)');
+    if (projectId) query = query.eq('project_id', projectId);
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) handleError(error, 'findAllBasic');
     return data.map(r => ({
       id: r.id,

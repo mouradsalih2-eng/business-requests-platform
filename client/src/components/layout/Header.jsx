@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../ui/Avatar';
+import { ProjectSwitcher } from './ProjectSwitcher';
 
 export function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
@@ -57,6 +58,9 @@ export function Header({ onMenuClick }) {
             User Voice
           </span>
         </Link>
+
+        {/* Project Switcher */}
+        <ProjectSwitcher />
       </div>
 
       {/* Right: User menu */}

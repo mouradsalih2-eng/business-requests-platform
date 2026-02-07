@@ -88,3 +88,16 @@ export const mergeRequestSchema = z.object({
   merge_votes: z.boolean().optional().default(true),
   merge_comments: z.boolean().optional().default(false),
 });
+
+// Project schemas
+export const projectCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  slug: z.string().min(1, 'Slug is required').max(50, 'Slug too long')
+    .regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
+  description: z.string().max(500).optional(),
+});
+
+export const projectUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional().nullable(),
+});

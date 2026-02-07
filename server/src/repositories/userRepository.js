@@ -78,8 +78,8 @@ export const userRepository = {
     return data;
   },
 
-  async create({ email, password, name, role = 'employee', auth_id }) {
-    const insertData = { email, name, role };
+  async create({ email, password, name, role = 'employee', auth_id, auth_provider = 'email' }) {
+    const insertData = { email, name, role, auth_provider };
     if (password) insertData.password = password;
     if (auth_id) insertData.auth_id = auth_id;
 

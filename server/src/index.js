@@ -18,6 +18,9 @@ import commentsRoutes from './routes/comments.js';
 import usersRoutes from './routes/users.js';
 import roadmapRoutes from './routes/roadmap.js';
 import featureFlagsRoutes from './routes/feature-flags.js';
+import projectsRoutes from './routes/projects.js';
+import formConfigRoutes from './routes/form-config.js';
+import superAdminRoutes from './routes/super-admin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,11 +36,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      connectSrc: ["'self'", config.supabase.url],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      connectSrc: ["'self'", config.supabase.url, "https://accounts.google.com", "https://login.microsoftonline.com"],
+      scriptSrc: ["'self'", "https://accounts.google.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", config.supabase.url],
+      frameSrc: ["'self'", config.supabase.url, "https://accounts.google.com", "https://login.microsoftonline.com"],
     },
   },
 }));
@@ -124,6 +128,9 @@ function createApiRouter() {
   router.use('/users', usersRoutes);
   router.use('/roadmap', roadmapRoutes);
   router.use('/feature-flags', featureFlagsRoutes);
+  router.use('/projects', projectsRoutes);
+  router.use('/form-config', formConfigRoutes);
+  router.use('/super-admin', superAdminRoutes);
   return router;
 }
 
