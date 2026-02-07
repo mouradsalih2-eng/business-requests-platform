@@ -10,6 +10,7 @@ import { MyRequests } from './pages/MyRequests';
 import { AdminPanel } from './pages/AdminPanel';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import Settings from './pages/Settings';
+import { Roadmap } from './pages/Roadmap';
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading, isAdmin } = useAuth();
@@ -126,6 +127,14 @@ export default function App() {
         element={
           <ProtectedRoute adminOnly>
             <AdminPanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/roadmap"
+        element={
+          <ProtectedRoute>
+            <Roadmap />
           </ProtectedRoute>
         }
       />

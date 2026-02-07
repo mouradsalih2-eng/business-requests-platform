@@ -441,7 +441,7 @@ export function AdminPanel() {
     try {
       await featureFlagsApi.toggle(name, enabled);
       setFlagsList((prev) =>
-        prev.map((f) => (f.name === name ? { ...f, enabled: enabled ? 1 : 0 } : f))
+        prev.map((f) => (f.name === name ? { ...f, enabled } : f))
       );
       // Refresh the global feature flags context
       refreshFeatureFlags();
@@ -1085,7 +1085,7 @@ export function AdminPanel() {
                     <Toggle
                       label={formatFlagName(flag.name)}
                       description={flag.description}
-                      checked={flag.enabled === 1}
+                      checked={!!flag.enabled}
                       onChange={(enabled) => handleToggleFlag(flag.name, enabled)}
                       disabled={togglingFlag === flag.name}
                     />

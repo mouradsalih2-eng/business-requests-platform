@@ -17,7 +17,7 @@ export function FeatureFlagProvider({ children }) {
       const data = await featureFlags.getAll();
       const flagMap = {};
       data.forEach(f => {
-        flagMap[f.name] = f.enabled === 1;
+        flagMap[f.name] = !!f.enabled;
       });
       setFlags(flagMap);
     } catch (err) {
