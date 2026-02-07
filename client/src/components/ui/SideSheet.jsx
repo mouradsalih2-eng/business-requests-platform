@@ -46,7 +46,7 @@ export function SideSheet({ isOpen, onClose, title, children }) {
       {/* Side Sheet */}
       <div
         className={`
-          fixed top-0 right-0 bottom-0 w-full max-w-sm bg-white dark:bg-[#161B22] z-50
+          fixed top-0 right-0 bottom-0 w-full sm:max-w-md bg-white dark:bg-[#161B22] z-50
           shadow-2xl transform transition-transform duration-300 ease-out
           flex flex-col border-l border-neutral-200 dark:border-[#30363D]
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}

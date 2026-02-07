@@ -1,40 +1,93 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { RequestList } from '../components/requests/RequestList';
 import { RequestDetail } from '../components/requests/RequestDetail';
+import { SideSheet } from '../components/ui/SideSheet';
+import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { SearchInput } from '../components/ui/SearchInput';
 import { SkeletonList } from '../components/ui/Skeleton';
+import { FilterChips } from '../components/ui/FilterChips';
 import { requests as requestsApi } from '../lib/api';
 
 /**
  * MyRequests - User's personal request tracking page
  * Shows only requests submitted by the current user
+ * Mirrors Dashboard's search/filter/sort UI
  */
+
+const statusOptions = [
+  { value: '', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'duplicate', label: 'Duplicate' },
+];
+
+const categoryOptions = [
+  { value: '', label: 'All Categories' },
+  { value: 'bug', label: 'Bug' },
+  { value: 'new_feature', label: 'New Feature' },
+  { value: 'optimization', label: 'Optimization' },
+];
 
 export function MyRequests() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Initialize filters from URL params
+  const [filters, setFilters] = useState({
+    status: searchParams.get('status') || '',
+    category: searchParams.get('category') || '',
+    sort: searchParams.get('sort') || 'recency',
+    search: searchParams.get('search') || '',
+  });
+
   const [requestsList, setRequestsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // Track position changes for animations
+  const [positionChanges, setPositionChanges] = useState({});
+  const previousOrderRef = useRef([]);
+
+  // Track items being archived for exit animation
   const [archivingIds, setArchivingIds] = useState(new Set());
 
+  // Check if any filters are active
+  const hasActiveFilters = filters.status || filters.category;
+  const activeFilterCount = [filters.status, filters.category].filter(Boolean).length;
+
+  // Sync filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    if (filters.category) params.set('category', filters.category);
+    if (filters.sort && filters.sort !== 'recency') params.set('sort', filters.sort);
+    if (filters.search) params.set('search', filters.search);
+    setSearchParams(params, { replace: true });
+  }, [filters, setSearchParams]);
+
+  // Load requests from API
   useEffect(() => {
     loadRequests();
-  }, [statusFilter, searchQuery]);
+  }, [filters.status, filters.category, filters.search]);
 
   const loadRequests = async () => {
     setLoading(true);
     try {
-      // Use myRequests=true to only get current user's requests
       const params = { order: 'desc', myRequests: 'true' };
-      if (statusFilter) params.status = statusFilter;
-      if (searchQuery) params.search = searchQuery;
+      if (filters.status) params.status = filters.status;
+      if (filters.category) params.category = filters.category;
+      if (filters.search) params.search = filters.search;
+
       const data = await requestsApi.getAll(params);
       setRequestsList(data);
+      previousOrderRef.current = data.map(r => r.id);
     } catch (err) {
       console.error('Failed to load requests:', err);
     } finally {
@@ -42,10 +95,80 @@ export function MyRequests() {
     }
   };
 
+  // Sort requests client-side for instant updates
+  const sortedRequests = useMemo(() => {
+    const sorted = [...requestsList];
+
+    if (filters.sort === 'votes') {
+      sorted.sort((a, b) => {
+        const scoreA = (a.upvotes || 0) + (a.likes || 0);
+        const scoreB = (b.upvotes || 0) + (b.likes || 0);
+        return scoreB - scoreA;
+      });
+    } else {
+      sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    return sorted;
+  }, [requestsList, filters.sort]);
+
+  // Toggle sort between recency and votes
+  const toggleSort = () => {
+    setFilters((prev) => ({
+      ...prev,
+      sort: prev.sort === 'recency' ? 'votes' : 'recency',
+    }));
+  };
+
+  // Detect position changes when sorted order changes
+  useEffect(() => {
+    const currentOrder = sortedRequests.map(r => r.id);
+    const changes = {};
+
+    currentOrder.forEach((id, newIndex) => {
+      const oldIndex = previousOrderRef.current.indexOf(id);
+      if (oldIndex !== -1 && oldIndex !== newIndex) {
+        if (newIndex < oldIndex) {
+          changes[id] = 'up';
+        } else if (newIndex > oldIndex) {
+          changes[id] = 'down';
+        }
+      }
+    });
+
+    if (Object.keys(changes).length > 0) {
+      setPositionChanges(changes);
+      setTimeout(() => {
+        setPositionChanges({});
+      }, 2000);
+    }
+
+    previousOrderRef.current = currentOrder;
+  }, [sortedRequests]);
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ status: '', category: '', sort: 'recency', search: '' });
+  };
+
   // Handle search from autocomplete
   const handleSearchSelect = (suggestion) => {
     handleRequestClick(suggestion);
   };
+
+  // Handle real-time vote updates
+  const handleVoteChange = useCallback((requestId, { upvotes, likes, userVotes }) => {
+    setRequestsList((prev) =>
+      prev.map((r) =>
+        r.id === requestId
+          ? { ...r, upvotes, likes, userVotes }
+          : r
+      )
+    );
+  }, []);
 
   const handleRequestClick = async (request) => {
     try {
@@ -56,30 +179,10 @@ export function MyRequests() {
     }
   };
 
-  // Handle real-time vote updates
-  const handleVoteChange = useCallback((requestId, { upvotes, likes }) => {
-    setRequestsList((prev) =>
-      prev.map((r) =>
-        r.id === requestId
-          ? { ...r, upvotes, likes }
-          : r
-      )
-    );
-  }, []);
-
-  const handleDelete = (requestId) => {
-    setRequestsList((prev) => prev.filter((r) => r.id !== requestId));
-    setSelectedRequest(null);
-  };
-
   const handleStatusUpdate = (requestId, newStatus) => {
-    // If archiving, animate out then remove from list
     if (newStatus === 'archived') {
-      // Start exit animation
       setArchivingIds((prev) => new Set([...prev, requestId]));
-      // Close the modal
       setSelectedRequest(null);
-      // Remove from list after animation completes
       setTimeout(() => {
         setRequestsList((prev) => prev.filter((r) => r.id !== requestId));
         setArchivingIds((prev) => {
@@ -98,27 +201,16 @@ export function MyRequests() {
     }
   };
 
-  // Group requests by status for summary
-  const statusCounts = requestsList.reduce((acc, req) => {
-    acc[req.status] = (acc[req.status] || 0) + 1;
-    return acc;
-  }, {});
-
-  // Status config
-  const statusConfig = [
-    { key: 'pending', label: 'Pending' },
-    { key: 'backlog', label: 'Backlog' },
-    { key: 'in_progress', label: 'Active' },
-    { key: 'completed', label: 'Done' },
-    { key: 'rejected', label: 'Rejected' },
-    { key: 'duplicate', label: 'Duplicate' },
-  ];
+  const handleDelete = (requestId) => {
+    setRequestsList((prev) => prev.filter((r) => r.id !== requestId));
+    setSelectedRequest(null);
+  };
 
   return (
     <Layout>
       <div className="max-w-4xl mx-auto">
-        {/* Header with back button */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(-1)}
@@ -130,8 +222,8 @@ export function MyRequests() {
               </svg>
             </button>
             <div>
-              <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-neutral-100">My Requests</h1>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Track your submitted requests</p>
+              <h1 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-1">My Requests</h1>
+              <p className="text-sm text-neutral-500 dark:text-[#8B949E]">Track your submitted requests</p>
             </div>
           </div>
           <Link to="/new-request">
@@ -139,49 +231,68 @@ export function MyRequests() {
           </Link>
         </div>
 
-        {/* Search */}
-        <div className="mb-6">
-          <SearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            onSelect={handleSearchSelect}
-            placeholder="Search your requests..."
-          />
-        </div>
-
-        {/* Status Summary - Horizontal scroll on mobile */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible scrollbar-hide">
+        {/* Search and Filter Row */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1">
+            <SearchInput
+              value={filters.search}
+              onChange={(value) => handleFilterChange('search', value)}
+              onSelect={handleSearchSelect}
+              placeholder="Search by title or requester..."
+            />
+          </div>
           <button
-            onClick={() => setStatusFilter('')}
+            onClick={() => setShowFilters(true)}
             className={`
-              px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0
-              ${statusFilter === ''
-                ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
-                : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+              relative flex items-center justify-center w-11 h-11 rounded-lg border transition-all duration-200
+              ${hasActiveFilters
+                ? 'bg-[#4F46E5] dark:bg-[#6366F1] border-[#4F46E5] dark:border-[#6366F1] text-white'
+                : 'bg-white dark:bg-[#21262D] border-neutral-200 dark:border-[#30363D] text-neutral-600 dark:text-[#8B949E] hover:border-neutral-300 dark:hover:border-[#484F58] hover:bg-neutral-50 dark:hover:bg-[#2D333B]'
               }
             `}
+            title="Filters"
           >
-            All ({requestsList.length})
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+            </svg>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs font-medium rounded-full flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
-          {statusConfig.map(({ key, label }) => {
-            const count = statusCounts[key] || 0;
-            if (count === 0 && statusFilter !== key) return null;
-            return (
-              <button
-                key={key}
-                onClick={() => setStatusFilter(statusFilter === key ? '' : key)}
-                className={`
-                  px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0
-                  ${statusFilter === key
-                    ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
-                    : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600'
-                  }
-                `}
-              >
-                {label} ({count})
-              </button>
-            );
-          })}
+        </div>
+
+        {/* Active Filter Chips */}
+        <FilterChips
+          filters={filters}
+          onRemove={(key) => handleFilterChange(key, '')}
+          onClearAll={clearFilters}
+        />
+
+        {/* Request count and sort toggle */}
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-neutral-500 dark:text-[#8B949E]">
+            {sortedRequests.length} request{sortedRequests.length !== 1 ? 's' : ''}
+          </p>
+          <button
+            onClick={toggleSort}
+            className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] transition-colors"
+            title={filters.sort === 'recency' ? 'Sorted by recent' : 'Sorted by votes'}
+          >
+            <span className="text-neutral-400 dark:text-[#6E7681]">
+              {filters.sort === 'recency' ? 'Recent' : 'Votes'}
+            </span>
+            <svg
+              className={`w-4 h-4 transition-transform duration-200 ${filters.sort === 'votes' ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
 
         {/* Request List */}
@@ -189,13 +300,54 @@ export function MyRequests() {
           <SkeletonList count={3} />
         ) : (
           <RequestList
-            requests={requestsList}
+            requests={sortedRequests}
             onRequestClick={handleRequestClick}
             onVoteChange={handleVoteChange}
+            positionChanges={positionChanges}
             exitingIds={archivingIds}
             emptyMessage="You haven't submitted any requests yet"
           />
         )}
+
+        {/* Filter Side Sheet */}
+        <SideSheet
+          isOpen={showFilters}
+          onClose={() => setShowFilters(false)}
+          title="Filters"
+        >
+          <div className="space-y-5">
+            <Select
+              label="Status"
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              options={statusOptions}
+            />
+            <Select
+              label="Category"
+              value={filters.category}
+              onChange={(e) => handleFilterChange('category', e.target.value)}
+              options={categoryOptions}
+            />
+
+            {/* Actions */}
+            <div className="pt-4 border-t border-neutral-100 dark:border-[#30363D] space-y-3">
+              <Button
+                onClick={() => setShowFilters(false)}
+                className="w-full"
+              >
+                Apply Filters
+              </Button>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="w-full text-sm text-neutral-500 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] transition-colors py-2"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          </div>
+        </SideSheet>
 
         {/* Request Detail Modal */}
         <RequestDetail

@@ -199,7 +199,7 @@ describe('SideSheet', () => {
     );
 
     const sheet = screen.getByRole('dialog');
-    expect(sheet).toHaveClass('max-w-sm');
+    expect(sheet).toHaveClass('sm:max-w-md');
   });
 
   it('has scrollable content area', () => {
