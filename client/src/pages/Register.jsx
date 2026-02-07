@@ -4,6 +4,7 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import VerificationCodeInput from '../components/auth/VerificationCodeInput';
 import { registration } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 export function Register() {
   const [step, setStep] = useState('form'); // form, verify
@@ -59,10 +60,12 @@ export function Register() {
     setError('');
     setLoading(true);
     try {
-      const { token } = await registration.verify(email, code);
-      localStorage.setItem('token', token);
+      await registration.verify(email, code);
+      // Account created — sign in via Supabase Auth
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw new Error(signInError.message);
       navigate('/dashboard');
-      window.location.reload(); // Force reload to update auth state
+      window.location.reload();
     } catch (err) {
       setError(err.message || 'Invalid verification code');
     } finally {

@@ -4,9 +4,8 @@ node_modules/
 # Database
 *.db
 
-# Uploads
-server/uploads/*
-!server/uploads/.gitkeep
+# Uploads (legacy — files now in Supabase Storage)
+server/uploads/
 
 # Environment
 .env

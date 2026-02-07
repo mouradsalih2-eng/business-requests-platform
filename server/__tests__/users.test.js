@@ -3,438 +3,558 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-// Mock bcrypt
+// ── Constants ────────────────────────────────────────────────
+const JWT_SECRET = 'test-secret';
+
+// ── Mock repositories and services ──────────────────────────
+
+const mockUserRepository = {
+  findById: jest.fn(),
+  findByIdOrFail: jest.fn(),
+  findByEmail: jest.fn(),
+  findAll: jest.fn(),
+  findAllWithRequestCount: jest.fn(),
+  search: jest.fn(),
+  create: jest.fn(),
+  updateRole: jest.fn(),
+  updatePassword: jest.fn(),
+  updateTheme: jest.fn(),
+  updateProfilePicture: jest.fn(),
+  delete: jest.fn(),
+  count: jest.fn(),
+};
+
+const mockSeedDatabase = jest.fn();
+
+jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
+  userRepository: mockUserRepository,
+}));
+
+jest.unstable_mockModule('../src/services/seedService.js', () => ({
+  seedDatabase: mockSeedDatabase,
+}));
+
 jest.unstable_mockModule('bcryptjs', () => ({
   default: {
     hash: jest.fn().mockResolvedValue('hashed_password'),
     compare: jest.fn(),
+    compareSync: jest.fn(),
   },
 }));
 
-// Mock the database
-const mockDb = {
-  get: jest.fn(),
-  all: jest.fn(),
-  run: jest.fn(),
-};
-
-// Mock JWT_SECRET
-const JWT_SECRET = 'test-secret';
-
-jest.unstable_mockModule('../src/db/database.js', () => ({
-  default: mockDb,
-  initializeDatabase: jest.fn(),
+jest.unstable_mockModule('../src/db/supabase.js', () => ({
+  supabase: {
+    auth: {
+      admin: {
+        createUser: jest.fn().mockResolvedValue({ data: { user: { id: 'mock-uuid' } }, error: null }),
+        updateUserById: jest.fn().mockResolvedValue({ error: null }),
+        deleteUser: jest.fn().mockResolvedValue({ error: null }),
+      },
+    },
+  },
+  supabaseAnon: null,
 }));
 
 jest.unstable_mockModule('../src/middleware/auth.js', () => ({
-  JWT_SECRET,
   authenticateToken: (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ error: 'Access denied' });
-    }
-
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Access token required' });
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
+      req.user = jwt.verify(token, JWT_SECRET);
       next();
-    } catch (err) {
+    } catch {
       return res.status(403).json({ error: 'Invalid token' });
     }
   },
   requireAdmin: (req, res, next) => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
     next();
   },
 }));
 
-// Import router after mocks
-const { default: usersRoutes } = await import('../src/routes/users.js');
+// Mock storageService (files are now in Supabase Storage, no local fs)
+jest.unstable_mockModule('../src/services/storageService.js', () => ({
+  storageService: {
+    uploadAvatar: jest.fn(),
+    deleteAvatar: jest.fn(),
+    uploadAttachment: jest.fn(),
+    deleteAttachments: jest.fn(),
+  },
+}));
 
-// Create test app
+// ── Import route and error infrastructure AFTER mocks ────────
+
+const { default: usersRoutes } = await import('../src/routes/users.js');
+const { errorHandler } = await import('../src/middleware/errorHandler.js');
+
+// ── Create test Express app ──────────────────────────────────
+
 const app = express();
 app.use(express.json());
 app.use('/api/users', usersRoutes);
+app.use(errorHandler);
 
-// Helper to generate tokens
-const generateToken = (user) => jwt.sign(user, JWT_SECRET);
+// ── Helpers ──────────────────────────────────────────────────
+
+const generateToken = (payload) => jwt.sign(payload, JWT_SECRET);
+
+const employeeToken = generateToken({ id: 1, email: 'employee@example.com', role: 'employee' });
+const adminToken = generateToken({ id: 2, email: 'admin@example.com', role: 'admin' });
+
+// ── Tests ────────────────────────────────────────────────────
 
 describe('Users API', () => {
-  const userToken = generateToken({ id: 1, email: 'user@example.com', role: 'user' });
-  const adminToken = generateToken({ id: 2, email: 'admin@example.com', role: 'admin' });
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
+  // ── GET /api/users/search ──────────────────────────────────
+
   describe('GET /api/users/search', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).get('/api/users/search?q=john');
-      expect(response.status).toBe(401);
+      const res = await request(app).get('/api/users/search?q=john');
+      expect(res.status).toBe(401);
     });
 
-    it('returns empty array for empty query', async () => {
-      const response = await request(app)
+    it('returns empty array when query is empty', async () => {
+      const res = await request(app)
         .get('/api/users/search?q=')
-        .set('Authorization', `Bearer ${userToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual([]);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+      expect(mockUserRepository.search).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when query is missing', async () => {
+      const res = await request(app)
+        .get('/api/users/search')
+        .set('Authorization', `Bearer ${employeeToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('returns empty array when query is only whitespace', async () => {
+      const res = await request(app)
+        .get('/api/users/search?q=%20%20')
+        .set('Authorization', `Bearer ${employeeToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
     });
 
     it('returns matching users by name', async () => {
-      mockDb.all.mockReturnValue([
-        { id: 1, name: 'John Doe', email: 'john@example.com' },
-        { id: 2, name: 'Johnny Smith', email: 'johnny@example.com' },
+      mockUserRepository.search.mockResolvedValue([
+        { id: 10, name: 'John Doe', email: 'john@example.com' },
+        { id: 11, name: 'Johnny Smith', email: 'johnny@example.com' },
       ]);
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/users/search?q=john')
-        .set('Authorization', `Bearer ${userToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.length).toBe(2);
-      expect(response.body[0].name).toContain('John');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(2);
+      expect(res.body[0].name).toBe('John Doe');
+      expect(mockUserRepository.search).toHaveBeenCalledWith('john');
     });
 
     it('returns matching users by email', async () => {
-      mockDb.all.mockReturnValue([
-        { id: 1, name: 'Test User', email: 'test@company.com' },
+      mockUserRepository.search.mockResolvedValue([
+        { id: 10, name: 'Test User', email: 'test@company.com' },
       ]);
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/users/search?q=company')
-        .set('Authorization', `Bearer ${userToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.length).toBe(1);
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].email).toBe('test@company.com');
     });
 
-    it('limits results to 10', async () => {
-      // Check that LIMIT 10 is in the query
-      mockDb.all.mockReturnValue([]);
+    it('trims the query before searching', async () => {
+      mockUserRepository.search.mockResolvedValue([]);
 
       await request(app)
-        .get('/api/users/search?q=test')
-        .set('Authorization', `Bearer ${userToken}`);
+        .get('/api/users/search?q=%20john%20')
+        .set('Authorization', `Bearer ${employeeToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain('LIMIT 10');
+      expect(mockUserRepository.search).toHaveBeenCalledWith('john');
     });
   });
+
+  // ── GET /api/users (admin list all) ────────────────────────
 
   describe('GET /api/users', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).get('/api/users');
-      expect(response.status).toBe(401);
+      const res = await request(app).get('/api/users');
+      expect(res.status).toBe(401);
     });
 
     it('returns 403 for non-admin users', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/users')
-        .set('Authorization', `Bearer ${userToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
-      expect(response.status).toBe(403);
-      expect(response.body.error).toContain('Admin');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Admin');
     });
 
-    it('returns all users for admin', async () => {
-      mockDb.all.mockReturnValue([
-        { id: 1, email: 'user1@test.com', name: 'User 1', role: 'employee', request_count: 5 },
-        { id: 2, email: 'user2@test.com', name: 'User 2', role: 'admin', request_count: 3 },
+    it('returns all users with request counts for admin', async () => {
+      mockUserRepository.findAllWithRequestCount.mockResolvedValue([
+        { id: 1, email: 'user1@test.com', name: 'User 1', role: 'employee', created_at: '2024-01-01', request_count: 5 },
+        { id: 2, email: 'admin@test.com', name: 'Admin', role: 'admin', created_at: '2024-01-01', request_count: 3 },
       ]);
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/users')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.length).toBe(2);
-      expect(response.body[0].request_count).toBeDefined();
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(2);
+      expect(res.body[0].request_count).toBe(5);
+      expect(res.body[1].request_count).toBe(3);
+      expect(mockUserRepository.findAllWithRequestCount).toHaveBeenCalled();
+    });
+
+    it('returns empty array when no users exist', async () => {
+      mockUserRepository.findAllWithRequestCount.mockResolvedValue([]);
+
+      const res = await request(app)
+        .get('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
     });
   });
 
+  // ── POST /api/users (admin create user) ────────────────────
+
   describe('POST /api/users', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .send({ email: 'new@test.com', password: 'pass123', name: 'New User' });
-      expect(response.status).toBe(401);
+      expect(res.status).toBe(401);
     });
 
     it('returns 403 for non-admin users', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${employeeToken}`)
         .send({ email: 'new@test.com', password: 'pass123', name: 'New User' });
 
-      expect(response.status).toBe(403);
+      expect(res.status).toBe(403);
     });
 
     it('returns 400 if email is missing', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ password: 'pass123', name: 'New User' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('required');
     });
 
     it('returns 400 if password is missing', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ email: 'new@test.com', name: 'New User' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('required');
     });
 
     it('returns 400 if name is missing', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ email: 'new@test.com', password: 'pass123' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('required');
     });
 
     it('returns 400 for invalid email format', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ email: 'invalid-email', password: 'pass123', name: 'New User' });
+        .send({ email: 'not-an-email', password: 'pass123', name: 'New User' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('valid email');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('valid email');
     });
 
     it('returns 400 for invalid role', async () => {
-      mockDb.get.mockReturnValue(null); // no existing user
-
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ email: 'new@test.com', password: 'pass123', name: 'New User', role: 'superuser' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Role');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('Role');
     });
 
-    it('returns 400 if user already exists', async () => {
-      mockDb.get.mockReturnValue({ id: 1, email: 'existing@test.com' });
+    it('returns 409 if email already exists', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue({ id: 99 });
 
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ email: 'existing@test.com', password: 'pass123', name: 'Existing User' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('already exists');
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('already exists');
     });
 
-    it('creates user with default role', async () => {
-      mockDb.get
-        .mockReturnValueOnce(null) // no existing user
-        .mockReturnValueOnce({
-          id: 10,
-          email: 'new@test.com',
-          name: 'New User',
-          role: 'employee',
-          created_at: '2024-01-01',
-        });
+    it('creates user with default employee role', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue({
+        id: 10, email: 'new@test.com', name: 'New User', role: 'employee', created_at: '2024-01-01',
+      });
 
-      mockDb.run.mockReturnValue({ lastInsertRowid: 10 });
-
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ email: 'new@test.com', password: 'pass123', name: 'New User' });
 
-      expect(response.status).toBe(201);
-      expect(response.body.email).toBe('new@test.com');
-      expect(response.body.role).toBe('employee');
+      expect(res.status).toBe(201);
+      expect(res.body.email).toBe('new@test.com');
+      expect(res.body.role).toBe('employee');
+      expect(mockUserRepository.create).toHaveBeenCalledWith({
+        email: 'new@test.com',
+        name: 'New User',
+        role: 'employee',
+        auth_id: 'mock-uuid',
+      });
     });
 
-    it('creates user with admin role', async () => {
-      mockDb.get
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce({
-          id: 10,
-          email: 'newadmin@test.com',
-          name: 'New Admin',
-          role: 'admin',
-          created_at: '2024-01-01',
-        });
+    it('creates user with explicit admin role', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue({
+        id: 11, email: 'newadmin@test.com', name: 'New Admin', role: 'admin', created_at: '2024-01-01',
+      });
 
-      mockDb.run.mockReturnValue({ lastInsertRowid: 10 });
-
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ email: 'newadmin@test.com', password: 'pass123', name: 'New Admin', role: 'admin' });
 
-      expect(response.status).toBe(201);
-      expect(response.body.role).toBe('admin');
+      expect(res.status).toBe(201);
+      expect(res.body.role).toBe('admin');
+    });
+
+    it('creates Supabase Auth account before app user', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue({
+        id: 12, email: 'new@test.com', name: 'New', role: 'employee', created_at: '2024-01-01',
+      });
+
+      const { supabase: mockSupabase } = await import('../src/db/supabase.js');
+
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'new@test.com', password: 'plaintext', name: 'New' });
+
+      expect(mockSupabase.auth.admin.createUser).toHaveBeenCalledWith({
+        email: 'new@test.com',
+        password: 'plaintext',
+        email_confirm: true,
+        user_metadata: { name: 'New', role: 'employee' },
+      });
+      expect(mockUserRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ auth_id: 'mock-uuid' })
+      );
     });
   });
 
+  // ── PATCH /api/users/:id (admin update role) ───────────────
+
   describe('PATCH /api/users/:id', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .patch('/api/users/5')
         .send({ role: 'admin' });
-      expect(response.status).toBe(401);
+      expect(res.status).toBe(401);
     });
 
     it('returns 403 for non-admin users', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .patch('/api/users/5')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${employeeToken}`)
         .send({ role: 'admin' });
 
-      expect(response.status).toBe(403);
+      expect(res.status).toBe(403);
     });
 
-    it('returns 400 for invalid role', async () => {
-      const response = await request(app)
+    it('returns 400 for missing role', async () => {
+      const res = await request(app)
+        .patch('/api/users/5')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('Role');
+    });
+
+    it('returns 400 for invalid role value', async () => {
+      const res = await request(app)
         .patch('/api/users/5')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'superadmin' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Role');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('Role');
     });
 
-    it('returns 400 when trying to change own role', async () => {
-      const response = await request(app)
+    it('returns 403 when admin tries to change own role (prevents self-change)', async () => {
+      const res = await request(app)
         .patch('/api/users/2') // admin's own ID
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'employee' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('own role');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('own role');
     });
 
-    it('returns 404 if user not found', async () => {
-      mockDb.get.mockReturnValue(null);
+    it('returns 404 if target user not found', async () => {
+      mockUserRepository.findByIdOrFail.mockRejectedValue(
+        (() => { const e = new Error('User not found'); e.statusCode = 404; e.isOperational = true; return e; })()
+      );
 
-      const response = await request(app)
+      // Use the actual NotFoundError
+      const { NotFoundError } = await import('../src/errors/AppError.js');
+      mockUserRepository.findByIdOrFail.mockRejectedValue(new NotFoundError('User'));
+
+      const res = await request(app)
         .patch('/api/users/999')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'admin' });
 
-      expect(response.status).toBe(404);
-      expect(response.body.error).toBe('User not found');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('User not found');
     });
 
     it('updates user role successfully', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 5 }) // user exists
-        .mockReturnValueOnce({
-          id: 5,
-          email: 'user@test.com',
-          name: 'Test User',
-          role: 'admin',
-          created_at: '2024-01-01',
-        });
+      mockUserRepository.findByIdOrFail.mockResolvedValue({ id: 5, email: 'user@test.com', role: 'employee' });
+      mockUserRepository.updateRole.mockResolvedValue({
+        id: 5, email: 'user@test.com', name: 'Test User', role: 'admin', created_at: '2024-01-01',
+      });
 
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
+      const res = await request(app)
         .patch('/api/users/5')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'admin' });
 
-      expect(response.status).toBe(200);
-      expect(response.body.role).toBe('admin');
+      expect(res.status).toBe(200);
+      expect(res.body.role).toBe('admin');
+      expect(mockUserRepository.updateRole).toHaveBeenCalledWith('5', 'admin');
     });
   });
+
+  // ── DELETE /api/users/:id (admin delete user) ──────────────
 
   describe('DELETE /api/users/:id', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).delete('/api/users/5');
-      expect(response.status).toBe(401);
+      const res = await request(app).delete('/api/users/5');
+      expect(res.status).toBe(401);
     });
 
     it('returns 403 for non-admin users', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .delete('/api/users/5')
-        .set('Authorization', `Bearer ${userToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
-      expect(response.status).toBe(403);
+      expect(res.status).toBe(403);
     });
 
-    it('returns 400 when trying to delete own account', async () => {
-      const response = await request(app)
+    it('returns 403 when admin tries to delete own account (prevents self-delete)', async () => {
+      const res = await request(app)
         .delete('/api/users/2') // admin's own ID
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('own account');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('own account');
     });
 
-    it('returns 404 if user not found', async () => {
-      mockDb.get.mockReturnValue(null);
+    it('returns 404 if target user not found', async () => {
+      const { NotFoundError } = await import('../src/errors/AppError.js');
+      mockUserRepository.findByIdOrFail.mockRejectedValue(new NotFoundError('User'));
 
-      const response = await request(app)
+      const res = await request(app)
         .delete('/api/users/999')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(404);
-      expect(response.body.error).toBe('User not found');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('User not found');
     });
 
     it('deletes user successfully', async () => {
-      mockDb.get.mockReturnValue({ id: 5, email: 'todelete@test.com' });
-      mockDb.run.mockReturnValue({ changes: 1 });
+      mockUserRepository.findByIdOrFail.mockResolvedValue({ id: 5, email: 'todelete@test.com' });
+      mockUserRepository.delete.mockResolvedValue();
 
-      const response = await request(app)
+      const res = await request(app)
         .delete('/api/users/5')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('deleted');
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('deleted');
+      expect(mockUserRepository.delete).toHaveBeenCalledWith('5');
     });
   });
 
+  // ── POST /api/users/seed (admin seed database) ────────────
+
   describe('POST /api/users/seed', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).post('/api/users/seed');
-      expect(response.status).toBe(401);
+      const res = await request(app).post('/api/users/seed');
+      expect(res.status).toBe(401);
     });
 
     it('returns 403 for non-admin users', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users/seed')
-        .set('Authorization', `Bearer ${userToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
-      expect(response.status).toBe(403);
+      expect(res.status).toBe(403);
     });
 
     it('seeds database successfully for admin', async () => {
-      // Mock all db operations for seeding
-      mockDb.get
-        .mockReturnValue(null) // no existing users/requests
-        .mockReturnValue({ id: 1 }) // created items
-        .mockReturnValue({ count: 10 }); // counts
+      mockSeedDatabase.mockResolvedValue({
+        message: 'Database seeded successfully',
+        users: 12,
+        requests: 115,
+        votes: 340,
+        comments: 120,
+      });
 
-      mockDb.run.mockReturnValue({ lastInsertRowid: 1 });
-
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/users/seed')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('seeded');
-      expect(response.body.users).toBeDefined();
-      expect(response.body.requests).toBeDefined();
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('seeded');
+      expect(res.body.users).toBe(12);
+      expect(res.body.requests).toBe(115);
+      expect(res.body.votes).toBe(340);
+      expect(res.body.comments).toBe(120);
+      expect(mockSeedDatabase).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates errors from seedDatabase', async () => {
+      mockSeedDatabase.mockRejectedValue(new Error('Seed failed'));
+
+      const res = await request(app)
+        .post('/api/users/seed')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(500);
     });
   });
 });

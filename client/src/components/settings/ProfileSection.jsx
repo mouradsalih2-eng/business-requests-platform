@@ -68,9 +68,7 @@ export default function ProfileSection({ user, onUpdate }) {
     }
   };
 
-  const profilePictureUrl = user.profile_picture
-    ? `${import.meta.env.VITE_API_URL || ''}${user.profile_picture}`
-    : null;
+  const profilePictureUrl = user.profile_picture || null;
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-6">

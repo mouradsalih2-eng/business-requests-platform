@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 
 // Wrapper component that provides Router context
@@ -48,12 +49,16 @@ function TestComponent() {
 describe('AuthContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.getItem.mockReturnValue(null);
+    // Default: no active session
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
+    supabase.auth.onAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    });
+    supabase.auth.signOut.mockResolvedValue({});
   });
 
-  it('shows loading state initially when token exists', async () => {
-    localStorage.getItem.mockReturnValue('fake-token');
-    authApi.me.mockReturnValue(new Promise(() => {})); // Never resolves
+  it('shows loading state initially when session exists', async () => {
+    supabase.auth.getSession.mockReturnValue(new Promise(() => {})); // Never resolves
 
     render(
       <TestWrapper>
@@ -66,8 +71,8 @@ describe('AuthContext', () => {
     expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
 
-  it('shows not logged in when no token', async () => {
-    localStorage.getItem.mockReturnValue(null);
+  it('shows not logged in when no session', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
 
     render(
       <TestWrapper>
@@ -82,8 +87,10 @@ describe('AuthContext', () => {
     });
   });
 
-  it('loads user from token on mount', async () => {
-    localStorage.getItem.mockReturnValue('valid-token');
+  it('loads user from Supabase session on mount', async () => {
+    supabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'valid-token' } },
+    });
     authApi.me.mockResolvedValue({ id: 1, name: 'Test User', role: 'user' });
 
     render(
@@ -101,7 +108,9 @@ describe('AuthContext', () => {
   });
 
   it('identifies admin users', async () => {
-    localStorage.getItem.mockReturnValue('admin-token');
+    supabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'admin-token' } },
+    });
     authApi.me.mockResolvedValue({ id: 1, name: 'Admin User', role: 'admin' });
 
     render(
@@ -119,9 +128,9 @@ describe('AuthContext', () => {
 
   it('handles login', async () => {
     const user = userEvent.setup();
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
     authApi.login.mockResolvedValue({
       user: { id: 1, name: 'New User', role: 'user' },
-      token: 'new-token',
     });
 
     render(
@@ -141,12 +150,13 @@ describe('AuthContext', () => {
     await waitFor(() => {
       expect(screen.getByTestId('user-status')).toHaveTextContent('Logged in as New User');
     });
-    expect(localStorage.setItem).toHaveBeenCalledWith('token', 'new-token');
   });
 
   it('handles logout', async () => {
     const user = userEvent.setup();
-    localStorage.getItem.mockReturnValue('valid-token');
+    supabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'valid-token' } },
+    });
     authApi.me.mockResolvedValue({ id: 1, name: 'Test User', role: 'user' });
 
     render(
@@ -166,11 +176,13 @@ describe('AuthContext', () => {
     await waitFor(() => {
       expect(screen.getByTestId('user-status')).toHaveTextContent('Not logged in');
     });
-    expect(localStorage.removeItem).toHaveBeenCalledWith('token');
+    expect(supabase.auth.signOut).toHaveBeenCalled();
   });
 
-  it('clears token on failed auth check', async () => {
-    localStorage.getItem.mockReturnValue('invalid-token');
+  it('signs out on failed auth check', async () => {
+    supabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'invalid-token' } },
+    });
     authApi.me.mockRejectedValue(new Error('Unauthorized'));
 
     render(
@@ -184,7 +196,7 @@ describe('AuthContext', () => {
     await waitFor(() => {
       expect(screen.getByTestId('user-status')).toHaveTextContent('Not logged in');
     });
-    expect(localStorage.removeItem).toHaveBeenCalledWith('token');
+    expect(supabase.auth.signOut).toHaveBeenCalled();
   });
 });
 

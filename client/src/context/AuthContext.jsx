@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { auth as authApi, refreshCsrfToken } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { auth as authApi } from '../lib/api';
 
 const AuthContext = createContext(null);
 
-// Session timeout in milliseconds (60 minutes)
+// Session timeout in milliseconds (60 minutes of inactivity)
 const SESSION_TIMEOUT = 60 * 60 * 1000;
 // Warning time before timeout (5 minutes)
 const WARNING_TIME = 5 * 60 * 1000;
@@ -18,14 +19,11 @@ export function AuthProvider({ children }) {
   const warningShownRef = useRef(false);
   const timeoutCheckRef = useRef(null);
 
-  // Get navigation for redirect
   const navigate = useNavigate();
-  const location = useLocation();
 
   // Update last activity timestamp
   const updateActivity = useCallback(() => {
     lastActivityRef.current = Date.now();
-    // Reset warning if user becomes active again
     if (warningShownRef.current) {
       warningShownRef.current = false;
       setSessionWarning(false);
@@ -40,16 +38,12 @@ export function AuthProvider({ children }) {
     const timeSinceActivity = now - lastActivityRef.current;
     const timeRemaining = SESSION_TIMEOUT - timeSinceActivity;
 
-    // Session expired
     if (timeRemaining <= 0) {
-      // Clear interval
       if (timeoutCheckRef.current) {
         clearInterval(timeoutCheckRef.current);
         timeoutCheckRef.current = null;
       }
-      // Logout and redirect
-      localStorage.removeItem('token');
-      authApi.logout();
+      supabase.auth.signOut();
       setUser(null);
       setSessionWarning(false);
       warningShownRef.current = false;
@@ -59,7 +53,6 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // Show warning at 5 minutes remaining
     if (timeRemaining <= WARNING_TIME && !warningShownRef.current) {
       warningShownRef.current = true;
       setSessionWarning(true);
@@ -72,7 +65,6 @@ export function AuthProvider({ children }) {
 
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
 
-    // Throttle activity updates to once per second
     let lastUpdate = 0;
     const throttledUpdate = () => {
       const now = Date.now();
@@ -82,23 +74,17 @@ export function AuthProvider({ children }) {
       }
     };
 
-    // Add event listeners
     events.forEach((event) => {
       window.addEventListener(event, throttledUpdate, { passive: true });
     });
 
-    // Set up timeout check interval (every minute)
     timeoutCheckRef.current = setInterval(checkTimeout, 60 * 1000);
-
-    // Initial activity timestamp
     updateActivity();
 
     return () => {
-      // Remove event listeners
       events.forEach((event) => {
         window.removeEventListener(event, throttledUpdate);
       });
-      // Clear interval
       if (timeoutCheckRef.current) {
         clearInterval(timeoutCheckRef.current);
         timeoutCheckRef.current = null;
@@ -106,27 +92,55 @@ export function AuthProvider({ children }) {
     };
   }, [user, updateActivity, checkTimeout]);
 
-  // Load user on mount
+  // Initialize auth state from Supabase session
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      authApi.me()
-        .then((userData) => {
+    let mounted = true;
+
+    async function initAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && mounted) {
+          const userData = await authApi.me();
           setUser(userData);
           updateActivity();
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
+        }
+      } catch {
+        // Session invalid or user not found in app — sign out
+        await supabase.auth.signOut();
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
-  }, [updateActivity]);
+
+    initAuth();
+
+    // Listen for auth state changes (token refresh, sign out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setSessionWarning(false);
+        warningShownRef.current = false;
+      } else if (event === 'TOKEN_REFRESHED' && session && !user) {
+        // Token was refreshed but we lost the user state — refetch
+        try {
+          const userData = await authApi.me();
+          setUser(userData);
+        } catch {
+          await supabase.auth.signOut();
+        }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = async (email, password) => {
-    const { user: userData, token } = await authApi.login(email, password);
-    localStorage.setItem('token', token);
+    const { user: userData } = await authApi.login(email, password);
     setUser(userData);
     updateActivity();
     warningShownRef.current = false;
@@ -135,16 +149,12 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (email, password, name) => {
-    const { user: userData, token } = await authApi.register(email, password, name);
-    localStorage.setItem('token', token);
-    setUser(userData);
-    updateActivity();
-    return userData;
+    // Registration is handled via initiate/verify flow, then user signs in
+    throw new Error('Use registration.initiate/verify flow');
   };
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    authApi.logout();
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setSessionWarning(false);
     warningShownRef.current = false;
@@ -154,12 +164,10 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Extend session by updating activity
   const extendSession = useCallback(() => {
     updateActivity();
   }, [updateActivity]);
 
-  // Update user data (e.g., after profile picture change)
   const updateUser = useCallback((updates) => {
     setUser((prev) => prev ? { ...prev, ...updates } : null);
   }, []);

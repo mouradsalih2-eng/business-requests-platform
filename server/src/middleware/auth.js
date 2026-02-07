@@ -1,19 +1,13 @@
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import { config } from '../config/index.js';
+import { userRepository } from '../repositories/userRepository.js';
 
-// Generate a secure random secret if not provided via environment variable
-// WARNING: In production, always set JWT_SECRET in environment variables
-// because a generated secret will change on server restart, invalidating all tokens
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('FATAL: JWT_SECRET must be set in production environment');
-    process.exit(1);
-  }
-  console.warn('WARNING: JWT_SECRET not set. Using temporary secret. All tokens will be invalid after restart.');
-  return crypto.randomBytes(64).toString('hex');
-})();
-
-export function authenticateToken(req, res, next) {
+/**
+ * Authenticate Supabase Auth JWT tokens.
+ * Verifies the token locally using the Supabase JWT secret,
+ * then looks up the app user by auth_id (Supabase user UUID).
+ */
+export async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -21,12 +15,28 @@ export function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
+  if (!config.supabase.jwtSecret) {
+    console.error('SUPABASE_JWT_SECRET is not configured');
+    return res.status(500).json({ error: 'Server authentication misconfigured' });
+  }
+
   try {
-    const user = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, config.supabase.jwtSecret);
+    const authId = decoded.sub;
+
+    if (!authId) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const user = await userRepository.findByAuthId(authId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
     req.user = user;
     next();
-  } catch (err) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
@@ -36,5 +46,3 @@ export function requireAdmin(req, res, next) {
   }
   next();
 }
-
-export { JWT_SECRET };

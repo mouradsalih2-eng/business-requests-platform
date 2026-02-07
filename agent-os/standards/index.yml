@@ -1,0 +1,51 @@
+# Agent OS Standards Index
+
+api:
+  client-organization:
+    description: API methods grouped by resource in single file
+  csrf-handling:
+    description: CSRF token refresh and header management
+  optimistic-updates:
+    description: Mutation pattern with rollback on error
+  query-keys:
+    description: Hierarchical React Query keys for cache invalidation
+
+database:
+  migrations:
+    description: Idempotent migrations with existence checks
+  parameterized-queries:
+    description: SQL injection prevention with ? placeholders
+  query-helpers:
+    description: run(), get(), all() methods with predictable return types
+
+components:
+  folder-organization:
+    description: Feature-driven folders with shared primitives in /ui
+  form-error-handling:
+    description: Error strings from parent, inline display in child
+  responsive-design:
+    description: Mobile-first with sm: breakpoint patterns
+  variant-props:
+    description: Variant/size objects for consistent component styling
+
+middleware:
+  authorization:
+    description: Role-based (requireAdmin) and resource-level (owner check)
+  error-handling:
+    description: Route try-catch plus global error handler
+  jwt-authentication:
+    description: Bearer token extraction and req.user attachment
+  rate-limiting:
+    description: Tiered limits by endpoint sensitivity
+  validation:
+    description: Zod schema middleware factory pattern
+
+testing:
+  client-vitest-setup:
+    description: Vitest with jsdom, globals, and setupTests.js
+  database-mocking:
+    description: jest.unstable_mockModule for isolated route tests
+  fetch-mocking:
+    description: Global fetch mock with ok/json response pattern
+  server-jest-setup:
+    description: Jest with --experimental-vm-modules for ES modules

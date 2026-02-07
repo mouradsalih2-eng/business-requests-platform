@@ -3,306 +3,298 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-// Mock the database
-const mockDb = {
-  get: jest.fn(),
-  all: jest.fn(),
-  run: jest.fn(),
-};
+// ── Constants ────────────────────────────────────────────────────────
 
-// Mock JWT_SECRET
 const JWT_SECRET = 'test-secret';
 
-jest.unstable_mockModule('../src/db/database.js', () => ({
-  default: mockDb,
-  initializeDatabase: jest.fn(),
+// ── Mock repositories ────────────────────────────────────────────────
+
+const mockVoteRepository = {
+  findByRequestAndUser: jest.fn(),
+  getUserVoteTypes: jest.fn(),
+  getCounts: jest.fn(),
+  create: jest.fn(),
+  delete: jest.fn(),
+  findByRequest: jest.fn(),
+  deleteByRequest: jest.fn(),
+  getUpvoters: jest.fn(),
+  getLikers: jest.fn(),
+  count: jest.fn(),
+};
+
+const mockRequestRepository = {
+  findById: jest.fn(),
+  findByIdOrFail: jest.fn(),
+};
+
+jest.unstable_mockModule('../src/repositories/voteRepository.js', () => ({
+  voteRepository: mockVoteRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/requestRepository.js', () => ({
+  requestRepository: mockRequestRepository,
+}));
+
+// Mock supabase so transitive imports never try to connect
+jest.unstable_mockModule('../src/db/supabase.js', () => ({
+  supabase: {},
+}));
+
+// Mock auth middleware to use local JWT verification
+jest.unstable_mockModule('../src/services/authService.js', () => ({
+  authService: {},
+  JWT_SECRET,
 }));
 
 jest.unstable_mockModule('../src/middleware/auth.js', () => ({
-  JWT_SECRET,
   authenticateToken: (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ error: 'Access denied' });
-    }
-
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Access token required' });
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
+      req.user = jwt.verify(token, JWT_SECRET);
       next();
-    } catch (err) {
+    } catch {
       return res.status(403).json({ error: 'Invalid token' });
     }
   },
+  requireAdmin: (req, res, next) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+    next();
+  },
 }));
 
-// Import router after mocks
-const { default: votesRoutes } = await import('../src/routes/votes.js');
+// ── Import route + error handler AFTER mocks ─────────────────────────
 
-// Create test app
+const { default: votesRoutes } = await import('../src/routes/votes.js');
+const { errorHandler } = await import('../src/middleware/errorHandler.js');
+const { NotFoundError, AppError } = await import('../src/errors/AppError.js');
+
+// ── Build test Express app ───────────────────────────────────────────
+
 const app = express();
 app.use(express.json());
 app.use('/api/votes', votesRoutes);
+app.use(errorHandler);
 
-// Helper to generate tokens
-const generateToken = (user) => jwt.sign(user, JWT_SECRET);
+// ── Helpers ──────────────────────────────────────────────────────────
+
+const generateToken = (payload) => jwt.sign(payload, JWT_SECRET);
+
+// ── Tests ────────────────────────────────────────────────────────────
 
 describe('Votes API', () => {
-  const userToken = generateToken({ id: 1, email: 'user@example.com', role: 'user' });
-  const user2Token = generateToken({ id: 2, email: 'user2@example.com', role: 'user' });
+  const userToken = generateToken({ id: 1, email: 'user@example.com', role: 'employee' });
+  const user2Token = generateToken({ id: 2, email: 'user2@example.com', role: 'employee' });
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
+  // ── POST /:requestId/vote ─────────────────────────────────────────
+
   describe('POST /api/votes/:requestId/vote', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/votes/1/vote')
         .send({ type: 'upvote' });
-      expect(response.status).toBe(401);
+
+      expect(res.status).toBe(401);
     });
 
-    it('returns 400 if vote type is missing', async () => {
-      const response = await request(app)
+    it('adds an upvote successfully', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1 });
+      mockVoteRepository.create.mockResolvedValue(undefined);
+      mockVoteRepository.getCounts.mockResolvedValue({ upvotes: 1, likes: 0 });
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue(['upvote']);
+
+      const res = await request(app)
+        .post('/api/votes/1/vote')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ type: 'upvote' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Vote added');
+      expect(res.body.upvotes).toBe(1);
+      expect(res.body.likes).toBe(0);
+      expect(res.body.userVotes).toContain('upvote');
+
+      expect(mockRequestRepository.findByIdOrFail).toHaveBeenCalledWith('1');
+      expect(mockVoteRepository.create).toHaveBeenCalledWith('1', 1, 'upvote');
+    });
+
+    it('adds a like successfully', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1 });
+      mockVoteRepository.create.mockResolvedValue(undefined);
+      mockVoteRepository.getCounts.mockResolvedValue({ upvotes: 0, likes: 1 });
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue(['like']);
+
+      const res = await request(app)
+        .post('/api/votes/1/vote')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ type: 'like' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Vote added');
+      expect(res.body.likes).toBe(1);
+      expect(res.body.userVotes).toContain('like');
+    });
+
+    it('returns 400 for invalid vote type', async () => {
+      const res = await request(app)
+        .post('/api/votes/1/vote')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ type: 'dislike' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/upvote|like/i);
+    });
+
+    it('returns 400 when vote type is missing', async () => {
+      const res = await request(app)
         .post('/api/votes/1/vote')
         .set('Authorization', `Bearer ${userToken}`)
         .send({});
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Vote type');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Vote type/i);
     });
 
-    it('returns 400 if vote type is invalid', async () => {
-      const response = await request(app)
-        .post('/api/votes/1/vote')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ type: 'invalid' });
+    it('returns 404 when the request does not exist', async () => {
+      mockRequestRepository.findByIdOrFail.mockRejectedValue(new NotFoundError('Request'));
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('upvote');
-    });
-
-    it('returns 404 if request not found', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/votes/999/vote')
         .set('Authorization', `Bearer ${userToken}`)
         .send({ type: 'upvote' });
 
-      expect(response.status).toBe(404);
-      expect(response.body.error).toBe('Request not found');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Request not found');
     });
 
-    it('returns 400 if already voted same type', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1 }) // request exists
-        .mockReturnValueOnce({ id: 1 }); // existing vote
+    it('returns 400 on duplicate vote', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1 });
+      mockVoteRepository.create.mockRejectedValue(
+        new AppError('You have already upvoted this request', 400)
+      );
 
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/votes/1/vote')
         .set('Authorization', `Bearer ${userToken}`)
         .send({ type: 'upvote' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('already');
-    });
-
-    it('adds upvote successfully', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1 }) // request exists
-        .mockReturnValueOnce(null) // no existing vote
-        .mockReturnValueOnce({ count: 1 }) // upvotes count
-        .mockReturnValueOnce({ count: 0 }); // likes count
-
-      mockDb.all.mockReturnValue([{ type: 'upvote' }]);
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/votes/1/vote')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ type: 'upvote' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Vote added');
-      expect(response.body.upvotes).toBe(1);
-      expect(response.body.userVotes).toContain('upvote');
-    });
-
-    it('adds like successfully', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1 }) // request exists
-        .mockReturnValueOnce(null) // no existing vote
-        .mockReturnValueOnce({ count: 0 }) // upvotes count
-        .mockReturnValueOnce({ count: 1 }); // likes count
-
-      mockDb.all.mockReturnValue([{ type: 'like' }]);
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/votes/1/vote')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ type: 'like' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Vote added');
-      expect(response.body.likes).toBe(1);
-      expect(response.body.userVotes).toContain('like');
-    });
-
-    it('allows both upvote and like on same request', async () => {
-      // First add upvote
-      mockDb.get
-        .mockReturnValueOnce({ id: 1 })
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce({ count: 1 })
-        .mockReturnValueOnce({ count: 0 });
-      mockDb.all.mockReturnValue([{ type: 'upvote' }]);
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      await request(app)
-        .post('/api/votes/1/vote')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ type: 'upvote' });
-
-      // Then add like (different type, should work)
-      mockDb.get
-        .mockReturnValueOnce({ id: 1 })
-        .mockReturnValueOnce(null) // no existing like
-        .mockReturnValueOnce({ count: 1 })
-        .mockReturnValueOnce({ count: 1 });
-      mockDb.all.mockReturnValue([{ type: 'upvote' }, { type: 'like' }]);
-
-      const response = await request(app)
-        .post('/api/votes/1/vote')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ type: 'like' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.userVotes).toContain('upvote');
-      expect(response.body.userVotes).toContain('like');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('already');
     });
   });
+
+  // ── DELETE /:requestId/vote/:type ─────────────────────────────────
 
   describe('DELETE /api/votes/:requestId/vote/:type', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).delete('/api/votes/1/vote/upvote');
-      expect(response.status).toBe(401);
+      const res = await request(app).delete('/api/votes/1/vote/upvote');
+      expect(res.status).toBe(401);
     });
 
-    it('returns 400 for invalid vote type', async () => {
-      const response = await request(app)
-        .delete('/api/votes/1/vote/invalid')
-        .set('Authorization', `Bearer ${userToken}`);
+    it('removes an upvote successfully', async () => {
+      mockVoteRepository.findByRequestAndUser.mockResolvedValue({ id: 10 });
+      mockVoteRepository.delete.mockResolvedValue(undefined);
+      mockVoteRepository.getCounts.mockResolvedValue({ upvotes: 0, likes: 1 });
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue(['like']);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('upvote');
-    });
-
-    it('returns 404 if vote not found', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
+      const res = await request(app)
         .delete('/api/votes/1/vote/upvote')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(404);
-      expect(response.body.error).toBe('Vote not found');
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Vote removed');
+      expect(res.body.upvotes).toBe(0);
+      expect(res.body.userVotes).not.toContain('upvote');
+
+      expect(mockVoteRepository.findByRequestAndUser).toHaveBeenCalledWith('1', 1, 'upvote');
+      expect(mockVoteRepository.delete).toHaveBeenCalledWith('1', 1, 'upvote');
     });
 
-    it('removes upvote successfully', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1 }) // existing vote
-        .mockReturnValueOnce({ count: 0 }) // upvotes after removal
-        .mockReturnValueOnce({ count: 1 }); // likes count
+    it('removes a like successfully', async () => {
+      mockVoteRepository.findByRequestAndUser.mockResolvedValue({ id: 11 });
+      mockVoteRepository.delete.mockResolvedValue(undefined);
+      mockVoteRepository.getCounts.mockResolvedValue({ upvotes: 3, likes: 0 });
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue(['upvote']);
 
-      mockDb.all.mockReturnValue([{ type: 'like' }]); // remaining votes
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .delete('/api/votes/1/vote/upvote')
-        .set('Authorization', `Bearer ${userToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Vote removed');
-      expect(response.body.upvotes).toBe(0);
-      expect(response.body.userVotes).not.toContain('upvote');
-    });
-
-    it('removes like successfully', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1 }) // existing vote
-        .mockReturnValueOnce({ count: 2 }) // upvotes count
-        .mockReturnValueOnce({ count: 0 }); // likes after removal
-
-      mockDb.all.mockReturnValue([{ type: 'upvote' }]);
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
+      const res = await request(app)
         .delete('/api/votes/1/vote/like')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Vote removed');
-      expect(response.body.likes).toBe(0);
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Vote removed');
+      expect(res.body.likes).toBe(0);
+    });
+
+    it('returns 400 for invalid vote type', async () => {
+      const res = await request(app)
+        .delete('/api/votes/1/vote/invalid')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/upvote|like/i);
+    });
+
+    it('returns 404 when the vote does not exist', async () => {
+      mockVoteRepository.findByRequestAndUser.mockResolvedValue(null);
+
+      const res = await request(app)
+        .delete('/api/votes/1/vote/upvote')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Vote not found');
     });
   });
 
+  // ── GET /:requestId/votes ─────────────────────────────────────────
+
   describe('GET /api/votes/:requestId/votes', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).get('/api/votes/1/votes');
-      expect(response.status).toBe(401);
+      const res = await request(app).get('/api/votes/1/votes');
+      expect(res.status).toBe(401);
     });
 
     it('returns vote counts and user votes', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ count: 5 }) // upvotes
-        .mockReturnValueOnce({ count: 3 }); // likes
+      mockVoteRepository.getCounts.mockResolvedValue({ upvotes: 5, likes: 3 });
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue(['upvote']);
 
-      mockDb.all.mockReturnValue([{ type: 'upvote' }]);
-
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/votes/1/votes')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.upvotes).toBe(5);
-      expect(response.body.likes).toBe(3);
-      expect(response.body.userVotes).toEqual(['upvote']);
+      expect(res.status).toBe(200);
+      expect(res.body.upvotes).toBe(5);
+      expect(res.body.likes).toBe(3);
+      expect(res.body.userVotes).toEqual(['upvote']);
     });
 
-    it('returns empty userVotes if user has not voted', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ count: 10 })
-        .mockReturnValueOnce({ count: 5 });
+    it('returns empty userVotes when the user has not voted', async () => {
+      mockVoteRepository.getCounts.mockResolvedValue({ upvotes: 10, likes: 5 });
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
 
-      mockDb.all.mockReturnValue([]);
-
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/votes/1/votes')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.userVotes).toEqual([]);
+      expect(res.status).toBe(200);
+      expect(res.body.userVotes).toEqual([]);
     });
 
-    it('returns both vote types if user voted both', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ count: 10 })
-        .mockReturnValueOnce({ count: 5 });
+    it('returns both vote types when the user has upvoted and liked', async () => {
+      mockVoteRepository.getCounts.mockResolvedValue({ upvotes: 7, likes: 4 });
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue(['upvote', 'like']);
 
-      mockDb.all.mockReturnValue([{ type: 'upvote' }, { type: 'like' }]);
-
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/votes/1/votes')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.userVotes).toContain('upvote');
-      expect(response.body.userVotes).toContain('like');
+      expect(res.status).toBe(200);
+      expect(res.body.userVotes).toContain('upvote');
+      expect(res.body.userVotes).toContain('like');
     });
   });
 });

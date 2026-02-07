@@ -6,7 +6,11 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 
-import { initializeDatabase } from './db/database.js';
+import { config } from './config/index.js';
+import { supabase } from './db/supabase.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { csrfProvider, csrfProtection } from './middleware/csrf.js';
+
 import authRoutes from './routes/auth.js';
 import requestsRoutes from './routes/requests.js';
 import votesRoutes from './routes/votes.js';
@@ -14,219 +18,148 @@ import commentsRoutes from './routes/comments.js';
 import usersRoutes from './routes/users.js';
 import roadmapRoutes from './routes/roadmap.js';
 import featureFlagsRoutes from './routes/feature-flags.js';
-import { csrfProvider, csrfProtection } from './middleware/csrf.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 
-// Trust proxy - required for Railway/Heroku (reverse proxy)
+// Trust proxy — required for Railway/Heroku
 app.set('trust proxy', 1);
-const PORT = process.env.PORT || 3001;
 
 // Security headers
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow file uploads to be accessed
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// Rate limiting - general API limiter
+// Rate limiting
 const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // limit each IP to 500 requests per windowMs
+  ...config.rateLimit.general,
   message: { error: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Stricter rate limiting for auth endpoints
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 10 : 100, // stricter in production
+  ...config.rateLimit.auth,
   message: { error: 'Too many login attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Very strict rate limiting for password reset
 const passwordResetLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per 15 minutes
+  ...config.rateLimit.passwordReset,
   message: { error: 'Too many password reset attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// CORS configuration - restrict to known origins
+// CORS
 const allowedOrigins = [
-  'http://localhost:5173',      // Vite dev server
-  'http://localhost:3000',      // Alternate dev
+  'http://localhost:5173',
+  'http://localhost:3000',
   'http://127.0.0.1:5173',
-  process.env.CLIENT_URL,       // Production client URL
+  config.client.url,
 ].filter(Boolean);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+  origin(origin, callback) {
     if (!origin) return callback(null, true);
-
-    // In production, allow all origins (client/API are same domain)
-    if (process.env.NODE_ENV === 'production') {
-      return callback(null, true);
-    }
-
-    // In development, check against allowed origins
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+    if (config.isProduction) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   exposedHeaders: ['X-CSRF-Token'],
 }));
 
-// Apply general rate limiting to all requests
 app.use(generalLimiter);
-
-// JSON parsing with size limit
 app.use(express.json({ limit: '1mb' }));
-
-// CSRF provider middleware
 app.use(csrfProvider);
 
-// Serve uploaded files
-app.use('/uploads', express.static(join(__dirname, '../uploads')));
-
 // Serve client static files in production
-if (process.env.NODE_ENV === 'production') {
-    const clientPath = join(__dirname, '../../client/dist');
-  console.log('Client path:', clientPath);
-  console.log('Client path exists:', fs.existsSync(clientPath));
+if (config.isProduction) {
+  const clientPath = join(__dirname, '../../client/dist');
   if (fs.existsSync(clientPath)) {
-    console.log('Client files:', fs.readdirSync(clientPath));
     app.use(express.static(clientPath));
   } else {
-    console.log('WARNING: Client dist folder not found!');
+    console.warn('WARNING: Client dist folder not found!');
   }
 }
 
-// Health check - Railway uses this to verify the app is running
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-app.get('/api/v1/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Health check
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // CSRF token endpoint
-app.get('/api/csrf-token', (req, res) => {
-  const token = res.getCsrfToken();
-  res.json({ csrfToken: token });
-});
-app.get('/api/v1/csrf-token', (req, res) => {
-  const token = res.getCsrfToken();
-  res.json({ csrfToken: token });
-});
+app.get('/api/csrf-token', (_req, res) => res.json({ csrfToken: res.getCsrfToken() }));
+app.get('/api/v1/csrf-token', (_req, res) => res.json({ csrfToken: res.getCsrfToken() }));
 
-// Root health check for Railway (responds before SPA fallback)
+// Root health check
 app.get('/', (req, res, next) => {
-  // If in production and client files exist, let the static middleware handle it
-  if (process.env.NODE_ENV === 'production') {
-    return next();
-  }
+  if (config.isProduction) return next();
   res.json({ status: 'ok', message: 'API is running' });
 });
 
-// Debug endpoint (only in production for troubleshooting)
-app.get('/api/debug', (req, res) => {
-    const clientPath = join(__dirname, '../../client/dist');
-  const indexPath = join(clientPath, 'index.html');
-  res.json({
-    __dirname,
-    cwd: process.cwd(),
-    clientPath,
-    indexExists: fs.existsSync(indexPath),
-    clientDirExists: fs.existsSync(clientPath),
-    clientFiles: fs.existsSync(clientPath) ? fs.readdirSync(clientPath) : [],
-  });
-});
+// ── Mount API routes ─────────────────────────────────────────
 
-// Create v1 router
-const v1Router = express.Router();
+function createApiRouter() {
+  const router = express.Router();
+  router.use(csrfProtection);
+  router.use('/auth', authLimiter, authRoutes);
+  router.use('/requests', requestsRoutes);
+  router.use('/requests', votesRoutes);
+  router.use('/requests', commentsRoutes);
+  router.use('/comments', commentsRoutes);
+  router.use('/users', usersRoutes);
+  router.use('/roadmap', roadmapRoutes);
+  router.use('/feature-flags', featureFlagsRoutes);
+  return router;
+}
 
-// Apply CSRF protection to state-changing routes
-v1Router.use(csrfProtection);
+app.use('/api/v1', createApiRouter());
+app.use('/api', createApiRouter());
 
-// Mount routes on v1 router
-v1Router.use('/auth', authLimiter, authRoutes);
-v1Router.use('/requests', requestsRoutes);
-v1Router.use('/requests', votesRoutes);
-v1Router.use('/requests', commentsRoutes);
-v1Router.use('/comments', commentsRoutes);
-v1Router.use('/users', usersRoutes);
-v1Router.use('/roadmap', roadmapRoutes);
-v1Router.use('/feature-flags', featureFlagsRoutes);
-
-// Mount v1 router under /api/v1
-app.use('/api/v1', v1Router);
-
-// Backward compatibility: mount same routes under /api
-// Create separate router to avoid middleware duplication
-const legacyRouter = express.Router();
-legacyRouter.use(csrfProtection);
-legacyRouter.use('/auth', authLimiter, authRoutes);
-legacyRouter.use('/requests', requestsRoutes);
-legacyRouter.use('/requests', votesRoutes);
-legacyRouter.use('/requests', commentsRoutes);
-legacyRouter.use('/comments', commentsRoutes);
-legacyRouter.use('/users', usersRoutes);
-legacyRouter.use('/roadmap', roadmapRoutes);
-legacyRouter.use('/feature-flags', featureFlagsRoutes);
-app.use('/api', legacyRouter);
-
-// Stricter rate limit for password reset endpoints specifically
+// Password reset rate limiting
 app.use('/api/v1/auth/forgot-password', passwordResetLimiter);
 app.use('/api/v1/auth/reset-password', passwordResetLimiter);
 app.use('/api/auth/forgot-password', passwordResetLimiter);
 app.use('/api/auth/reset-password', passwordResetLimiter);
 
-// Serve client app for all non-API routes in production (SPA fallback)
-if (process.env.NODE_ENV === 'production') {
-    const indexPath = join(__dirname, '../../client/dist/index.html');
+// SPA fallback in production
+if (config.isProduction) {
+  const indexPath = join(__dirname, '../../client/dist/index.html');
   const indexExists = fs.existsSync(indexPath);
-  console.log('Index.html path:', indexPath);
-  console.log('Index.html exists:', indexExists);
 
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
       if (indexExists) {
         res.sendFile(indexPath);
       } else {
-        res.status(200).send(`
-          <html>
-            <body>
-              <h1>API Server Running</h1>
-              <p>Client build not found. The API is working at <a href="/api/health">/api/health</a></p>
-            </body>
-          </html>
-        `);
+        res.status(200).send('<html><body><h1>API Server Running</h1><p>Client build not found.</p></body></html>');
       }
     }
   });
 }
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Centralized error handler — must be last
+app.use(errorHandler);
 
-// Initialize database and start server
+// ── Start server ─────────────────────────────────────────────
+
 async function start() {
   try {
-    await initializeDatabase();
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
+    // Verify Supabase connectivity
+    const { error } = await supabase.from('feature_flags').select('name').limit(1);
+    if (error) {
+      console.error('Supabase connection check failed:', error.message);
+      console.error('Ensure your Supabase schema has been set up (see server/supabase/migrations/).');
+      process.exit(1);
+    }
+    console.log('Supabase connection verified');
+
+    app.listen(config.port, '0.0.0.0', () => {
+      console.log(`Server running on port ${config.port}`);
     });
   } catch (err) {
     console.error('Failed to start server:', err);

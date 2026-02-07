@@ -1,200 +1,160 @@
-import { jest, describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import express from 'express';
-import request from 'supertest';
-import bcrypt from 'bcryptjs';
+import { jest } from '@jest/globals';
 import jwt from 'jsonwebtoken';
+import supertest from 'supertest';
+import express from 'express';
 
-// Mock the database
-const mockDb = {
-  get: jest.fn(),
-  all: jest.fn(),
-  run: jest.fn(),
+const JWT_SECRET = 'test-secret';
+
+// ── Declare mock objects OUTSIDE factories ──────────────────
+
+const mockSupabaseAnon = {
+  auth: { signInWithPassword: jest.fn() },
 };
 
-// Mock the database module
-jest.unstable_mockModule('../src/db/database.js', () => ({
-  default: mockDb,
-  initializeDatabase: jest.fn(),
-}));
+const mockUserRepository = {
+  findByAuthId: jest.fn(),
+  findById: jest.fn(),
+  findByEmail: jest.fn(),
+  create: jest.fn(),
+};
 
-// Mock JWT_SECRET
-const JWT_SECRET = 'test-secret';
-jest.unstable_mockModule('../src/middleware/auth.js', () => ({
-  JWT_SECRET,
-  authenticateToken: (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+// ── Register mocks ──────────────────────────────────────────
 
-    if (!token) {
-      return res.status(401).json({ error: 'Access denied' });
-    }
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
-      next();
-    } catch (err) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
+jest.unstable_mockModule('../src/config/index.js', () => ({
+  config: {
+    supabase: { jwtSecret: JWT_SECRET },
+    rateLimit: { auth: { windowMs: 1, max: 100 } },
   },
 }));
 
-// Import router after mocks
-const { default: authRoutes } = await import('../src/routes/auth.js');
+jest.unstable_mockModule('../src/db/supabase.js', () => ({
+  supabase: {
+    auth: { admin: { createUser: jest.fn(), updateUserById: jest.fn(), deleteUser: jest.fn(), listUsers: jest.fn() } },
+  },
+  supabaseAnon: mockSupabaseAnon,
+}));
 
-// Create test app
+jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
+  userRepository: mockUserRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/authRepository.js', () => ({
+  pendingRegistrationRepository: { findByEmail: jest.fn(), findByEmailAndCode: jest.fn(), create: jest.fn(), updateCode: jest.fn(), delete: jest.fn() },
+  verificationCodeRepository: { findByEmailCodeType: jest.fn(), create: jest.fn(), deleteByEmailAndType: jest.fn(), delete: jest.fn() },
+  passwordResetRepository: { findByToken: jest.fn(), create: jest.fn(), deleteByUserId: jest.fn(), delete: jest.fn() },
+}));
+
+jest.unstable_mockModule('../src/services/email.js', () => ({
+  sendVerificationEmail: jest.fn().mockResolvedValue({ success: true }),
+  sendPasswordResetEmail: jest.fn().mockResolvedValue({ success: true }),
+  generateVerificationCode: jest.fn().mockReturnValue('123456'),
+  getCodeExpiration: jest.fn().mockReturnValue(new Date(Date.now() + 900000).toISOString()),
+}));
+
+// Dynamic imports after mocks
+const { default: authRoutes } = await import('../src/routes/auth.js');
+const { errorHandler } = await import('../src/middleware/errorHandler.js');
+
+// Build test app
 const app = express();
 app.use(express.json());
-app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+app.use(errorHandler);
 
-describe('Auth API', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+const request = supertest(app);
 
-  describe('POST /api/auth/register', () => {
-    it('returns 403 - registration disabled', async () => {
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'test@example.com',
-          password: 'password123',
-          name: 'Test User',
-        });
+const adminUser = { id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin', auth_id: 'uuid-admin-123', profile_picture: null, theme_preference: 'light' };
+const employeeUser = { id: 2, email: 'user@test.com', name: 'User', role: 'employee', auth_id: 'uuid-user-456', profile_picture: null, theme_preference: 'light' };
 
-      expect(response.status).toBe(403);
-      expect(response.body.error).toContain('Registration is disabled');
+const generateToken = (user) => jwt.sign({ sub: user.auth_id, email: user.email, role: 'authenticated' }, JWT_SECRET);
+
+describe('Auth Routes', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  describe('POST /auth/register', () => {
+    it('should return 403 - registration disabled', async () => {
+      const res = await request.post('/auth/register').send({ email: 'new@test.com', password: 'pass123', name: 'New' });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/disabled/i);
     });
   });
 
-  describe('POST /api/auth/login', () => {
-    it('returns 400 if email is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ password: 'password123' });
+  describe('POST /auth/login', () => {
+    it('should login successfully with valid credentials', async () => {
+      mockSupabaseAnon.auth.signInWithPassword.mockResolvedValue({
+        data: {
+          user: { id: adminUser.auth_id },
+          session: { access_token: 'sb-token-123', refresh_token: 'sb-refresh-123', expires_in: 3600, expires_at: Date.now() + 3600000 },
+        },
+        error: null,
+      });
+      mockUserRepository.findByAuthId.mockResolvedValue(adminUser);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Email and password are required');
+      const res = await request.post('/auth/login').send({ email: 'admin@test.com', password: 'admin123' });
+      expect(res.status).toBe(200);
+      expect(res.body.user.email).toBe('admin@test.com');
+      expect(res.body.token).toBe('sb-token-123');
+      expect(res.body.session).toBeDefined();
+      expect(res.body.session.access_token).toBe('sb-token-123');
     });
 
-    it('returns 400 if password is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Email and password are required');
-    });
-
-    it('returns 401 if user not found', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'notfound@example.com', password: 'password123' });
-
-      expect(response.status).toBe(401);
-      expect(response.body.error).toBe('Invalid credentials');
-    });
-
-    it('returns 401 if password is incorrect', async () => {
-      const hashedPassword = bcrypt.hashSync('correctpassword', 10);
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'test@example.com',
-        password: hashedPassword,
-        name: 'Test User',
-        role: 'user',
+    it('should return 401 for invalid credentials', async () => {
+      mockSupabaseAnon.auth.signInWithPassword.mockResolvedValue({
+        data: { user: null, session: null },
+        error: { message: 'Invalid credentials' },
       });
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'wrongpassword' });
-
-      expect(response.status).toBe(401);
-      expect(response.body.error).toBe('Invalid credentials');
+      const res = await request.post('/auth/login').send({ email: 'admin@test.com', password: 'wrong' });
+      expect(res.status).toBe(401);
     });
 
-    it('returns user and token on successful login', async () => {
-      const hashedPassword = bcrypt.hashSync('password123', 10);
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'test@example.com',
-        password: hashedPassword,
-        name: 'Test User',
-        role: 'user',
+    it('should return 400 when email or password missing', async () => {
+      const res = await request.post('/auth/login').send({ email: 'admin@test.com' });
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 401 when Supabase user has no app account', async () => {
+      mockSupabaseAnon.auth.signInWithPassword.mockResolvedValue({
+        data: {
+          user: { id: 'unknown-uuid' },
+          session: { access_token: 'token', refresh_token: 'refresh', expires_in: 3600, expires_at: 0 },
+        },
+        error: null,
       });
+      mockUserRepository.findByAuthId.mockResolvedValue(null);
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'password123' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.user).toEqual({
-        id: 1,
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'user',
-      });
-      expect(response.body.token).toBeDefined();
-      expect(response.body.user.password).toBeUndefined();
-
-      // Verify token is valid
-      const decoded = jwt.verify(response.body.token, JWT_SECRET);
-      expect(decoded.id).toBe(1);
-      expect(decoded.email).toBe('test@example.com');
+      const res = await request.post('/auth/login').send({ email: 'orphan@test.com', password: 'pass123' });
+      expect(res.status).toBe(401);
     });
   });
 
-  describe('GET /api/auth/me', () => {
-    it('returns 401 without token', async () => {
-      const response = await request(app).get('/api/auth/me');
+  describe('GET /auth/me', () => {
+    it('should return current user with valid token', async () => {
+      const token = generateToken(adminUser);
+      mockUserRepository.findByAuthId.mockResolvedValue(adminUser);
+      mockUserRepository.findById.mockResolvedValue(adminUser);
 
-      expect(response.status).toBe(401);
+      const res = await request.get('/auth/me').set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.email).toBe('admin@test.com');
     });
 
-    it('returns 403 with invalid token', async () => {
-      const response = await request(app)
-        .get('/api/auth/me')
-        .set('Authorization', 'Bearer invalid-token');
-
-      expect(response.status).toBe(403);
+    it('should return 401 without token', async () => {
+      const res = await request.get('/auth/me');
+      expect(res.status).toBe(401);
     });
 
-    it('returns 404 if user not found', async () => {
-      const token = jwt.sign({ id: 999, email: 'ghost@example.com', role: 'user' }, JWT_SECRET);
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toBe(404);
-      expect(response.body.error).toBe('User not found');
+    it('should return 401 with invalid token', async () => {
+      const res = await request.get('/auth/me').set('Authorization', 'Bearer invalid-token');
+      expect(res.status).toBe(401);
     });
 
-    it('returns user data with valid token', async () => {
-      const token = jwt.sign({ id: 1, email: 'test@example.com', role: 'user' }, JWT_SECRET);
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'user',
-        created_at: '2024-01-01T00:00:00.000Z',
-      });
+    it('should return 401 when user not found by auth_id', async () => {
+      const token = jwt.sign({ sub: 'nonexistent-uuid', email: 'ghost@test.com', role: 'authenticated' }, JWT_SECRET);
+      mockUserRepository.findByAuthId.mockResolvedValue(null);
 
-      const response = await request(app)
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({
-        id: 1,
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'user',
-        created_at: '2024-01-01T00:00:00.000Z',
-      });
+      const res = await request.get('/auth/me').set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(401);
     });
   });
 });

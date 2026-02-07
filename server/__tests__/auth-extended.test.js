@@ -1,611 +1,378 @@
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import express from 'express';
-import request from 'supertest';
-import bcrypt from 'bcryptjs';
+import { jest } from '@jest/globals';
 import jwt from 'jsonwebtoken';
+import supertest from 'supertest';
+import express from 'express';
 
-// Mock the database
-const mockDb = {
-  get: jest.fn(),
-  all: jest.fn(),
-  run: jest.fn(),
-};
-
-// Mock JWT_SECRET
 const JWT_SECRET = 'test-secret';
 
-// Mock email service
-const mockSendVerificationEmail = jest.fn();
-const mockSendPasswordResetEmail = jest.fn();
-const mockGenerateVerificationCode = jest.fn();
-const mockGetCodeExpiration = jest.fn();
+// ── Declare mock objects OUTSIDE factories so test + middleware share the same refs ──
 
-jest.unstable_mockModule('../src/db/database.js', () => ({
-  default: mockDb,
-  initializeDatabase: jest.fn(),
-}));
+const mockSupabase = {
+  auth: {
+    admin: {
+      createUser: jest.fn(),
+      updateUserById: jest.fn(),
+      deleteUser: jest.fn(),
+      listUsers: jest.fn(),
+    },
+  },
+};
 
-jest.unstable_mockModule('../src/middleware/auth.js', () => ({
-  JWT_SECRET,
-  authenticateToken: (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+const mockSupabaseAnon = {
+  auth: {
+    signInWithPassword: jest.fn(),
+  },
+};
 
-    if (!token) {
-      return res.status(401).json({ error: 'Access denied' });
-    }
+const mockUserRepository = {
+  findByAuthId: jest.fn(),
+  findById: jest.fn(),
+  findByEmail: jest.fn(),
+  create: jest.fn(),
+};
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
-      next();
-    } catch (err) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
+const mockPendingRegistrationRepository = {
+  findByEmail: jest.fn(),
+  findByEmailAndCode: jest.fn(),
+  create: jest.fn(),
+  updateCode: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockVerificationCodeRepository = {
+  findByEmailCodeType: jest.fn(),
+  create: jest.fn(),
+  deleteByEmailAndType: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockPasswordResetRepository = {
+  findByToken: jest.fn(),
+  create: jest.fn(),
+  deleteByUserId: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockEmail = {
+  sendVerificationEmail: jest.fn().mockResolvedValue({ success: true }),
+  sendPasswordResetEmail: jest.fn().mockResolvedValue({ success: true }),
+  generateVerificationCode: jest.fn().mockReturnValue('123456'),
+  getCodeExpiration: jest.fn().mockReturnValue(new Date(Date.now() + 900000).toISOString()),
+};
+
+// ── Register mocks ──────────────────────────────────────────
+
+jest.unstable_mockModule('../src/config/index.js', () => ({
+  config: {
+    supabase: { jwtSecret: JWT_SECRET },
+    rateLimit: { auth: { windowMs: 1, max: 100 } },
   },
 }));
 
-jest.unstable_mockModule('../src/services/email.js', () => ({
-  sendVerificationEmail: mockSendVerificationEmail,
-  sendPasswordResetEmail: mockSendPasswordResetEmail,
-  generateVerificationCode: mockGenerateVerificationCode,
-  getCodeExpiration: mockGetCodeExpiration,
+jest.unstable_mockModule('../src/db/supabase.js', () => ({
+  supabase: mockSupabase,
+  supabaseAnon: mockSupabaseAnon,
 }));
 
-jest.unstable_mockModule('../src/middleware/validate.js', () => ({
-  validateBody: () => (req, res, next) => next(),
+jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
+  userRepository: mockUserRepository,
 }));
 
-// Import router after mocks
+jest.unstable_mockModule('../src/repositories/authRepository.js', () => ({
+  pendingRegistrationRepository: mockPendingRegistrationRepository,
+  verificationCodeRepository: mockVerificationCodeRepository,
+  passwordResetRepository: mockPasswordResetRepository,
+}));
+
+jest.unstable_mockModule('../src/services/email.js', () => mockEmail);
+
+jest.unstable_mockModule('../src/validation/schemas.js', () => ({
+  forgotPasswordSchema: { parse: jest.fn((d) => d) },
+  resetPasswordSchema: { parse: jest.fn((d) => d) },
+}));
+
+// ── Dynamic imports after mocks ──────────────────────────────
+
 const { default: authRoutes } = await import('../src/routes/auth.js');
+const { errorHandler } = await import('../src/middleware/errorHandler.js');
 
-// Create test app
 const app = express();
 app.use(express.json());
-app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+app.use(errorHandler);
 
-// Helper to generate tokens
-const generateToken = (user) => jwt.sign(user, JWT_SECRET);
+const request = supertest(app);
 
-describe('Auth Extended API', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockGenerateVerificationCode.mockReturnValue('123456');
-    mockGetCodeExpiration.mockReturnValue(new Date(Date.now() + 15 * 60 * 1000).toISOString());
-    mockSendVerificationEmail.mockResolvedValue({ success: true });
-    mockSendPasswordResetEmail.mockResolvedValue({ success: true });
-  });
+const testUser = { id: 1, email: 'user@test.com', name: 'Test User', role: 'employee', auth_id: 'uuid-user-123', profile_picture: null, theme_preference: 'light' };
 
-  describe('POST /api/auth/register/initiate', () => {
-    it('returns 400 if email is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/register/initiate')
-        .send({ password: 'password123', name: 'Test User' });
+const generateToken = (user) => jwt.sign({ sub: user.auth_id, email: user.email, role: 'authenticated' }, JWT_SECRET);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
+describe('Auth Extended Routes', () => {
+  beforeEach(() => jest.clearAllMocks());
 
-    it('returns 400 if password is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/register/initiate')
-        .send({ email: 'test@example.com', name: 'Test User' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 400 if name is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/register/initiate')
-        .send({ email: 'test@example.com', password: 'password123' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 400 for invalid email format', async () => {
-      const response = await request(app)
-        .post('/api/auth/register/initiate')
-        .send({ email: 'invalid-email', password: 'password123', name: 'Test' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('valid email');
-    });
-
-    it('returns 400 if user already exists', async () => {
-      mockDb.get.mockReturnValue({ id: 1, email: 'existing@example.com' });
-
-      const response = await request(app)
-        .post('/api/auth/register/initiate')
-        .send({ email: 'existing@example.com', password: 'password123', name: 'Test' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('already exists');
-    });
-
-    it('initiates registration successfully', async () => {
-      mockDb.get.mockReturnValue(null); // No existing user
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/auth/register/initiate')
-        .send({ email: 'new@example.com', password: 'password123', name: 'New User' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('Verification code sent');
-      expect(mockSendVerificationEmail).toHaveBeenCalledWith('new@example.com', '123456', 'registration');
-    });
-
-    it('deletes existing pending registration before creating new one', async () => {
-      mockDb.get.mockReturnValue(null);
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      await request(app)
-        .post('/api/auth/register/initiate')
-        .send({ email: 'test@example.com', password: 'password123', name: 'Test' });
-
-      // Check that DELETE was called for pending_registrations
-      const deleteCall = mockDb.run.mock.calls.find(call =>
-        call[0].includes('DELETE FROM pending_registrations')
-      );
-      expect(deleteCall).toBeDefined();
-    });
-  });
-
-  describe('POST /api/auth/register/verify', () => {
-    it('returns 400 if email is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/register/verify')
-        .send({ code: '123456' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 400 if code is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/register/verify')
-        .send({ email: 'test@example.com' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 400 for invalid verification code', async () => {
-      mockDb.get.mockReturnValue(null); // No matching pending registration
-
-      const response = await request(app)
-        .post('/api/auth/register/verify')
-        .send({ email: 'test@example.com', code: 'wrong' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Invalid verification code');
-    });
-
-    it('returns 400 if code has expired', async () => {
-      const expiredDate = new Date(Date.now() - 60 * 1000).toISOString(); // 1 minute ago
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'test@example.com',
-        password_hash: 'hashed',
-        name: 'Test',
-        verification_code: '123456',
-        expires_at: expiredDate,
-      });
-
-      const response = await request(app)
-        .post('/api/auth/register/verify')
-        .send({ email: 'test@example.com', code: '123456' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('expired');
-    });
-
-    it('verifies registration and creates user successfully', async () => {
-      const futureDate = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-      mockDb.get
-        .mockReturnValueOnce({
-          id: 1,
-          email: 'test@example.com',
-          password_hash: 'hashed_password',
-          name: 'Test User',
-          verification_code: '123456',
-          expires_at: futureDate,
-        })
-        .mockReturnValueOnce({
-          id: 10,
-          email: 'test@example.com',
-          name: 'Test User',
-          role: 'employee',
-          created_at: new Date().toISOString(),
+  describe('Registration Flow', () => {
+    describe('POST /auth/register/initiate', () => {
+      it('should initiate registration successfully', async () => {
+        mockUserRepository.findByEmail.mockResolvedValue(null);
+        mockPendingRegistrationRepository.findByEmail.mockResolvedValue(null);
+        mockSupabase.auth.admin.createUser.mockResolvedValue({
+          data: { user: { id: 'new-uuid-123' } },
+          error: null,
         });
 
-      mockDb.run.mockReturnValue({ lastInsertRowid: 10 });
-
-      const response = await request(app)
-        .post('/api/auth/register/verify')
-        .send({ email: 'test@example.com', code: '123456' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.user).toBeDefined();
-      expect(response.body.token).toBeDefined();
-      expect(response.body.user.email).toBe('test@example.com');
-    });
-  });
-
-  describe('POST /api/auth/register/resend', () => {
-    it('returns 400 if email is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/register/resend')
-        .send({});
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 400 if no pending registration found', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
-        .post('/api/auth/register/resend')
-        .send({ email: 'notfound@example.com' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('No pending registration');
-    });
-
-    it('resends verification code successfully', async () => {
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'test@example.com',
-        verification_code: 'old_code',
-      });
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/auth/register/resend')
-        .send({ email: 'test@example.com' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('resent');
-      expect(mockSendVerificationEmail).toHaveBeenCalled();
-    });
-  });
-
-  describe('POST /api/auth/forgot-password', () => {
-    it('returns success even if user not found (prevent enumeration)', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'notfound@example.com' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('If an account exists');
-      expect(mockSendPasswordResetEmail).not.toHaveBeenCalled();
-    });
-
-    it('sends password reset email when user exists', async () => {
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'user@example.com',
-        name: 'Test User',
-      });
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'user@example.com' });
-
-      expect(response.status).toBe(200);
-      expect(mockSendPasswordResetEmail).toHaveBeenCalledWith(
-        'user@example.com',
-        expect.any(String),
-        'Test User'
-      );
-    });
-
-    it('deletes existing tokens before creating new one', async () => {
-      mockDb.get.mockReturnValue({ id: 1, email: 'user@example.com', name: 'Test' });
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'user@example.com' });
-
-      const deleteCall = mockDb.run.mock.calls.find(call =>
-        call[0].includes('DELETE FROM password_reset_tokens')
-      );
-      expect(deleteCall).toBeDefined();
-    });
-  });
-
-  describe('POST /api/auth/reset-password', () => {
-    it('returns 400 for invalid token', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
-        .post('/api/auth/reset-password')
-        .send({ token: 'invalid-token', password: 'newpassword123' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Invalid or expired');
-    });
-
-    it('returns 400 if token has expired', async () => {
-      const expiredDate = new Date(Date.now() - 60 * 1000).toISOString();
-      mockDb.get.mockReturnValue({
-        id: 1,
-        user_id: 5,
-        token: 'valid-token',
-        expires_at: expiredDate,
+        const res = await request.post('/auth/register/initiate').send({
+          email: 'new@test.com', password: 'pass123', name: 'New User',
+        });
+        expect(res.status).toBe(200);
+        expect(res.body.message).toMatch(/verification/i);
+        expect(mockSupabase.auth.admin.createUser).toHaveBeenCalledWith(
+          expect.objectContaining({ email: 'new@test.com', email_confirm: false })
+        );
+        expect(mockEmail.sendVerificationEmail).toHaveBeenCalled();
       });
 
-      const response = await request(app)
-        .post('/api/auth/reset-password')
-        .send({ token: 'valid-token', password: 'newpassword123' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('expired');
-    });
-
-    it('resets password successfully', async () => {
-      const futureDate = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-      mockDb.get.mockReturnValue({
-        id: 1,
-        user_id: 5,
-        token: 'valid-token',
-        expires_at: futureDate,
-      });
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/auth/reset-password')
-        .send({ token: 'valid-token', password: 'newpassword123' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('successfully');
-
-      // Verify password was updated
-      const updateCall = mockDb.run.mock.calls.find(call =>
-        call[0].includes('UPDATE users SET password')
-      );
-      expect(updateCall).toBeDefined();
-    });
-
-    it('deletes all reset tokens for user after successful reset', async () => {
-      const futureDate = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-      mockDb.get.mockReturnValue({
-        id: 1,
-        user_id: 5,
-        token: 'valid-token',
-        expires_at: futureDate,
-      });
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      await request(app)
-        .post('/api/auth/reset-password')
-        .send({ token: 'valid-token', password: 'newpassword123' });
-
-      // Should delete by id and by user_id
-      const deleteCalls = mockDb.run.mock.calls.filter(call =>
-        call[0].includes('DELETE FROM password_reset_tokens')
-      );
-      expect(deleteCalls.length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  describe('POST /api/auth/password/request-change', () => {
-    const userToken = generateToken({ id: 1, email: 'user@example.com', role: 'user' });
-
-    it('returns 401 without authentication', async () => {
-      const response = await request(app)
-        .post('/api/auth/password/request-change')
-        .send({ old_password: 'old', new_password: 'newpass123' });
-
-      expect(response.status).toBe(401);
-    });
-
-    it('returns 400 if old_password is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/password/request-change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ new_password: 'newpass123' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 400 if new_password is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/password/request-change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ old_password: 'oldpass123' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 400 if new_password is too short', async () => {
-      const response = await request(app)
-        .post('/api/auth/password/request-change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ old_password: 'oldpass123', new_password: '12345' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('6 characters');
-    });
-
-    it('returns 404 if user not found', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
-        .post('/api/auth/password/request-change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ old_password: 'oldpass123', new_password: 'newpass123' });
-
-      expect(response.status).toBe(404);
-    });
-
-    it('returns 400 if old password is incorrect', async () => {
-      const hashedPassword = bcrypt.hashSync('correctpassword', 10);
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'user@example.com',
-        password: hashedPassword,
+      it('should return 400 if email already exists', async () => {
+        mockUserRepository.findByEmail.mockResolvedValue({ id: 1 });
+        const res = await request.post('/auth/register/initiate').send({
+          email: 'existing@test.com', password: 'pass123', name: 'User',
+        });
+        expect(res.status).toBe(400);
       });
 
-      const response = await request(app)
-        .post('/api/auth/password/request-change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ old_password: 'wrongpassword', new_password: 'newpass123' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('incorrect');
-    });
-
-    it('sends verification code when old password is correct', async () => {
-      const hashedPassword = bcrypt.hashSync('oldpass123', 10);
-      mockDb.get.mockReturnValue({
-        id: 1,
-        email: 'user@example.com',
-        password: hashedPassword,
-      });
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/auth/password/request-change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ old_password: 'oldpass123', new_password: 'newpass123' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('Verification code sent');
-      expect(mockSendVerificationEmail).toHaveBeenCalledWith(
-        'user@example.com',
-        '123456',
-        'password_change'
-      );
-    });
-  });
-
-  describe('POST /api/auth/password/change', () => {
-    const userToken = generateToken({ id: 1, email: 'user@example.com', role: 'user' });
-
-    it('returns 401 without authentication', async () => {
-      const response = await request(app)
-        .post('/api/auth/password/change')
-        .send({ code: '123456' });
-
-      expect(response.status).toBe(401);
-    });
-
-    it('returns 400 if code is missing', async () => {
-      const response = await request(app)
-        .post('/api/auth/password/change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({});
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('required');
-    });
-
-    it('returns 404 if user not found', async () => {
-      mockDb.get.mockReturnValue(null);
-
-      const response = await request(app)
-        .post('/api/auth/password/change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ code: '123456' });
-
-      expect(response.status).toBe(404);
-    });
-
-    it('returns 400 for invalid verification code', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, email: 'user@example.com' }) // user found
-        .mockReturnValueOnce(null); // no verification code
-
-      const response = await request(app)
-        .post('/api/auth/password/change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ code: 'wrongcode' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Invalid verification code');
-    });
-
-    it('returns 400 if verification code has expired', async () => {
-      const expiredDate = new Date(Date.now() - 60 * 1000).toISOString();
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, email: 'user@example.com' })
-        .mockReturnValueOnce({
-          id: 1,
-          email: 'user@example.com',
-          code: '123456',
-          type: 'password_change',
-          expires_at: expiredDate,
-          pending_data: 'hashed_new_password',
+      it('should clean up previous pending registration', async () => {
+        mockUserRepository.findByEmail.mockResolvedValue(null);
+        mockPendingRegistrationRepository.findByEmail.mockResolvedValue({ id: 5, auth_id: 'old-uuid' });
+        mockSupabase.auth.admin.deleteUser.mockResolvedValue({});
+        mockSupabase.auth.admin.createUser.mockResolvedValue({
+          data: { user: { id: 'new-uuid-456' } },
+          error: null,
         });
 
-      const response = await request(app)
-        .post('/api/auth/password/change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ code: '123456' });
+        const res = await request.post('/auth/register/initiate').send({
+          email: 'retry@test.com', password: 'pass123', name: 'Retry User',
+        });
+        expect(res.status).toBe(200);
+        expect(mockSupabase.auth.admin.deleteUser).toHaveBeenCalledWith('old-uuid');
+        expect(mockPendingRegistrationRepository.delete).toHaveBeenCalledWith(5);
+      });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('expired');
+      it('should return 400 for missing fields', async () => {
+        const res = await request.post('/auth/register/initiate').send({ email: 'new@test.com' });
+        expect(res.status).toBe(400);
+      });
+
+      it('should return 400 for invalid email', async () => {
+        const res = await request.post('/auth/register/initiate').send({
+          email: 'not-an-email', password: 'pass123', name: 'User',
+        });
+        expect(res.status).toBe(400);
+      });
     });
 
-    it('returns 400 if pending_data is missing', async () => {
-      const futureDate = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, email: 'user@example.com' })
-        .mockReturnValueOnce({
-          id: 1,
-          email: 'user@example.com',
-          code: '123456',
-          type: 'password_change',
-          expires_at: futureDate,
-          pending_data: null, // missing
+    describe('POST /auth/register/verify', () => {
+      it('should verify and create user successfully', async () => {
+        const futureDate = new Date(Date.now() + 600000).toISOString();
+        mockPendingRegistrationRepository.findByEmailAndCode.mockResolvedValue({
+          id: 1, email: 'new@test.com', name: 'New User', auth_id: 'uuid-new-123', expires_at: futureDate,
         });
+        mockSupabase.auth.admin.updateUserById.mockResolvedValue({ error: null });
+        mockUserRepository.create.mockResolvedValue({ id: 10, email: 'new@test.com', name: 'New User', role: 'employee' });
 
-      const response = await request(app)
-        .post('/api/auth/password/change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ code: '123456' });
+        const res = await request.post('/auth/register/verify').send({ email: 'new@test.com', code: '123456' });
+        expect(res.status).toBe(200);
+        expect(res.body.user).toBeDefined();
+        expect(res.body.user.email).toBe('new@test.com');
+        expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith('uuid-new-123', { email_confirm: true });
+        expect(mockUserRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ auth_id: 'uuid-new-123' })
+        );
+        expect(mockPendingRegistrationRepository.delete).toHaveBeenCalledWith(1);
+      });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('invalid');
+      it('should return 400 for invalid code', async () => {
+        mockPendingRegistrationRepository.findByEmailAndCode.mockResolvedValue(null);
+        const res = await request.post('/auth/register/verify').send({ email: 'new@test.com', code: '000000' });
+        expect(res.status).toBe(400);
+      });
+
+      it('should return 400 for expired code', async () => {
+        const pastDate = new Date(Date.now() - 60000).toISOString();
+        mockPendingRegistrationRepository.findByEmailAndCode.mockResolvedValue({
+          id: 1, email: 'new@test.com', auth_id: 'uuid-expired', expires_at: pastDate,
+        });
+        mockSupabase.auth.admin.deleteUser.mockResolvedValue({});
+
+        const res = await request.post('/auth/register/verify').send({ email: 'new@test.com', code: '123456' });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/expired/i);
+      });
     });
 
-    it('changes password successfully', async () => {
-      const futureDate = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, email: 'user@example.com' })
-        .mockReturnValueOnce({
-          id: 1,
-          email: 'user@example.com',
-          code: '123456',
-          type: 'password_change',
-          expires_at: futureDate,
-          pending_data: 'hashed_new_password',
+    describe('POST /auth/register/resend', () => {
+      it('should resend code successfully', async () => {
+        mockPendingRegistrationRepository.findByEmail.mockResolvedValue({ id: 1, email: 'new@test.com' });
+
+        const res = await request.post('/auth/register/resend').send({ email: 'new@test.com' });
+        expect(res.status).toBe(200);
+        expect(mockEmail.sendVerificationEmail).toHaveBeenCalled();
+      });
+
+      it('should return 400 when no pending registration', async () => {
+        mockPendingRegistrationRepository.findByEmail.mockResolvedValue(null);
+        const res = await request.post('/auth/register/resend').send({ email: 'unknown@test.com' });
+        expect(res.status).toBe(400);
+      });
+    });
+  });
+
+  describe('Password Change Flow', () => {
+    describe('POST /auth/password/request-change', () => {
+      it('should send verification code for password change', async () => {
+        const token = generateToken(testUser);
+        mockUserRepository.findByAuthId.mockResolvedValue(testUser);
+        mockUserRepository.findById.mockResolvedValue(testUser);
+        mockSupabaseAnon.auth.signInWithPassword.mockResolvedValue({ data: {}, error: null });
+
+        const res = await request
+          .post('/auth/password/request-change')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ old_password: 'oldpass', new_password: 'newpass123' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toMatch(/verification/i);
+        expect(mockSupabaseAnon.auth.signInWithPassword).toHaveBeenCalledWith({
+          email: testUser.email,
+          password: 'oldpass',
         });
-      mockDb.run.mockReturnValue({ changes: 1 });
+      });
 
-      const response = await request(app)
-        .post('/api/auth/password/change')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ code: '123456' });
+      it('should return 400 for wrong current password', async () => {
+        const token = generateToken(testUser);
+        mockUserRepository.findByAuthId.mockResolvedValue(testUser);
+        mockUserRepository.findById.mockResolvedValue(testUser);
+        mockSupabaseAnon.auth.signInWithPassword.mockResolvedValue({
+          data: {}, error: { message: 'Invalid credentials' },
+        });
 
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('successfully');
+        const res = await request
+          .post('/auth/password/request-change')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ old_password: 'wrongpass', new_password: 'newpass123' });
 
-      // Verify password was updated
-      const updateCall = mockDb.run.mock.calls.find(call =>
-        call[0].includes('UPDATE users SET password')
-      );
-      expect(updateCall).toBeDefined();
+        expect(res.status).toBe(400);
+      });
+
+      it('should return 400 for short new password', async () => {
+        const token = generateToken(testUser);
+        mockUserRepository.findByAuthId.mockResolvedValue(testUser);
+
+        const res = await request
+          .post('/auth/password/request-change')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ old_password: 'oldpass', new_password: 'ab' });
+
+        expect(res.status).toBe(400);
+      });
+    });
+
+    describe('POST /auth/password/change', () => {
+      it('should change password successfully', async () => {
+        const token = generateToken(testUser);
+        mockUserRepository.findByAuthId.mockResolvedValue(testUser);
+        mockUserRepository.findById.mockResolvedValue(testUser);
+        mockVerificationCodeRepository.findByEmailCodeType.mockResolvedValue({
+          id: 1, email: testUser.email, code: '123456', type: 'password_change',
+          expires_at: new Date(Date.now() + 600000).toISOString(),
+        });
+        mockSupabase.auth.admin.updateUserById.mockResolvedValue({ error: null });
+
+        const res = await request
+          .post('/auth/password/change')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ code: '123456', new_password: 'newpass123' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.message).toMatch(/changed/i);
+        expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith(testUser.auth_id, { password: 'newpass123' });
+      });
+
+      it('should return 400 for invalid code', async () => {
+        const token = generateToken(testUser);
+        mockUserRepository.findByAuthId.mockResolvedValue(testUser);
+        mockUserRepository.findById.mockResolvedValue(testUser);
+        mockVerificationCodeRepository.findByEmailCodeType.mockResolvedValue(null);
+
+        const res = await request
+          .post('/auth/password/change')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ code: '000000', new_password: 'newpass123' });
+
+        expect(res.status).toBe(400);
+      });
+
+      it('should return 400 for missing new_password', async () => {
+        const token = generateToken(testUser);
+        mockUserRepository.findByAuthId.mockResolvedValue(testUser);
+
+        const res = await request
+          .post('/auth/password/change')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ code: '123456' });
+
+        expect(res.status).toBe(400);
+      });
+    });
+  });
+
+  describe('Forgot/Reset Password', () => {
+    describe('POST /auth/forgot-password', () => {
+      it('should send reset email for existing user', async () => {
+        mockUserRepository.findByEmail.mockResolvedValue({ ...testUser, name: 'Test User' });
+
+        const res = await request.post('/auth/forgot-password').send({ email: 'user@test.com' });
+        expect(res.status).toBe(200);
+        expect(mockEmail.sendPasswordResetEmail).toHaveBeenCalled();
+      });
+
+      it('should return generic message for non-existent email', async () => {
+        mockUserRepository.findByEmail.mockResolvedValue(null);
+
+        const res = await request.post('/auth/forgot-password').send({ email: 'unknown@test.com' });
+        expect(res.status).toBe(200);
+        expect(mockEmail.sendPasswordResetEmail).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('POST /auth/reset-password', () => {
+      it('should reset password successfully', async () => {
+        mockPasswordResetRepository.findByToken.mockResolvedValue({
+          id: 1, user_id: testUser.id, token: 'reset-token',
+          expires_at: new Date(Date.now() + 3600000).toISOString(),
+        });
+        mockUserRepository.findById.mockResolvedValue(testUser);
+        mockSupabase.auth.admin.updateUserById.mockResolvedValue({ error: null });
+
+        const res = await request.post('/auth/reset-password').send({ token: 'reset-token', password: 'newpass123' });
+        expect(res.status).toBe(200);
+        expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith(testUser.auth_id, { password: 'newpass123' });
+      });
+
+      it('should return 400 for invalid token', async () => {
+        mockPasswordResetRepository.findByToken.mockResolvedValue(null);
+        const res = await request.post('/auth/reset-password').send({ token: 'bad-token', password: 'newpass123' });
+        expect(res.status).toBe(400);
+      });
+
+      it('should return 400 for expired token', async () => {
+        mockPasswordResetRepository.findByToken.mockResolvedValue({
+          id: 1, user_id: testUser.id, token: 'expired-token',
+          expires_at: new Date(Date.now() - 60000).toISOString(),
+        });
+
+        const res = await request.post('/auth/reset-password').send({ token: 'expired-token', password: 'newpass123' });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/expired/i);
+      });
     });
   });
 });

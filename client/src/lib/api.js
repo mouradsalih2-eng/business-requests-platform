@@ -1,28 +1,18 @@
+import { supabase } from './supabase';
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
-let csrfToken = null;
-
-function getToken() {
-  return localStorage.getItem('token');
+/**
+ * Get the current Supabase access token.
+ * Returns null if no active session.
+ */
+async function getToken() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token || null;
 }
-
-async function fetchCsrfToken() {
-  try {
-    const response = await fetch(`${API_BASE}/csrf-token`);
-    if (response.ok) {
-      const data = await response.json();
-      csrfToken = data.csrfToken;
-    }
-  } catch (error) {
-    console.warn('Failed to fetch CSRF token:', error);
-  }
-}
-
-// Fetch CSRF token on load
-fetchCsrfToken();
 
 async function request(endpoint, options = {}) {
-  const token = getToken();
+  const token = await getToken();
 
   const config = {
     ...options,
@@ -35,11 +25,6 @@ async function request(endpoint, options = {}) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Add CSRF token for state-changing requests
-  if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(options.method?.toUpperCase())) {
-    config.headers['X-CSRF-Token'] = csrfToken;
-  }
-
   // Don't set Content-Type for FormData (let browser set it with boundary)
   if (!(options.body instanceof FormData)) {
     config.headers['Content-Type'] = 'application/json';
@@ -49,12 +34,6 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
-
-    // Refresh CSRF token on 403
-    if (response.status === 403 && error.error?.includes('CSRF')) {
-      await fetchCsrfToken();
-    }
-
     throw new Error(error.error || 'Request failed');
   }
 
@@ -64,20 +43,19 @@ async function request(endpoint, options = {}) {
 // Auth
 export const auth = {
   login: async (email, password) => {
-    const result = await request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-    // Refresh CSRF token after login
-    await fetchCsrfToken();
-    return result;
+    // Sign in via Supabase Auth directly
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+
+    // Fetch app user data from our API
+    const user = await request('/auth/me');
+    return { user, session: data.session };
   },
 
-  register: (email, password, name) =>
-    request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, name }),
-    }),
+  register: async (email, password, name) => {
+    // Registration is disabled — admin creates users
+    throw new Error('Registration is disabled. Please contact an administrator.');
+  },
 
   me: () => request('/auth/me'),
 
@@ -93,8 +71,8 @@ export const auth = {
       body: JSON.stringify({ token, password }),
     }),
 
-  logout: () => {
-    csrfToken = null;
+  logout: async () => {
+    await supabase.auth.signOut();
   },
 };
 
@@ -237,10 +215,10 @@ export const users = {
       body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
     }),
 
-  changePassword: (code) =>
+  changePassword: (code, newPassword) =>
     request('/auth/password/change', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, new_password: newPassword }),
     }),
 
   // Seed data (admin only)
@@ -315,6 +293,3 @@ export const featureFlags = {
       body: JSON.stringify({ enabled }),
     }),
 };
-
-// Export CSRF refresh function for use after auth state changes
-export const refreshCsrfToken = fetchCsrfToken;

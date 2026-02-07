@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { users } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 const ThemeContext = createContext(null);
 
@@ -49,10 +50,9 @@ export function ThemeProvider({ children }) {
 
     // Try to sync with server if logged in
     try {
-      const token = localStorage.getItem('token');
-      if (token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         await users.updateSettings({ theme_preference: newTheme });
-        console.log('Theme preference synced to server:', newTheme);
       }
     } catch (error) {
       // Log server sync errors but don't block UI - localStorage is source of truth

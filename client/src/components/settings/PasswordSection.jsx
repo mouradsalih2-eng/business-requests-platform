@@ -98,7 +98,7 @@ export default function PasswordSection() {
 
     setLoading(true);
     try {
-      await users.changePassword(code);
+      await users.changePassword(code, newPassword);
       toast.success('Password changed successfully');
       // Reset form
       resetForm();

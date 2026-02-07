@@ -29,9 +29,7 @@ export function Header({ onMenuClick }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const profilePictureUrl = user?.profile_picture
-    ? `${import.meta.env.VITE_API_URL || ''}${user.profile_picture}`
-    : null;
+  const profilePictureUrl = user?.profile_picture || null;
 
   return (
     <header className="h-14 bg-white dark:bg-[#0D1117] border-b border-neutral-100 dark:border-[#30363D] px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30">

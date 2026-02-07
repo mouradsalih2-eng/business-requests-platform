@@ -274,7 +274,7 @@ export function RequestDetailPage() {
                   {request.attachments.map((attachment) => (
                     <a
                       key={attachment.id}
-                      href={`/api/uploads/${attachment.filepath}`}
+                      href={attachment.filepath}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 p-2 bg-neutral-50 dark:bg-neutral-900 rounded-lg text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"

@@ -1,720 +1,193 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import db from '../db/database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requestRepository } from '../repositories/requestRepository.js';
+import { voteRepository } from '../repositories/voteRepository.js';
+import { attachmentRepository } from '../repositories/attachmentRepository.js';
+import { activityRepository } from '../repositories/activityRepository.js';
+import { adminReadRepository } from '../repositories/adminReadRepository.js';
+import { requestService } from '../services/requestService.js';
+import { storageService } from '../services/storageService.js';
+import { commentRepository } from '../repositories/commentRepository.js';
+import { ValidationError, ForbiddenError } from '../errors/AppError.js';
 
 const router = Router();
 
-/**
- * Requests API - CRUD operations for business requests
- * All authenticated users can view all requests
- */
+// ── File upload config (memory storage — file goes to Supabase) ──
 
-// Allowed file types for uploads
 const ALLOWED_FILE_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-  'application/msword',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/pdf', 'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-  'text/csv',
+  'text/plain', 'text/csv',
 ];
-
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv'];
 
-// Configure multer for file uploads with validation
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, join(__dirname, '../../uploads'));
-  },
-  filename: (req, file, cb) => {
-    // Sanitize filename - remove path traversal and special characters
-    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + sanitizedName);
-  }
-});
-
-const fileFilter = (req, file, cb) => {
+const fileFilter = (_req, file, cb) => {
   const ext = '.' + file.originalname.split('.').pop().toLowerCase();
-
-  if (ALLOWED_FILE_TYPES.includes(file.mimetype) && ALLOWED_EXTENSIONS.includes(ext)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Allowed: images, PDF, Word, Excel, and text files.'), false);
-  }
+  cb(null, ALLOWED_FILE_TYPES.includes(file.mimetype) && ALLOWED_EXTENSIONS.includes(ext));
 };
 
 const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter,
 });
 
-// Get analytics data (admin only) - MUST be before /:id routes
-router.get('/stats/analytics', authenticateToken, requireAdmin, (req, res) => {
-  try {
-    const { period } = req.query; // '7days', '30days', '90days', 'all'
-    const now = new Date();
+// ── Routes ───────────────────────────────────────────────────
 
-    let days;
-    let groupBy;
+// Analytics (admin only) — before /:id
+router.get('/stats/analytics', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  const data = await requestService.getAnalytics(req.query.period);
+  res.json(data);
+}));
 
-    switch (period) {
-      case '7days':
-        days = 7;
-        groupBy = 'day';
-        break;
-      case '30days':
-        days = 30;
-        groupBy = 'week';
-        break;
-      case '90days':
-        days = 90;
-        groupBy = 'month';
-        break;
-      case 'all':
-      default:
-        days = 365 * 10; // 10 years back
-        groupBy = 'month';
-        break;
-    }
+// Search autocomplete — before /:id
+router.get('/search', authenticateToken, asyncHandler(async (req, res) => {
+  const results = await requestService.search(req.query.q, req.query.limit);
+  res.json(results);
+}));
 
-    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+// List all requests
+router.get('/', authenticateToken, asyncHandler(async (req, res) => {
+  const requests = await requestRepository.findAll({ ...req.query, userId: req.user.id });
+  const isAdmin = req.user.role === 'admin';
 
-    // Get all requests within the period
-    const requests = db.all(
-      `SELECT id, created_at, status, category, priority, team, region
-       FROM requests
-       WHERE created_at >= ?
-       ORDER BY created_at ASC`,
-      [startDate.toISOString()]
-    );
+  // Enrich with user votes and read status
+  const enriched = await Promise.all(requests.map(async (request) => {
+    const userVotes = await voteRepository.getUserVoteTypes(request.id, req.user.id);
+    let isRead = true;
+    if (isAdmin) isRead = await adminReadRepository.isRead(request.id, req.user.id);
+    return { ...request, userVotes, isRead };
+  }));
 
-    // Group requests by time period
-    const grouped = {};
+  res.json(enriched);
+}));
 
-    requests.forEach(r => {
-      const date = new Date(r.created_at);
-      let key;
+// Get single request
+router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
+  const request = await requestRepository.findByIdWithCounts(req.params.id);
+  if (!request) return res.status(404).json({ error: 'Request not found' });
 
-      if (groupBy === 'day') {
-        key = date.toISOString().split('T')[0]; // YYYY-MM-DD
-      } else if (groupBy === 'week') {
-        // Get the start of the week (Monday)
-        const tempDate = new Date(date);
-        const dayOfWeek = tempDate.getDay();
-        const diff = tempDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        const weekStart = new Date(tempDate.setDate(diff));
-        key = `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-      } else {
-        key = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      }
+  const [attachments, userVotes] = await Promise.all([
+    attachmentRepository.findByRequest(req.params.id),
+    voteRepository.getUserVoteTypes(req.params.id, req.user.id),
+  ]);
 
-      if (!grouped[key]) {
-        grouped[key] = { label: key, count: 0, pending: 0, completed: 0 };
-      }
-      grouped[key].count++;
-      if (r.status === 'pending') grouped[key].pending++;
-      if (r.status === 'completed') grouped[key].completed++;
-    });
+  res.json({ ...request, attachments, userVotes });
+}));
 
-    // Convert to array and sort
-    let data = Object.values(grouped);
-
-    // For 7 days, fill in missing days
-    if (groupBy === 'day') {
-      const filledData = [];
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        const key = date.toISOString().split('T')[0];
-        const existing = grouped[key];
-        filledData.push(existing || { label: key, count: 0, pending: 0, completed: 0 });
-      }
-      data = filledData;
-    }
-
-    // Get summary stats
-    const totalRequests = requests.length;
-    const pendingCount = requests.filter(r => r.status === 'pending').length;
-    const completedCount = requests.filter(r => r.status === 'completed').length;
-    const inProgressCount = requests.filter(r => r.status === 'in_progress').length;
-    const archivedCount = requests.filter(r => r.status === 'archived').length;
-
-    // Category breakdown
-    const categoryBreakdown = {
-      bug: requests.filter(r => r.category === 'bug').length,
-      new_feature: requests.filter(r => r.category === 'new_feature').length,
-      optimization: requests.filter(r => r.category === 'optimization').length
-    };
-
-    // Priority breakdown
-    const priorityBreakdown = {
-      high: requests.filter(r => r.priority === 'high').length,
-      medium: requests.filter(r => r.priority === 'medium').length,
-      low: requests.filter(r => r.priority === 'low').length
-    };
-
-    // Team breakdown
-    const teamBreakdown = {
-      Manufacturing: requests.filter(r => r.team === 'Manufacturing').length,
-      Sales: requests.filter(r => r.team === 'Sales').length,
-      Service: requests.filter(r => r.team === 'Service').length,
-      Energy: requests.filter(r => r.team === 'Energy').length
-    };
-
-    // Region breakdown
-    const regionBreakdown = {
-      EMEA: requests.filter(r => r.region === 'EMEA').length,
-      'North America': requests.filter(r => r.region === 'North America').length,
-      APAC: requests.filter(r => r.region === 'APAC').length,
-      Global: requests.filter(r => r.region === 'Global').length
-    };
-
-    res.json({
-      trendData: data,
-      summary: {
-        total: totalRequests,
-        pending: pendingCount,
-        completed: completedCount,
-        inProgress: inProgressCount,
-        archived: archivedCount
-      },
-      categoryBreakdown,
-      priorityBreakdown,
-      teamBreakdown,
-      regionBreakdown
-    });
-  } catch (err) {
-    console.error('Get analytics error:', err);
-    res.status(500).json({ error: 'Failed to get analytics' });
-  }
-});
-
-// Search requests (autocomplete) - MUST be before /:id routes
-router.get('/search', authenticateToken, (req, res) => {
-  try {
-    const { q, limit = 10 } = req.query;
-
-    if (!q || q.length < 2) {
-      return res.json([]);
-    }
-
-    const searchTerm = q.toLowerCase();
-    const limitNum = Math.min(parseInt(limit) || 10, 20);
-
-    // Get all requests with author info
-    const requests = db.all(`
-      SELECT
-        r.id, r.title, r.status, r.category,
-        u.name as author_name
-      FROM requests r
-      JOIN users u ON r.user_id = u.id
-    `);
-
-    // Score and filter results
-    const scored = requests
-      .map(r => {
-        const titleLower = r.title.toLowerCase();
-        const authorLower = r.author_name.toLowerCase();
-        let score = 0;
-
-        // Exact title match
-        if (titleLower === searchTerm) score = 100;
-        // Title starts with term
-        else if (titleLower.startsWith(searchTerm)) score = 90;
-        // Exact author name match
-        else if (authorLower === searchTerm) score = 80;
-        // Author name starts with term
-        else if (authorLower.startsWith(searchTerm)) score = 70;
-        // Title contains term at word boundary
-        else if (new RegExp(`\\b${searchTerm}`, 'i').test(r.title)) score = 50;
-        // Author contains term at word boundary
-        else if (new RegExp(`\\b${searchTerm}`, 'i').test(r.author_name)) score = 40;
-        // Title contains term anywhere
-        else if (titleLower.includes(searchTerm)) score = 20;
-        // Author contains term anywhere
-        else if (authorLower.includes(searchTerm)) score = 10;
-
-        return { ...r, score };
-      })
-      .filter(r => r.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limitNum);
-
-    res.json(scored);
-  } catch (err) {
-    console.error('Search requests error:', err);
-    res.status(500).json({ error: 'Failed to search requests' });
-  }
-});
-
-// Get all requests (all users can see all requests)
-router.get('/', authenticateToken, (req, res) => {
-  try {
-    const { status, category, priority, sort, order, myRequests, timePeriod, search } = req.query;
-    const isAdmin = req.user.role === 'admin';
-
-    let query = `
-      SELECT
-        r.*,
-        u.name as author_name,
-        u.email as author_email,
-        (SELECT COUNT(*) FROM votes WHERE request_id = r.id AND type = 'upvote') as upvotes,
-        (SELECT COUNT(*) FROM votes WHERE request_id = r.id AND type = 'like') as likes,
-        (SELECT COUNT(*) FROM comments WHERE request_id = r.id) as comment_count
-      FROM requests r
-      JOIN users u ON r.user_id = u.id
-      WHERE 1=1
-    `;
-
-    const params = [];
-
-    // Exclude archived requests unless specifically filtering for them
-    if (status !== 'archived') {
-      query += ' AND r.status != ?';
-      params.push('archived');
-    }
-
-    // Only filter by user if explicitly requested (for My Requests page)
-    if (myRequests === 'true') {
-      query += ' AND r.user_id = ?';
-      params.push(req.user.id);
-    }
-
-    // Time period filter
-    if (timePeriod) {
-      const now = new Date();
-      let startDate;
-
-      switch (timePeriod) {
-        case 'today':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case '7days':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case '30days':
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        case '90days':
-          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = null;
-      }
-
-      if (startDate) {
-        query += ' AND r.created_at >= ?';
-        params.push(startDate.toISOString());
-      }
-    }
-
-    // Search filter
-    if (search && search.trim()) {
-      const searchTerm = `%${search.trim()}%`;
-      query += ' AND (r.title LIKE ? OR u.name LIKE ?)';
-      params.push(searchTerm, searchTerm);
-    }
-
-    // Filters
-    if (status) {
-      query += ' AND r.status = ?';
-      params.push(status);
-    }
-    if (category) {
-      query += ' AND r.category = ?';
-      params.push(category);
-    }
-    if (priority) {
-      query += ' AND r.priority = ?';
-      params.push(priority);
-    }
-
-    // Sorting
-    const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
-    if (sort === 'popularity') {
-      query += ` ORDER BY (upvotes + likes) ${sortOrder}, r.created_at DESC`;
-    } else if (sort === 'upvotes') {
-      query += ` ORDER BY upvotes ${sortOrder}, r.created_at DESC`;
-    } else if (sort === 'likes') {
-      query += ` ORDER BY likes ${sortOrder}, r.created_at DESC`;
-    } else {
-      query += ` ORDER BY r.created_at ${sortOrder}`;
-    }
-
-    const requests = db.all(query, params);
-
-    // Get user votes and read status for each request
-    const requestsWithUserVotes = requests.map(request => {
-      const userVotes = db.all(
-        'SELECT type FROM votes WHERE request_id = ? AND user_id = ?',
-        [request.id, req.user.id]
-      );
-
-      // Check if admin has read this request
-      let isRead = true; // Default to true for non-admins
-      if (isAdmin) {
-        const readRecord = db.get(
-          'SELECT id FROM admin_read_requests WHERE request_id = ? AND admin_id = ?',
-          [request.id, req.user.id]
-        );
-        isRead = !!readRecord;
-      }
-
-      return {
-        ...request,
-        userVotes: userVotes.map(v => v.type),
-        isRead
-      };
-    });
-
-    res.json(requestsWithUserVotes);
-  } catch (err) {
-    console.error('Get requests error:', err);
-    res.status(500).json({ error: 'Failed to get requests' });
-  }
-});
-
-// Get single request with full details
-router.get('/:id', authenticateToken, (req, res) => {
-  try {
-    const request = db.get(`
-      SELECT
-        r.*,
-        u.name as author_name,
-        u.email as author_email,
-        (SELECT COUNT(*) FROM votes WHERE request_id = r.id AND type = 'upvote') as upvotes,
-        (SELECT COUNT(*) FROM votes WHERE request_id = r.id AND type = 'like') as likes
-      FROM requests r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.id = ?
-    `, [req.params.id]);
-
-    if (!request) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-
-    // Get attachments
-    const attachments = db.all('SELECT * FROM attachments WHERE request_id = ?', [req.params.id]);
-
-    // Check if current user has voted
-    const userVotes = db.all('SELECT type FROM votes WHERE request_id = ? AND user_id = ?', [req.params.id, req.user.id]);
-
-    res.json({
-      ...request,
-      attachments,
-      userVotes: userVotes.map(v => v.type)
-    });
-  } catch (err) {
-    console.error('Get request error:', err);
-    res.status(500).json({ error: 'Failed to get request' });
-  }
-});
-
-// Get interactions for a request (who voted/liked/commented)
-router.get('/:id/interactions', authenticateToken, (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Get upvoters
-    const upvoters = db.all(`
-      SELECT u.id, u.name
-      FROM votes v
-      JOIN users u ON v.user_id = u.id
-      WHERE v.request_id = ? AND v.type = 'upvote'
-      ORDER BY v.created_at DESC
-    `, [id]);
-
-    // Get likers
-    const likers = db.all(`
-      SELECT u.id, u.name
-      FROM votes v
-      JOIN users u ON v.user_id = u.id
-      WHERE v.request_id = ? AND v.type = 'like'
-      ORDER BY v.created_at DESC
-    `, [id]);
-
-    // Get commenters (unique)
-    const commenters = db.all(`
-      SELECT DISTINCT u.id, u.name
-      FROM comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.request_id = ?
-    `, [id]);
-
-    res.json({
-      upvoters,
-      likers,
-      commenters
-    });
-  } catch (err) {
-    console.error('Get interactions error:', err);
-    res.status(500).json({ error: 'Failed to get interactions' });
-  }
-});
+// Get interactions (upvoters, likers, commenters)
+router.get('/:id/interactions', authenticateToken, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const [upvoters, likers, commenters] = await Promise.all([
+    voteRepository.getUpvoters(id),
+    voteRepository.getLikers(id),
+    commentRepository.getCommenters(id),
+  ]);
+  res.json({ upvoters, likers, commenters });
+}));
 
 // Create request
-router.post('/', authenticateToken, upload.array('attachments', 5), (req, res) => {
-  try {
-    const { title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact } = req.body;
+router.post('/', authenticateToken, upload.array('attachments', 5), asyncHandler(async (req, res) => {
+  const { title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact } = req.body;
+  if (!title?.trim() || !category || !priority) throw new ValidationError('Title, category, and priority are required');
 
-    if (!title || !title.trim() || !category || !priority) {
-      return res.status(400).json({ error: 'Title, category, and priority are required' });
-    }
+  const request = await requestRepository.create({
+    user_id: req.user.id, title, category, priority,
+    team: team || 'Manufacturing', region: region || 'Global',
+    business_problem: business_problem || '', problem_size: problem_size || '',
+    business_expectations: business_expectations || '', expected_impact: expected_impact || '',
+  });
 
-    const result = db.run(`
-      INSERT INTO requests (user_id, title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [req.user.id, title, category, priority, team || 'Manufacturing', region || 'Global', business_problem || '', problem_size || '', business_expectations || '', expected_impact || '']);
-
-    // Save attachments
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        db.run(
-          'INSERT INTO attachments (request_id, filename, filepath) VALUES (?, ?, ?)',
-          [result.lastInsertRowid, file.originalname, file.filename]
-        );
-      }
-    }
-
-    const request = db.get('SELECT * FROM requests WHERE id = ?', [result.lastInsertRowid]);
-    const attachments = db.all('SELECT * FROM attachments WHERE request_id = ?', [result.lastInsertRowid]);
-
-    res.status(201).json({ ...request, attachments });
-  } catch (err) {
-    console.error('Create request error:', err);
-    res.status(500).json({ error: 'Failed to create request' });
-  }
-});
-
-// Update request (admin can update status, owner can update content)
-router.patch('/:id', authenticateToken, (req, res) => {
-  try {
-    const request = db.get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
-
-    if (!request) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-
-    const isOwner = request.user_id === req.user.id;
-    const isAdmin = req.user.role === 'admin';
-
-    if (!isOwner && !isAdmin) {
-      return res.status(403).json({ error: 'Not authorized to update this request' });
-    }
-
-    const { status, title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact } = req.body;
-
-    // Admin can update status - log activity
-    if (isAdmin && status && status !== request.status) {
-      db.run('UPDATE requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [status, req.params.id]);
-      // Log the status change
-      db.run(
-        'INSERT INTO activity_log (request_id, user_id, action, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
-        [req.params.id, req.user.id, 'status_change', request.status, status]
+  if (req.files?.length) {
+    for (const file of req.files) {
+      const { publicUrl } = await storageService.uploadAttachment(
+        file.buffer, file.originalname, file.mimetype
       );
+      await attachmentRepository.create(request.id, file.originalname, publicUrl);
     }
-
-    // Owner can update content
-    if (isOwner) {
-      const updates = [];
-      const values = [];
-
-      if (title) { updates.push('title = ?'); values.push(title); }
-      if (category) { updates.push('category = ?'); values.push(category); }
-      if (priority) { updates.push('priority = ?'); values.push(priority); }
-      if (team) { updates.push('team = ?'); values.push(team); }
-      if (region) { updates.push('region = ?'); values.push(region); }
-      if (business_problem !== undefined) { updates.push('business_problem = ?'); values.push(business_problem); }
-      if (problem_size !== undefined) { updates.push('problem_size = ?'); values.push(problem_size); }
-      if (business_expectations !== undefined) { updates.push('business_expectations = ?'); values.push(business_expectations); }
-      if (expected_impact !== undefined) { updates.push('expected_impact = ?'); values.push(expected_impact); }
-
-      if (updates.length > 0) {
-        updates.push('updated_at = CURRENT_TIMESTAMP');
-        values.push(req.params.id);
-        db.run(`UPDATE requests SET ${updates.join(', ')} WHERE id = ?`, values);
-      }
-    }
-
-    const updatedRequest = db.get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
-    res.json(updatedRequest);
-  } catch (err) {
-    console.error('Update request error:', err);
-    res.status(500).json({ error: 'Failed to update request' });
   }
-});
 
-// Get activity log for a request
-router.get('/:id/activity', authenticateToken, (req, res) => {
-  try {
-    const activities = db.all(`
-      SELECT
-        a.*,
-        u.name as user_name
-      FROM activity_log a
-      JOIN users u ON a.user_id = u.id
-      WHERE a.request_id = ?
-      ORDER BY a.created_at DESC
-    `, [req.params.id]);
+  const attachments = await attachmentRepository.findByRequest(request.id);
+  res.status(201).json({ ...request, attachments });
+}));
 
-    res.json(activities);
-  } catch (err) {
-    console.error('Get activity log error:', err);
-    res.status(500).json({ error: 'Failed to get activity log' });
-  }
-});
+// Update request
+router.patch('/:id', authenticateToken, asyncHandler(async (req, res) => {
+  const request = await requestRepository.findByIdOrFail(req.params.id);
+  const isOwner = request.user_id === req.user.id;
+  const isAdmin = req.user.role === 'admin';
+  if (!isOwner && !isAdmin) throw new ForbiddenError('Not authorized to update this request');
 
-// Delete request (admin only)
-router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
-  try {
-    const request = db.get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
+  const { status, title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact } = req.body;
 
-    if (!request) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-
-    db.run('DELETE FROM requests WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Request deleted successfully' });
-  } catch (err) {
-    console.error('Delete request error:', err);
-    res.status(500).json({ error: 'Failed to delete request' });
-  }
-});
-
-// Merge request into another (admin only) - marks source as duplicate
-router.post('/:id/merge', authenticateToken, requireAdmin, (req, res) => {
-  try {
-    const sourceId = parseInt(req.params.id, 10);
-    const { target_id, merge_votes = true, merge_comments = false } = req.body;
-
-    if (!target_id) {
-      return res.status(400).json({ error: 'Target request ID is required' });
-    }
-
-    const targetId = parseInt(target_id, 10);
-
-    if (sourceId === targetId) {
-      return res.status(400).json({ error: 'Cannot merge request into itself' });
-    }
-
-    // Check source request exists
-    const sourceRequest = db.get('SELECT * FROM requests WHERE id = ?', [sourceId]);
-    if (!sourceRequest) {
-      return res.status(404).json({ error: 'Source request not found' });
-    }
-
-    // Check target request exists
-    const targetRequest = db.get('SELECT * FROM requests WHERE id = ?', [targetId]);
-    if (!targetRequest) {
-      return res.status(404).json({ error: 'Target request not found' });
-    }
-
-    // Check source isn't already merged
-    if (sourceRequest.merged_into_id) {
-      return res.status(400).json({ error: 'Source request is already merged' });
-    }
-
-    // Transfer votes if requested
-    if (merge_votes) {
-      // Get votes from source that don't already exist on target
-      const sourceVotes = db.all('SELECT user_id, type FROM votes WHERE request_id = ?', [sourceId]);
-
-      for (const vote of sourceVotes) {
-        // Check if this user already voted on target
-        const existingVote = db.get(
-          'SELECT id FROM votes WHERE request_id = ? AND user_id = ? AND type = ?',
-          [targetId, vote.user_id, vote.type]
-        );
-
-        if (!existingVote) {
-          // Transfer the vote
-          db.run(
-            'INSERT INTO votes (request_id, user_id, type) VALUES (?, ?, ?)',
-            [targetId, vote.user_id, vote.type]
-          );
-        }
-      }
-
-      // Delete source votes
-      db.run('DELETE FROM votes WHERE request_id = ?', [sourceId]);
-    }
-
-    // Transfer comments if requested
-    if (merge_comments) {
-      db.run('UPDATE comments SET request_id = ? WHERE request_id = ?', [targetId, sourceId]);
-    }
-
-    // Mark source as duplicate and set merged_into_id
-    db.run(
-      'UPDATE requests SET status = ?, merged_into_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      ['duplicate', targetId, sourceId]
-    );
-
-    // Log the merge activity
-    db.run(
-      'INSERT INTO activity_log (request_id, user_id, action, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
-      [sourceId, req.user.id, 'merge', sourceRequest.status, `Merged into #${targetId}`]
-    );
-
-    // Also log on target
-    db.run(
-      'INSERT INTO activity_log (request_id, user_id, action, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
-      [targetId, req.user.id, 'merge_received', null, `Merged from #${sourceId}`]
-    );
-
-    const updatedSource = db.get('SELECT * FROM requests WHERE id = ?', [sourceId]);
-    res.json({
-      message: 'Request merged successfully',
-      source: updatedSource,
-      target_id: targetId,
-      votes_transferred: merge_votes,
-      comments_transferred: merge_comments
+  // Admin status change
+  if (isAdmin && status && status !== request.status) {
+    await requestRepository.update(req.params.id, { status });
+    await activityRepository.create({
+      requestId: req.params.id, userId: req.user.id,
+      action: 'status_change', oldValue: request.status, newValue: status,
     });
-  } catch (err) {
-    console.error('Merge request error:', err);
-    res.status(500).json({ error: 'Failed to merge request' });
   }
-});
 
-// Mark request as read (admin only)
-router.post('/:id/read', authenticateToken, requireAdmin, (req, res) => {
-  try {
-    const request = db.get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
+  // Owner content update
+  if (isOwner) {
+    const updates = {};
+    if (title) updates.title = title;
+    if (category) updates.category = category;
+    if (priority) updates.priority = priority;
+    if (team) updates.team = team;
+    if (region) updates.region = region;
+    if (business_problem !== undefined) updates.business_problem = business_problem;
+    if (problem_size !== undefined) updates.problem_size = problem_size;
+    if (business_expectations !== undefined) updates.business_expectations = business_expectations;
+    if (expected_impact !== undefined) updates.expected_impact = expected_impact;
 
-    if (!request) {
-      return res.status(404).json({ error: 'Request not found' });
+    if (Object.keys(updates).length > 0) {
+      await requestRepository.update(req.params.id, updates);
     }
-
-    // Check if already marked as read
-    const existing = db.get(
-      'SELECT id FROM admin_read_requests WHERE request_id = ? AND admin_id = ?',
-      [req.params.id, req.user.id]
-    );
-
-    if (!existing) {
-      db.run(
-        'INSERT INTO admin_read_requests (request_id, admin_id) VALUES (?, ?)',
-        [req.params.id, req.user.id]
-      );
-    }
-
-    res.json({ message: 'Request marked as read' });
-  } catch (err) {
-    console.error('Mark request as read error:', err);
-    res.status(500).json({ error: 'Failed to mark request as read' });
   }
-});
+
+  const updated = await requestRepository.findById(req.params.id);
+  res.json(updated);
+}));
+
+// Activity log
+router.get('/:id/activity', authenticateToken, asyncHandler(async (req, res) => {
+  const activities = await activityRepository.findByRequest(req.params.id);
+  res.json(activities);
+}));
+
+// Delete request (admin)
+router.delete('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  await requestRepository.findByIdOrFail(req.params.id);
+  await requestRepository.delete(req.params.id);
+  res.json({ message: 'Request deleted successfully' });
+}));
+
+// Merge requests (admin)
+router.post('/:id/merge', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  const sourceId = parseInt(req.params.id, 10);
+  const { target_id, merge_votes = true, merge_comments = false } = req.body;
+  if (!target_id) throw new ValidationError('Target request ID is required');
+
+  const result = await requestService.merge({
+    sourceId, targetId: parseInt(target_id, 10),
+    mergeVotes: merge_votes, mergeComments: merge_comments,
+    adminUserId: req.user.id,
+  });
+  res.json(result);
+}));
+
+// Mark as read (admin)
+router.post('/:id/read', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  await requestRepository.findByIdOrFail(req.params.id);
+  await adminReadRepository.markRead(req.params.id, req.user.id);
+  res.json({ message: 'Request marked as read' });
+}));
 
 export default router;

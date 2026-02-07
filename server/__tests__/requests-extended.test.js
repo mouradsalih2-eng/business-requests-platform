@@ -3,509 +3,796 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-// Mock the database
-const mockDb = {
-  get: jest.fn(),
-  all: jest.fn(),
-  run: jest.fn(),
-};
-
-// Mock JWT_SECRET
 const JWT_SECRET = 'test-secret';
 
-jest.unstable_mockModule('../src/db/database.js', () => ({
-  default: mockDb,
-  initializeDatabase: jest.fn(),
+// ── Mock all repositories / services that transitively touch Supabase ──
+
+const mockRequestRepository = {
+  findById: jest.fn(),
+  findByIdOrFail: jest.fn(),
+  findByIdWithCounts: jest.fn(),
+  findByTitle: jest.fn(),
+  findAll: jest.fn(),
+  findForAnalytics: jest.fn(),
+  findAllBasic: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  count: jest.fn(),
+};
+
+const mockVoteRepository = {
+  findByRequestAndUser: jest.fn(),
+  getUserVoteTypes: jest.fn(),
+  getCounts: jest.fn(),
+  create: jest.fn(),
+  delete: jest.fn(),
+  findByRequest: jest.fn(),
+  deleteByRequest: jest.fn(),
+  getUpvoters: jest.fn(),
+  getLikers: jest.fn(),
+  count: jest.fn(),
+};
+
+const mockAttachmentRepository = {
+  findByRequest: jest.fn(),
+  create: jest.fn(),
+};
+
+const mockActivityRepository = {
+  findByRequest: jest.fn(),
+  create: jest.fn(),
+};
+
+const mockAdminReadRepository = {
+  isRead: jest.fn(),
+  markRead: jest.fn(),
+};
+
+const mockCommentRepository = {
+  findById: jest.fn(),
+  findByIdWithAuthor: jest.fn(),
+  findByRequest: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  moveToRequest: jest.fn(),
+  getCommenters: jest.fn(),
+  count: jest.fn(),
+};
+
+const mockMentionRepository = {
+  saveMentions: jest.fn(),
+  getMentions: jest.fn(),
+  findUserIdsByNames: jest.fn(),
+};
+
+const mockRequestService = {
+  merge: jest.fn(),
+  getAnalytics: jest.fn(),
+  search: jest.fn(),
+};
+
+jest.unstable_mockModule('../src/repositories/requestRepository.js', () => ({
+  requestRepository: mockRequestRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/voteRepository.js', () => ({
+  voteRepository: mockVoteRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/attachmentRepository.js', () => ({
+  attachmentRepository: mockAttachmentRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/activityRepository.js', () => ({
+  activityRepository: mockActivityRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/adminReadRepository.js', () => ({
+  adminReadRepository: mockAdminReadRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/commentRepository.js', () => ({
+  commentRepository: mockCommentRepository,
+  mentionRepository: mockMentionRepository,
+}));
+
+jest.unstable_mockModule('../src/services/requestService.js', () => ({
+  requestService: mockRequestService,
+}));
+
+jest.unstable_mockModule('../src/services/storageService.js', () => ({
+  storageService: {
+    uploadAvatar: jest.fn(),
+    deleteAvatar: jest.fn(),
+    uploadAttachment: jest.fn().mockResolvedValue({ storagePath: 'test-path', publicUrl: 'https://example.supabase.co/storage/v1/object/public/attachments/test-file.png' }),
+    deleteAttachments: jest.fn(),
+  },
 }));
 
 jest.unstable_mockModule('../src/middleware/auth.js', () => ({
-  JWT_SECRET,
   authenticateToken: (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ error: 'Access denied' });
-    }
-
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Access token required' });
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
+      req.user = jwt.verify(token, JWT_SECRET);
       next();
-    } catch (err) {
+    } catch {
       return res.status(403).json({ error: 'Invalid token' });
     }
   },
   requireAdmin: (req, res, next) => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
     next();
   },
 }));
 
-// Import router after mocks
+// Dynamic imports AFTER all mocks are registered
 const { default: requestsRoutes } = await import('../src/routes/requests.js');
+const { errorHandler } = await import('../src/middleware/errorHandler.js');
 
-// Create test app
+// ── Express test app ────────────────────────────────────────
+
 const app = express();
 app.use(express.json());
 app.use('/api/requests', requestsRoutes);
+app.use(errorHandler);
 
-// Helper to generate tokens
+// ── Helpers ─────────────────────────────────────────────────
+
 const generateToken = (user) => jwt.sign(user, JWT_SECRET);
 
-describe('Requests Extended API', () => {
-  const userToken = generateToken({ id: 1, email: 'user@example.com', role: 'user' });
-  const adminToken = generateToken({ id: 2, email: 'admin@example.com', role: 'admin' });
+const employeeUser = { id: 1, email: 'user@example.com', role: 'employee', name: 'Test User' };
+const adminUser = { id: 2, email: 'admin@example.com', role: 'admin', name: 'Admin User' };
 
+const userToken = generateToken(employeeUser);
+const adminToken = generateToken(adminUser);
+
+// ── Tests ───────────────────────────────────────────────────
+
+describe('Requests Extended API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
+  // ─────────────── GET /stats/analytics ─────────────────────
+
   describe('GET /api/requests/stats/analytics', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).get('/api/requests/stats/analytics');
-      expect(response.status).toBe(401);
+      const res = await request(app).get('/api/requests/stats/analytics');
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Access token required');
     });
 
     it('returns 403 for non-admin users', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/requests/stats/analytics')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(403);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Admin access required');
     });
 
     it('returns analytics data for 7 days period', async () => {
-      const now = new Date();
-      const mockRequests = [
-        { id: 1, created_at: now.toISOString(), status: 'pending', category: 'bug', priority: 'high', team: 'Manufacturing', region: 'EMEA' },
-        { id: 2, created_at: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(), status: 'completed', category: 'new_feature', priority: 'medium', team: 'Sales', region: 'North America' },
-        { id: 3, created_at: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(), status: 'in_progress', category: 'optimization', priority: 'low', team: 'Service', region: 'APAC' },
-      ];
+      const analyticsData = {
+        trendData: [
+          { label: '2026-02-01', count: 2, pending: 1, completed: 1 },
+          { label: '2026-02-02', count: 1, pending: 1, completed: 0 },
+        ],
+        summary: { total: 3, pending: 1, completed: 1, inProgress: 1, archived: 0 },
+        categoryBreakdown: { bug: 2, new_feature: 1, optimization: 0 },
+        priorityBreakdown: { high: 1, medium: 1, low: 1 },
+        teamBreakdown: { Manufacturing: 1, Sales: 1, Service: 1, Energy: 0 },
+        regionBreakdown: { EMEA: 1, 'North America': 1, APAC: 1, Global: 0 },
+      };
 
-      mockDb.all.mockReturnValue(mockRequests);
+      mockRequestService.getAnalytics.mockResolvedValue(analyticsData);
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/requests/stats/analytics?period=7days')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.trendData).toBeDefined();
-      expect(response.body.summary).toBeDefined();
-      expect(response.body.summary.total).toBe(3);
-      expect(response.body.summary.pending).toBe(1);
-      expect(response.body.summary.completed).toBe(1);
-      expect(response.body.categoryBreakdown).toBeDefined();
-      expect(response.body.priorityBreakdown).toBeDefined();
-      expect(response.body.teamBreakdown).toBeDefined();
-      expect(response.body.regionBreakdown).toBeDefined();
+      expect(res.status).toBe(200);
+      expect(res.body.trendData).toBeDefined();
+      expect(res.body.summary).toBeDefined();
+      expect(res.body.summary.total).toBe(3);
+      expect(res.body.summary.pending).toBe(1);
+      expect(res.body.summary.completed).toBe(1);
+      expect(res.body.categoryBreakdown).toBeDefined();
+      expect(res.body.priorityBreakdown).toBeDefined();
+      expect(res.body.teamBreakdown).toBeDefined();
+      expect(res.body.regionBreakdown).toBeDefined();
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('7days');
     });
 
     it('returns analytics data for 30 days period', async () => {
-      mockDb.all.mockReturnValue([]);
+      const emptyAnalytics = {
+        trendData: [],
+        summary: { total: 0, pending: 0, completed: 0, inProgress: 0, archived: 0 },
+        categoryBreakdown: { bug: 0, new_feature: 0, optimization: 0 },
+        priorityBreakdown: { high: 0, medium: 0, low: 0 },
+        teamBreakdown: { Manufacturing: 0, Sales: 0, Service: 0, Energy: 0 },
+        regionBreakdown: { EMEA: 0, 'North America': 0, APAC: 0, Global: 0 },
+      };
 
-      const response = await request(app)
+      mockRequestService.getAnalytics.mockResolvedValue(emptyAnalytics);
+
+      const res = await request(app)
         .get('/api/requests/stats/analytics?period=30days')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.summary.total).toBe(0);
+      expect(res.status).toBe(200);
+      expect(res.body.summary.total).toBe(0);
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('30days');
     });
 
     it('returns analytics data for 90 days period', async () => {
-      mockDb.all.mockReturnValue([]);
+      mockRequestService.getAnalytics.mockResolvedValue({
+        trendData: [], summary: { total: 5, pending: 2, completed: 3, inProgress: 0, archived: 0 },
+        categoryBreakdown: { bug: 3, new_feature: 2, optimization: 0 },
+        priorityBreakdown: { high: 2, medium: 2, low: 1 },
+        teamBreakdown: { Manufacturing: 2, Sales: 1, Service: 1, Energy: 1 },
+        regionBreakdown: { EMEA: 2, 'North America': 1, APAC: 1, Global: 1 },
+      });
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/requests/stats/analytics?period=90days')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
+      expect(res.status).toBe(200);
+      expect(res.body.summary.total).toBe(5);
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('90days');
     });
 
-    it('returns analytics data for all time', async () => {
-      mockDb.all.mockReturnValue([]);
+    it('returns analytics data for all time (default period)', async () => {
+      mockRequestService.getAnalytics.mockResolvedValue({
+        trendData: [], summary: { total: 100, pending: 20, completed: 60, inProgress: 15, archived: 5 },
+        categoryBreakdown: { bug: 40, new_feature: 40, optimization: 20 },
+        priorityBreakdown: { high: 30, medium: 50, low: 20 },
+        teamBreakdown: { Manufacturing: 25, Sales: 25, Service: 25, Energy: 25 },
+        regionBreakdown: { EMEA: 25, 'North America': 25, APAC: 25, Global: 25 },
+      });
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/requests/stats/analytics?period=all')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
+      expect(res.status).toBe(200);
+      expect(res.body.summary.total).toBe(100);
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith('all');
     });
 
-    it('calculates category breakdown correctly', async () => {
-      const mockRequests = [
-        { id: 1, status: 'pending', category: 'bug', priority: 'high', team: 'Manufacturing', region: 'EMEA', created_at: new Date().toISOString() },
-        { id: 2, status: 'pending', category: 'bug', priority: 'medium', team: 'Sales', region: 'EMEA', created_at: new Date().toISOString() },
-        { id: 3, status: 'pending', category: 'new_feature', priority: 'low', team: 'Service', region: 'APAC', created_at: new Date().toISOString() },
-      ];
+    it('passes undefined period when no query param given', async () => {
+      mockRequestService.getAnalytics.mockResolvedValue({
+        trendData: [], summary: { total: 0, pending: 0, completed: 0, inProgress: 0, archived: 0 },
+        categoryBreakdown: { bug: 0, new_feature: 0, optimization: 0 },
+        priorityBreakdown: { high: 0, medium: 0, low: 0 },
+        teamBreakdown: { Manufacturing: 0, Sales: 0, Service: 0, Energy: 0 },
+        regionBreakdown: { EMEA: 0, 'North America': 0, APAC: 0, Global: 0 },
+      });
 
-      mockDb.all.mockReturnValue(mockRequests);
+      const res = await request(app)
+        .get('/api/requests/stats/analytics')
+        .set('Authorization', `Bearer ${adminToken}`);
 
-      const response = await request(app)
+      expect(res.status).toBe(200);
+      expect(mockRequestService.getAnalytics).toHaveBeenCalledWith(undefined);
+    });
+
+    it('returns 500 when the service throws an unexpected error', async () => {
+      mockRequestService.getAnalytics.mockRejectedValue(new Error('Database connection lost'));
+
+      const res = await request(app)
         .get('/api/requests/stats/analytics?period=7days')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.body.categoryBreakdown.bug).toBe(2);
-      expect(response.body.categoryBreakdown.new_feature).toBe(1);
-      expect(response.body.categoryBreakdown.optimization).toBe(0);
-    });
-
-    it('calculates priority breakdown correctly', async () => {
-      const mockRequests = [
-        { id: 1, status: 'pending', category: 'bug', priority: 'high', team: 'Manufacturing', region: 'EMEA', created_at: new Date().toISOString() },
-        { id: 2, status: 'pending', category: 'bug', priority: 'high', team: 'Sales', region: 'EMEA', created_at: new Date().toISOString() },
-        { id: 3, status: 'pending', category: 'bug', priority: 'low', team: 'Service', region: 'APAC', created_at: new Date().toISOString() },
-      ];
-
-      mockDb.all.mockReturnValue(mockRequests);
-
-      const response = await request(app)
-        .get('/api/requests/stats/analytics?period=7days')
-        .set('Authorization', `Bearer ${adminToken}`);
-
-      expect(response.body.priorityBreakdown.high).toBe(2);
-      expect(response.body.priorityBreakdown.low).toBe(1);
-      expect(response.body.priorityBreakdown.medium).toBe(0);
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe('Internal server error');
     });
   });
 
+  // ───────────────── GET /:id/activity ──────────────────────
+
   describe('GET /api/requests/:id/activity', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app).get('/api/requests/1/activity');
-      expect(response.status).toBe(401);
+      const res = await request(app).get('/api/requests/1/activity');
+      expect(res.status).toBe(401);
     });
 
-    it('returns empty array when no activity', async () => {
-      mockDb.all.mockReturnValue([]);
+    it('returns empty array when no activity exists', async () => {
+      mockActivityRepository.findByRequest.mockResolvedValue([]);
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/requests/1/activity')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual([]);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+      expect(mockActivityRepository.findByRequest).toHaveBeenCalledWith('1');
     });
 
     it('returns activity log with user names', async () => {
       const mockActivities = [
         {
-          id: 1,
-          request_id: 1,
-          user_id: 2,
-          action: 'status_change',
-          old_value: 'pending',
-          new_value: 'in_progress',
-          created_at: '2024-01-15T10:00:00Z',
-          user_name: 'Admin User',
+          id: 1, request_id: 1, user_id: 2, action: 'status_change',
+          old_value: 'pending', new_value: 'in_progress',
+          created_at: '2024-01-15T10:00:00Z', user_name: 'Admin User',
         },
         {
-          id: 2,
-          request_id: 1,
-          user_id: 2,
-          action: 'status_change',
-          old_value: 'in_progress',
-          new_value: 'completed',
-          created_at: '2024-01-20T14:00:00Z',
-          user_name: 'Admin User',
+          id: 2, request_id: 1, user_id: 2, action: 'status_change',
+          old_value: 'in_progress', new_value: 'completed',
+          created_at: '2024-01-20T14:00:00Z', user_name: 'Admin User',
         },
       ];
 
-      mockDb.all.mockReturnValue(mockActivities);
+      mockActivityRepository.findByRequest.mockResolvedValue(mockActivities);
 
-      const response = await request(app)
+      const res = await request(app)
         .get('/api/requests/1/activity')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.length).toBe(2);
-      expect(response.body[0].action).toBe('status_change');
-      expect(response.body[0].user_name).toBe('Admin User');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(2);
+      expect(res.body[0].action).toBe('status_change');
+      expect(res.body[0].old_value).toBe('pending');
+      expect(res.body[0].new_value).toBe('in_progress');
+      expect(res.body[0].user_name).toBe('Admin User');
+      expect(res.body[1].action).toBe('status_change');
+      expect(res.body[1].new_value).toBe('completed');
+    });
+
+    it('returns merge activity entries', async () => {
+      const mergeActivities = [
+        {
+          id: 5, request_id: 3, user_id: 2, action: 'merge',
+          old_value: 'pending', new_value: 'Merged into #7',
+          created_at: '2024-02-01T12:00:00Z', user_name: 'Admin User',
+        },
+      ];
+
+      mockActivityRepository.findByRequest.mockResolvedValue(mergeActivities);
+
+      const res = await request(app)
+        .get('/api/requests/3/activity')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].action).toBe('merge');
+      expect(res.body[0].new_value).toMatch(/Merged into/);
+    });
+
+    it('non-admin users can also view activity', async () => {
+      mockActivityRepository.findByRequest.mockResolvedValue([
+        { id: 1, request_id: 1, action: 'status_change', user_name: 'Admin' },
+      ]);
+
+      const res = await request(app)
+        .get('/api/requests/1/activity')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
     });
   });
 
+  // ─────────────── POST /:id/merge ──────────────────────────
+
   describe('POST /api/requests/:id/merge', () => {
     it('returns 401 without authentication', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/requests/1/merge')
         .send({ target_id: 2 });
 
-      expect(response.status).toBe(401);
+      expect(res.status).toBe(401);
     });
 
     it('returns 403 for non-admin users', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/requests/1/merge')
         .set('Authorization', `Bearer ${userToken}`)
         .send({ target_id: 2 });
 
-      expect(response.status).toBe(403);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Admin access required');
     });
 
     it('returns 400 if target_id is missing', async () => {
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/requests/1/merge')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({});
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Target request ID');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Target request ID/i);
     });
 
-    it('returns 400 if trying to merge into itself', async () => {
-      const response = await request(app)
+    it('merges requests successfully with default options (votes=true, comments=false)', async () => {
+      const mergeResult = {
+        message: 'Request merged successfully',
+        source: { id: 1, title: 'Source', status: 'duplicate', merged_into_id: 2 },
+        target_id: 2,
+        votes_transferred: true,
+        comments_transferred: false,
+      };
+
+      mockRequestService.merge.mockResolvedValue(mergeResult);
+
+      const res = await request(app)
+        .post('/api/requests/1/merge')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ target_id: 2 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/merged/i);
+      expect(res.body.target_id).toBe(2);
+      expect(res.body.votes_transferred).toBe(true);
+      expect(res.body.comments_transferred).toBe(false);
+      expect(mockRequestService.merge).toHaveBeenCalledWith({
+        sourceId: 1,
+        targetId: 2,
+        mergeVotes: true,
+        mergeComments: false,
+        adminUserId: adminUser.id,
+      });
+    });
+
+    it('merges with merge_votes=false', async () => {
+      const mergeResult = {
+        message: 'Request merged successfully',
+        source: { id: 3, status: 'duplicate', merged_into_id: 4 },
+        target_id: 4,
+        votes_transferred: false,
+        comments_transferred: false,
+      };
+
+      mockRequestService.merge.mockResolvedValue(mergeResult);
+
+      const res = await request(app)
+        .post('/api/requests/3/merge')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ target_id: 4, merge_votes: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.votes_transferred).toBe(false);
+      expect(mockRequestService.merge).toHaveBeenCalledWith(
+        expect.objectContaining({ mergeVotes: false }),
+      );
+    });
+
+    it('merges with merge_comments=true', async () => {
+      const mergeResult = {
+        message: 'Request merged successfully',
+        source: { id: 5, status: 'duplicate', merged_into_id: 6 },
+        target_id: 6,
+        votes_transferred: true,
+        comments_transferred: true,
+      };
+
+      mockRequestService.merge.mockResolvedValue(mergeResult);
+
+      const res = await request(app)
+        .post('/api/requests/5/merge')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ target_id: 6, merge_comments: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.comments_transferred).toBe(true);
+      expect(mockRequestService.merge).toHaveBeenCalledWith(
+        expect.objectContaining({ mergeComments: true }),
+      );
+    });
+
+    it('returns 400 when service throws ValidationError (merge into itself)', async () => {
+      const { ValidationError } = await import('../src/errors/AppError.js');
+      mockRequestService.merge.mockRejectedValue(
+        new ValidationError('Cannot merge request into itself'),
+      );
+
+      const res = await request(app)
         .post('/api/requests/1/merge')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ target_id: 1 });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('itself');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/itself/);
     });
 
-    it('returns 404 if source request not found', async () => {
-      mockDb.get.mockReturnValue(null);
+    it('returns 400 when source request is already merged', async () => {
+      const { ValidationError } = await import('../src/errors/AppError.js');
+      mockRequestService.merge.mockRejectedValue(
+        new ValidationError('Source request is already merged'),
+      );
 
-      const response = await request(app)
+      const res = await request(app)
+        .post('/api/requests/1/merge')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ target_id: 2 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/already merged/);
+    });
+
+    it('returns 404 when source request not found', async () => {
+      const { NotFoundError } = await import('../src/errors/AppError.js');
+      mockRequestService.merge.mockRejectedValue(new NotFoundError('Request'));
+
+      const res = await request(app)
         .post('/api/requests/999/merge')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ target_id: 2 });
 
-      expect(response.status).toBe(404);
-      expect(response.body.error).toContain('Source request not found');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Request not found');
     });
 
-    it('returns 404 if target request not found', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, title: 'Source Request', status: 'pending' }) // source exists
-        .mockReturnValueOnce(null); // target not found
+    it('returns 404 when target request not found', async () => {
+      const { NotFoundError } = await import('../src/errors/AppError.js');
+      mockRequestService.merge.mockRejectedValue(new NotFoundError('Request'));
 
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/requests/1/merge')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ target_id: 999 });
 
-      expect(response.status).toBe(404);
-      expect(response.body.error).toContain('Target request not found');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Request not found');
     });
 
-    it('returns 400 if source is already merged', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'duplicate', merged_into_id: 5 })
-        .mockReturnValueOnce({ id: 2, title: 'Target', status: 'pending' });
-
-      const response = await request(app)
-        .post('/api/requests/1/merge')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ target_id: 2 });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('already merged');
-    });
-
-    it('merges requests successfully with vote transfer', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'pending', merged_into_id: null })
-        .mockReturnValueOnce({ id: 2, title: 'Target', status: 'pending' })
-        .mockReturnValueOnce(null) // no existing vote on target
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'duplicate', merged_into_id: 2 }); // updated source
-
-      mockDb.all.mockReturnValue([{ user_id: 5, type: 'upvote' }]); // votes from source
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/requests/1/merge')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ target_id: 2, merge_votes: true });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toContain('merged');
-      expect(response.body.target_id).toBe(2);
-      expect(response.body.votes_transferred).toBe(true);
-    });
-
-    it('merges without vote transfer when merge_votes is false', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'pending', merged_into_id: null })
-        .mockReturnValueOnce({ id: 2, title: 'Target', status: 'pending' })
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'duplicate', merged_into_id: 2 });
-
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/requests/1/merge')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ target_id: 2, merge_votes: false });
-
-      expect(response.status).toBe(200);
-      expect(response.body.votes_transferred).toBe(false);
-    });
-
-    it('transfers comments when merge_comments is true', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'pending', merged_into_id: null })
-        .mockReturnValueOnce({ id: 2, title: 'Target', status: 'pending' })
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'duplicate', merged_into_id: 2 });
-
-      mockDb.all.mockReturnValue([]);
-      mockDb.run.mockReturnValue({ changes: 1 });
-
-      const response = await request(app)
-        .post('/api/requests/1/merge')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ target_id: 2, merge_comments: true });
-
-      expect(response.status).toBe(200);
-      expect(response.body.comments_transferred).toBe(true);
-
-      // Verify comment transfer SQL was called
-      const commentTransferCall = mockDb.run.mock.calls.find(call =>
-        call[0].includes('UPDATE comments SET request_id')
-      );
-      expect(commentTransferCall).toBeDefined();
-    });
-
-    it('logs merge activity on both source and target', async () => {
-      mockDb.get
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'pending', merged_into_id: null })
-        .mockReturnValueOnce({ id: 2, title: 'Target', status: 'pending' })
-        .mockReturnValueOnce({ id: 1, title: 'Source', status: 'duplicate', merged_into_id: 2 });
-
-      mockDb.all.mockReturnValue([]);
-      mockDb.run.mockReturnValue({ changes: 1 });
+    it('passes integer sourceId and targetId to the service', async () => {
+      mockRequestService.merge.mockResolvedValue({
+        message: 'Request merged successfully',
+        source: { id: 10 }, target_id: 20,
+        votes_transferred: true, comments_transferred: false,
+      });
 
       await request(app)
-        .post('/api/requests/1/merge')
+        .post('/api/requests/10/merge')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ target_id: 2 });
+        .send({ target_id: 20 });
 
-      // Should log activity for both source and target
-      const activityLogCalls = mockDb.run.mock.calls.filter(call =>
-        call[0].includes('INSERT INTO activity_log')
+      expect(mockRequestService.merge).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceId: 10, targetId: 20 }),
       );
-      expect(activityLogCalls.length).toBe(2);
     });
   });
 
-  describe('Request filtering edge cases', () => {
-    it('filters by time period - today', async () => {
-      mockDb.all.mockReturnValue([]);
-      mockDb.get.mockReturnValue(null);
+  // ──────────── Filtering and query params ──────────────────
+
+  describe('Request filtering', () => {
+    beforeEach(() => {
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+    });
+
+    it('passes timePeriod=today through to findAll', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
 
       await request(app)
         .get('/api/requests?timePeriod=today')
         .set('Authorization', `Bearer ${userToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain('r.created_at >=');
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ timePeriod: 'today' }),
+      );
     });
 
-    it('filters by time period - 7 days', async () => {
-      mockDb.all.mockReturnValue([]);
-      mockDb.get.mockReturnValue(null);
+    it('passes timePeriod=7days through to findAll', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
 
       await request(app)
         .get('/api/requests?timePeriod=7days')
         .set('Authorization', `Bearer ${userToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain('r.created_at >=');
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ timePeriod: '7days' }),
+      );
     });
 
-    it('filters by search term', async () => {
-      mockDb.all.mockReturnValue([]);
-      mockDb.get.mockReturnValue(null);
+    it('passes timePeriod=30days through to findAll', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
 
       await request(app)
-        .get('/api/requests?search=test')
+        .get('/api/requests?timePeriod=30days')
         .set('Authorization', `Bearer ${userToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain('r.title LIKE');
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ timePeriod: '30days' }),
+      );
     });
 
-    it('sorts by popularity', async () => {
-      mockDb.all.mockReturnValue([]);
-      mockDb.get.mockReturnValue(null);
+    it('passes search term through to findAll', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
 
       await request(app)
-        .get('/api/requests?sort=popularity')
+        .get('/api/requests?search=dashboard')
         .set('Authorization', `Bearer ${userToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain('(upvotes + likes)');
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'dashboard' }),
+      );
     });
 
-    it('sorts by upvotes', async () => {
-      mockDb.all.mockReturnValue([]);
-      mockDb.get.mockReturnValue(null);
+    it('passes sort=upvotes through to findAll', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
 
       await request(app)
-        .get('/api/requests?sort=upvotes')
+        .get('/api/requests?sort=upvotes&order=desc')
         .set('Authorization', `Bearer ${userToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain('ORDER BY upvotes');
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'upvotes', order: 'desc' }),
+      );
     });
 
-    it('excludes archived requests by default', async () => {
-      mockDb.all.mockReturnValue([]);
-      mockDb.get.mockReturnValue(null);
+    it('passes sort=likes through to findAll', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
 
       await request(app)
-        .get('/api/requests')
+        .get('/api/requests?sort=likes')
         .set('Authorization', `Bearer ${userToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain("r.status != ?");
-      expect(sqlCall[1]).toContain('archived');
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'likes' }),
+      );
     });
 
-    it('includes archived when specifically filtered', async () => {
-      mockDb.all.mockReturnValue([]);
-      mockDb.get.mockReturnValue(null);
+    it('passes myRequests=true through to findAll with userId', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
 
       await request(app)
-        .get('/api/requests?status=archived')
+        .get('/api/requests?myRequests=true')
         .set('Authorization', `Bearer ${userToken}`);
 
-      const sqlCall = mockDb.all.mock.calls[0];
-      expect(sqlCall[0]).toContain('r.status = ?');
-      expect(sqlCall[1]).toContain('archived');
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ myRequests: 'true', userId: employeeUser.id }),
+      );
+    });
+
+    it('passes multiple filter params simultaneously', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([]);
+
+      await request(app)
+        .get('/api/requests?status=in_progress&category=new_feature&priority=medium&sort=upvotes&timePeriod=30days&search=feature')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'in_progress',
+          category: 'new_feature',
+          priority: 'medium',
+          sort: 'upvotes',
+          timePeriod: '30days',
+          search: 'feature',
+          userId: employeeUser.id,
+        }),
+      );
     });
   });
 
-  describe('Admin read tracking', () => {
-    it('tracks isRead status for admin users', async () => {
-      const mockRequests = [{ id: 1, title: 'Test', status: 'pending', author_name: 'User' }];
-      mockDb.all
-        .mockReturnValueOnce(mockRequests) // requests query
-        .mockReturnValueOnce([]); // user votes query
+  // ──────────── Archived requests exclusion ─────────────────
 
-      mockDb.get.mockReturnValue({ id: 1 }); // read record exists
-
-      const response = await request(app)
-        .get('/api/requests')
-        .set('Authorization', `Bearer ${adminToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body[0].isRead).toBe(true);
+  describe('Archived requests exclusion', () => {
+    beforeEach(() => {
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
     });
 
-    it('marks isRead as false when admin has not read', async () => {
-      const mockRequests = [{ id: 1, title: 'Test', status: 'pending', author_name: 'User' }];
-      mockDb.all
-        .mockReturnValueOnce(mockRequests)
-        .mockReturnValueOnce([]);
+    it('excludes archived by default (repository receives no status=archived)', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([
+        { id: 1, title: 'Active request', status: 'pending' },
+      ]);
 
-      mockDb.get.mockReturnValue(null); // no read record
+      const res = await request(app)
+        .get('/api/requests')
+        .set('Authorization', `Bearer ${userToken}`);
 
-      const response = await request(app)
+      expect(res.status).toBe(200);
+      // The route passes query params directly; the repository handles exclusion
+      const callArgs = mockRequestRepository.findAll.mock.calls[0][0];
+      expect(callArgs.status).toBeUndefined();
+    });
+
+    it('includes archived when specifically filtered', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([
+        { id: 5, title: 'Archived request', status: 'archived' },
+      ]);
+
+      const res = await request(app)
+        .get('/api/requests?status=archived')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(200);
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'archived' }),
+      );
+    });
+
+    it('returns only the status-filtered requests when filtering for pending', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([
+        { id: 1, title: 'Pending 1', status: 'pending' },
+        { id: 2, title: 'Pending 2', status: 'pending' },
+      ]);
+
+      const res = await request(app)
+        .get('/api/requests?status=pending')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(2);
+      expect(mockRequestRepository.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'pending' }),
+      );
+    });
+  });
+
+  // ────────── Admin read tracking in list view ──────────────
+
+  describe('Admin read tracking in list view', () => {
+    it('tracks isRead=true when admin has read the request', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([
+        { id: 1, title: 'Read request', status: 'pending' },
+      ]);
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockAdminReadRepository.isRead.mockResolvedValue(true);
+
+      const res = await request(app)
         .get('/api/requests')
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body[0].isRead).toBe(false);
+      expect(res.status).toBe(200);
+      expect(res.body[0].isRead).toBe(true);
+    });
+
+    it('tracks isRead=false when admin has not read the request', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([
+        { id: 1, title: 'Unread request', status: 'pending' },
+      ]);
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockAdminReadRepository.isRead.mockResolvedValue(false);
+
+      const res = await request(app)
+        .get('/api/requests')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].isRead).toBe(false);
+    });
+
+    it('does not check admin read status for non-admin users', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([
+        { id: 1, title: 'Some request', status: 'pending' },
+      ]);
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+
+      const res = await request(app)
+        .get('/api/requests')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].isRead).toBe(true); // default for non-admin
+      expect(mockAdminReadRepository.isRead).not.toHaveBeenCalled();
+    });
+
+    it('handles multiple requests with mixed read states', async () => {
+      mockRequestRepository.findAll.mockResolvedValue([
+        { id: 1, title: 'Request 1', status: 'pending' },
+        { id: 2, title: 'Request 2', status: 'in_progress' },
+        { id: 3, title: 'Request 3', status: 'completed' },
+      ]);
+      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockAdminReadRepository.isRead
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+
+      const res = await request(app)
+        .get('/api/requests')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].isRead).toBe(true);
+      expect(res.body[1].isRead).toBe(false);
+      expect(res.body[2].isRead).toBe(true);
+      expect(mockAdminReadRepository.isRead).toHaveBeenCalledTimes(3);
     });
   });
 });
