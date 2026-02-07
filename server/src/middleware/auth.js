@@ -30,12 +30,14 @@ export async function authenticateToken(req, res, next) {
 
     const user = await userRepository.findByAuthId(authId);
     if (!user) {
+      console.error('Auth: no user found for auth_id:', authId);
       return res.status(401).json({ error: 'User not found' });
     }
 
     req.user = user;
     next();
-  } catch {
+  } catch (err) {
+    console.error('Auth JWT verify failed:', err.message, '| secret length:', config.supabase.jwtSecret?.length);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
