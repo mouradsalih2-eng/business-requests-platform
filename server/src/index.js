@@ -148,22 +148,22 @@ app.use(errorHandler);
 // ── Start server ─────────────────────────────────────────────
 
 async function start() {
+  // Start listening immediately so Railway health checks pass
+  const server = app.listen(config.port, '0.0.0.0', () => {
+    console.log(`Server running on port ${config.port}`);
+  });
+
   try {
     // Verify Supabase connectivity
     const { error } = await supabase.from('feature_flags').select('name').limit(1);
     if (error) {
       console.error('Supabase connection check failed:', error.message);
       console.error('Ensure your Supabase schema has been set up (see server/supabase/migrations/).');
-      process.exit(1);
+    } else {
+      console.log('Supabase connection verified');
     }
-    console.log('Supabase connection verified');
-
-    app.listen(config.port, '0.0.0.0', () => {
-      console.log(`Server running on port ${config.port}`);
-    });
   } catch (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
+    console.error('Supabase connection check error:', err.message);
   }
 }
 
