@@ -1,0 +1,12 @@
+node_modules
+.playwright-mcp
+test-results
+.git
+.claude
+.zencoder
+.zenflow
+agent-os
+*.db
+.env
+.env.*
+.DS_Store
