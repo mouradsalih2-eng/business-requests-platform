@@ -7,8 +7,11 @@ const JWT_SECRET = 'test-secret';
 
 // ── Declare mock objects OUTSIDE factories so test + middleware share the same refs ──
 
+const mockGetUser = jest.fn();
+
 const mockSupabase = {
   auth: {
+    getUser: mockGetUser,
     admin: {
       createUser: jest.fn(),
       updateUserById: jest.fn(),
@@ -108,7 +111,18 @@ const testUser = { id: 1, email: 'user@test.com', name: 'Test User', role: 'empl
 const generateToken = (user) => jwt.sign({ sub: user.auth_id, email: user.email, role: 'authenticated' }, JWT_SECRET);
 
 describe('Auth Extended Routes', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default mockGetUser: decode the JWT to extract the sub (auth_id)
+    mockGetUser.mockImplementation((token) => {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        return { data: { user: { id: decoded.sub } }, error: null };
+      } catch {
+        return { data: { user: null }, error: { message: 'Invalid token' } };
+      }
+    });
+  });
 
   describe('Registration Flow', () => {
     describe('POST /auth/register/initiate', () => {

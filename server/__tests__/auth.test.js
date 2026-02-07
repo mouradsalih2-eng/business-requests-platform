@@ -7,6 +7,8 @@ const JWT_SECRET = 'test-secret';
 
 // ── Declare mock objects OUTSIDE factories ──────────────────
 
+const mockGetUser = jest.fn();
+
 const mockSupabaseAnon = {
   auth: { signInWithPassword: jest.fn() },
 };
@@ -29,7 +31,10 @@ jest.unstable_mockModule('../src/config/index.js', () => ({
 
 jest.unstable_mockModule('../src/db/supabase.js', () => ({
   supabase: {
-    auth: { admin: { createUser: jest.fn(), updateUserById: jest.fn(), deleteUser: jest.fn(), listUsers: jest.fn() } },
+    auth: {
+      getUser: mockGetUser,
+      admin: { createUser: jest.fn(), updateUserById: jest.fn(), deleteUser: jest.fn(), listUsers: jest.fn() },
+    },
   },
   supabaseAnon: mockSupabaseAnon,
 }));
@@ -69,7 +74,18 @@ const employeeUser = { id: 2, email: 'user@test.com', name: 'User', role: 'emplo
 const generateToken = (user) => jwt.sign({ sub: user.auth_id, email: user.email, role: 'authenticated' }, JWT_SECRET);
 
 describe('Auth Routes', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default mockGetUser: decode the JWT to extract the sub (auth_id)
+    mockGetUser.mockImplementation((token) => {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        return { data: { user: { id: decoded.sub } }, error: null };
+      } catch {
+        return { data: { user: null }, error: { message: 'Invalid token' } };
+      }
+    });
+  });
 
   describe('POST /auth/register', () => {
     it('should return 403 - registration disabled', async () => {
