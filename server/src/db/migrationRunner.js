@@ -171,6 +171,14 @@ export class MigrationRunner {
       results.push({ version: migration.version, name: migration.name });
     }
 
+    // Reload PostgREST schema cache so new columns/views are immediately visible
+    if (results.length > 0) {
+      await this.supabase.rpc('exec_sql', {
+        sql: "NOTIFY pgrst, 'reload schema'",
+      }).maybeSingle();
+      console.log('  ✓ PostgREST schema cache reloaded');
+    }
+
     return { applied: results, message: `${results.length} migration(s) applied.` };
   }
 
