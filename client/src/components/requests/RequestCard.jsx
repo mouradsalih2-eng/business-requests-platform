@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { StatusBadge, CategoryBadge, PriorityBadge, TeamBadge, RegionBadge } from '../ui/Badge';
 import { votes as votesApi, requests as requestsApi } from '../../lib/api';
 import { useFieldVisibility } from '../../hooks/useFieldVisibility';
@@ -7,7 +7,7 @@ import { useFieldVisibility } from '../../hooks/useFieldVisibility';
  * RequestCard - Mobile-first responsive card with inline voting
  * Touch-friendly with hover tooltips on desktop
  */
-export function RequestCard({ request, onClick, onVoteChange, positionChange, showUnreadBadge = false }) {
+export const RequestCard = memo(function RequestCard({ request, onClick, onVoteChange, positionChange, showUnreadBadge = false }) {
   const {
     id,
     title,
@@ -371,4 +371,14 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
       </div>
     </article>
   );
-}
+}, (prev, next) => {
+  return (
+    prev.request.id === next.request.id &&
+    prev.request.upvotes === next.request.upvotes &&
+    prev.request.likes === next.request.likes &&
+    prev.request.status === next.request.status &&
+    prev.request.isRead === next.request.isRead &&
+    prev.positionChange === next.positionChange &&
+    prev.showUnreadBadge === next.showUnreadBadge
+  );
+});

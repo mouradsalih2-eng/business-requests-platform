@@ -18,6 +18,17 @@ export const adminReadRepository = {
     return !!data;
   },
 
+  async getReadStatusForMultiple(requestIds, adminId) {
+    if (!requestIds.length) return new Set();
+    const { data, error } = await supabase
+      .from('admin_read_requests')
+      .select('request_id')
+      .in('request_id', requestIds)
+      .eq('admin_id', adminId);
+    if (error) handleError(error, 'getReadStatusForMultiple');
+    return new Set(data.map(r => r.request_id));
+  },
+
   async markRead(requestId, adminId) {
     const { error } = await supabase
       .from('admin_read_requests')

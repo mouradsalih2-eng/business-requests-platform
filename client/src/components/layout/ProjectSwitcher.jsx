@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProject } from '../../context/ProjectContext';
+import { useAuth } from '../../context/AuthContext';
 
 export function ProjectSwitcher() {
   const { projects, currentProject, switchProject, loading } = useProject();
+  const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -16,7 +18,25 @@ export function ProjectSwitcher() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (loading || !currentProject) return null;
+  if (loading) return null;
+
+  // Admin with no projects: show "Create Project" button
+  if (!currentProject && isAdmin) {
+    return (
+      <button
+        onClick={() => navigate('/onboarding')}
+        className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-dashed border-[#4F46E5]/40 dark:border-[#6366F1]/40 bg-[#4F46E5]/5 dark:bg-[#6366F1]/10 text-[#4F46E5] dark:text-[#818CF8] hover:bg-[#4F46E5]/10 dark:hover:bg-[#6366F1]/20 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Create Project
+      </button>
+    );
+  }
+
+  // Non-admin with no project: show nothing
+  if (!currentProject) return null;
 
   return (
     <div className="relative" ref={ref}>

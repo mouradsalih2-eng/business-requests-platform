@@ -57,6 +57,11 @@ export function ProjectProvider({ children }) {
     await loadProjects();
   }, [loadProjects]);
 
+  // Admin/super_admin with no projects needs onboarding
+  const needsOnboarding = !loading && !!user &&
+    (user.role === 'admin' || user.role === 'super_admin') &&
+    projects.length === 0;
+
   return (
     <ProjectContext.Provider value={{
       projects,
@@ -64,6 +69,7 @@ export function ProjectProvider({ children }) {
       loading,
       switchProject,
       refresh,
+      needsOnboarding,
     }}>
       {children}
     </ProjectContext.Provider>

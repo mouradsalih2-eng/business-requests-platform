@@ -24,6 +24,7 @@ const mockRequestRepository = {
 const mockVoteRepository = {
   findByRequestAndUser: jest.fn(),
   getUserVoteTypes: jest.fn(),
+  getUserVotesForMultiple: jest.fn(),
   getCounts: jest.fn(),
   create: jest.fn(),
   delete: jest.fn(),
@@ -46,6 +47,7 @@ const mockActivityRepository = {
 
 const mockAdminReadRepository = {
   isRead: jest.fn(),
+  getReadStatusForMultiple: jest.fn(),
   markRead: jest.fn(),
 };
 
@@ -212,7 +214,7 @@ describe('Requests API', () => {
       ];
 
       mockRequestRepository.findAll.mockResolvedValue(mockRequests);
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
 
       const res = await request(app)
         .get('/api/requests')
@@ -234,8 +236,8 @@ describe('Requests API', () => {
       ];
 
       mockRequestRepository.findAll.mockResolvedValue(mockRequests);
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue(['upvote']);
-      mockAdminReadRepository.isRead.mockResolvedValue(false);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({ 1: ['upvote'] });
+      mockAdminReadRepository.getReadStatusForMultiple.mockResolvedValue(new Set());
 
       const res = await request(app)
         .get('/api/requests')
@@ -244,7 +246,7 @@ describe('Requests API', () => {
       expect(res.status).toBe(200);
       expect(res.body[0].isRead).toBe(false);
       expect(res.body[0].userVotes).toEqual(['upvote']);
-      expect(mockAdminReadRepository.isRead).toHaveBeenCalledWith(1, adminUser.id);
+      expect(mockAdminReadRepository.getReadStatusForMultiple).toHaveBeenCalledWith([1], adminUser.id);
     });
 
     it('passes query params through to findAll', async () => {

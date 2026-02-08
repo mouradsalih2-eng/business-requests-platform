@@ -24,6 +24,7 @@ const mockRequestRepository = {
 const mockVoteRepository = {
   findByRequestAndUser: jest.fn(),
   getUserVoteTypes: jest.fn(),
+  getUserVotesForMultiple: jest.fn(),
   getCounts: jest.fn(),
   create: jest.fn(),
   delete: jest.fn(),
@@ -46,6 +47,7 @@ const mockActivityRepository = {
 
 const mockAdminReadRepository = {
   isRead: jest.fn(),
+  getReadStatusForMultiple: jest.fn(),
   markRead: jest.fn(),
 };
 
@@ -599,7 +601,7 @@ describe('Requests Extended API', () => {
 
   describe('Request filtering', () => {
     beforeEach(() => {
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
     });
 
     it('passes timePeriod=today through to findAll', async () => {
@@ -711,7 +713,7 @@ describe('Requests Extended API', () => {
 
   describe('Archived requests exclusion', () => {
     beforeEach(() => {
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
     });
 
     it('excludes archived by default (repository receives no status=archived)', async () => {
@@ -769,8 +771,8 @@ describe('Requests Extended API', () => {
       mockRequestRepository.findAll.mockResolvedValue([
         { id: 1, title: 'Read request', status: 'pending' },
       ]);
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
-      mockAdminReadRepository.isRead.mockResolvedValue(true);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
+      mockAdminReadRepository.getReadStatusForMultiple.mockResolvedValue(new Set([1]));
 
       const res = await request(app)
         .get('/api/requests')
@@ -784,8 +786,8 @@ describe('Requests Extended API', () => {
       mockRequestRepository.findAll.mockResolvedValue([
         { id: 1, title: 'Unread request', status: 'pending' },
       ]);
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
-      mockAdminReadRepository.isRead.mockResolvedValue(false);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
+      mockAdminReadRepository.getReadStatusForMultiple.mockResolvedValue(new Set());
 
       const res = await request(app)
         .get('/api/requests')
@@ -799,7 +801,7 @@ describe('Requests Extended API', () => {
       mockRequestRepository.findAll.mockResolvedValue([
         { id: 1, title: 'Some request', status: 'pending' },
       ]);
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
 
       const res = await request(app)
         .get('/api/requests')
@@ -807,7 +809,7 @@ describe('Requests Extended API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body[0].isRead).toBe(true); // default for non-admin
-      expect(mockAdminReadRepository.isRead).not.toHaveBeenCalled();
+      expect(mockAdminReadRepository.getReadStatusForMultiple).not.toHaveBeenCalled();
     });
 
     it('handles multiple requests with mixed read states', async () => {
@@ -816,11 +818,8 @@ describe('Requests Extended API', () => {
         { id: 2, title: 'Request 2', status: 'in_progress' },
         { id: 3, title: 'Request 3', status: 'completed' },
       ]);
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
-      mockAdminReadRepository.isRead
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(true);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
+      mockAdminReadRepository.getReadStatusForMultiple.mockResolvedValue(new Set([1, 3]));
 
       const res = await request(app)
         .get('/api/requests')
@@ -830,7 +829,7 @@ describe('Requests Extended API', () => {
       expect(res.body[0].isRead).toBe(true);
       expect(res.body[1].isRead).toBe(false);
       expect(res.body[2].isRead).toBe(true);
-      expect(mockAdminReadRepository.isRead).toHaveBeenCalledTimes(3);
+      expect(mockAdminReadRepository.getReadStatusForMultiple).toHaveBeenCalledWith([1, 2, 3], adminUser.id);
     });
   });
 });

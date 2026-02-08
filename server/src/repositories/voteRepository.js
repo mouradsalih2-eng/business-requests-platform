@@ -31,6 +31,21 @@ export const voteRepository = {
     return data.map(v => v.type);
   },
 
+  async getUserVotesForMultiple(requestIds, userId) {
+    if (!requestIds.length) return {};
+    const { data, error } = await supabase
+      .from('votes')
+      .select('request_id, type')
+      .in('request_id', requestIds)
+      .eq('user_id', userId);
+    if (error) handleError(error, 'getUserVotesForMultiple');
+    return data.reduce((acc, v) => {
+      if (!acc[v.request_id]) acc[v.request_id] = [];
+      acc[v.request_id].push(v.type);
+      return acc;
+    }, {});
+  },
+
   async getCounts(requestId) {
     const [upRes, likeRes] = await Promise.all([
       supabase.from('votes').select('*', { count: 'exact', head: true }).eq('request_id', requestId).eq('type', 'upvote'),

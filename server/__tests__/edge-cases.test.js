@@ -38,6 +38,7 @@ const mockRequestRepository = {
 const mockVoteRepository = {
   findByRequestAndUser: jest.fn(),
   getUserVoteTypes: jest.fn(),
+  getUserVotesForMultiple: jest.fn(),
   getCounts: jest.fn(),
   create: jest.fn(),
   delete: jest.fn(),
@@ -78,6 +79,7 @@ const mockActivityRepository = {
 
 const mockAdminReadRepository = {
   isRead: jest.fn(),
+  getReadStatusForMultiple: jest.fn(),
   markRead: jest.fn(),
 };
 
@@ -363,7 +365,7 @@ describe('Edge Cases - Input Validation', () => {
 
     it('handles SQL injection in filter parameters', async () => {
       mockRequestRepository.findAll.mockResolvedValue([]);
-      mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
+      mockVoteRepository.getUserVotesForMultiple.mockResolvedValue({});
 
       const res = await request(app)
         .get("/api/requests?status=pending' OR '1'='1")

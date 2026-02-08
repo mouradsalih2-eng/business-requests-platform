@@ -59,16 +59,20 @@ router.get('/', authenticateToken, requireProject, asyncHandler(async (req, res)
   const requests = await requestRepository.findAll({ ...req.query, userId: req.user.id, projectId: req.project.id });
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin' || req.projectRole === 'admin';
 
-  // Batch-fetch card-visible custom field values for all requests
+  // Batch-fetch all enrichment data in parallel (avoids N+1 queries)
   const requestIds = requests.map(r => r.id);
-  const cardCustomValues = await customFieldValueRepository.findCardValuesForRequests(requestIds, req.project.id);
+  const [cardCustomValues, userVotesMap, readSet] = await Promise.all([
+    customFieldValueRepository.findCardValuesForRequests(requestIds, req.project.id),
+    voteRepository.getUserVotesForMultiple(requestIds, req.user.id),
+    isAdmin ? adminReadRepository.getReadStatusForMultiple(requestIds, req.user.id) : Promise.resolve(new Set()),
+  ]);
 
-  // Enrich with user votes, read status, and card custom field values
-  const enriched = await Promise.all(requests.map(async (request) => {
-    const userVotes = await voteRepository.getUserVoteTypes(request.id, req.user.id);
-    let isRead = true;
-    if (isAdmin) isRead = await adminReadRepository.isRead(request.id, req.user.id);
-    return { ...request, userVotes, isRead, cardCustomValues: cardCustomValues[request.id] || [] };
+  // Enrich with user votes, read status, and card custom field values (sync — no DB calls)
+  const enriched = requests.map((request) => ({
+    ...request,
+    userVotes: userVotesMap[request.id] || [],
+    isRead: isAdmin ? readSet.has(request.id) : true,
+    cardCustomValues: cardCustomValues[request.id] || [],
   }));
 
   res.json(enriched);

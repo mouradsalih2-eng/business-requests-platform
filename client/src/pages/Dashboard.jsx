@@ -11,6 +11,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { FilterChips } from '../components/ui/FilterChips';
 import { requests as requestsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useProject } from '../context/ProjectContext';
 
 /**
  * Dashboard - Main view for browsing all requests
@@ -37,7 +38,29 @@ const categoryOptions = [
 
 export function Dashboard() {
   const { isAdmin } = useAuth();
+  const { currentProject, loading: projectLoading } = useProject();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Non-admin with no project: show helpful message
+  if (!projectLoading && !currentProject && !isAdmin) {
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
+          <div className="text-center px-6 py-12">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-[#21262D] flex items-center justify-center">
+              <svg className="w-8 h-8 text-neutral-400 dark:text-[#484F58]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">No Project Assigned</h2>
+            <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto">
+              You haven't been added to any project yet. Contact your administrator to get access.
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
   const [showFilters, setShowFilters] = useState(false);
 
   // Initialize filters from URL params

@@ -385,6 +385,7 @@ export function AdminPanel() {
     }
   }, [currentProject]);
 
+  // Load data when switching tabs
   useEffect(() => {
     if (activeTab === 'requests') {
       loadRequests();
@@ -395,7 +396,21 @@ export function AdminPanel() {
     } else if (activeTab === 'flags') {
       loadFlags();
     }
-  }, [activeTab, filters, analyticsPeriod]);
+  }, [activeTab]);
+
+  // Reload requests when filters change (only if on requests tab)
+  useEffect(() => {
+    if (activeTab === 'requests') {
+      loadRequests();
+    }
+  }, [filters]);
+
+  // Reload analytics when period changes (only if on analytics tab)
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      loadAnalytics();
+    }
+  }, [analyticsPeriod]);
 
   const loadRequests = async () => {
     setLoading(true);

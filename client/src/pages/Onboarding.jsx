@@ -25,7 +25,7 @@ const DEFAULT_FLAGS = [
 export function Onboarding() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
-  const { refresh: refreshProjects } = useProject();
+  const { refresh: refreshProjects, switchProject } = useProject();
   const toast = useToast();
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -150,6 +150,8 @@ export function Onboarding() {
         }
       }
 
+      // Set active project explicitly, then refresh full list
+      switchProject(project);
       await refreshProjects();
       toast.success('Project launched successfully!');
       navigate('/dashboard', { replace: true });
