@@ -57,7 +57,13 @@ function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false, a
 
   // Redirect admins with no projects to onboarding (except exempt routes)
   const exemptPaths = ['/onboarding', '/settings', '/change-password', '/super-admin'];
-  if (needsOnboarding && !projectLoading && !exemptPaths.includes(location.pathname)) {
+
+  // Wait for projects to finish loading before deciding (prevents flash of wrong content)
+  if (projectLoading && isAdmin && !exemptPaths.includes(location.pathname)) {
+    return <PageLoader />;
+  }
+
+  if (needsOnboarding && !exemptPaths.includes(location.pathname)) {
     return <Navigate to="/onboarding" replace />;
   }
 

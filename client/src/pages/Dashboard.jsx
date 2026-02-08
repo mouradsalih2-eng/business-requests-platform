@@ -41,8 +41,36 @@ export function Dashboard() {
   const { currentProject, loading: projectLoading } = useProject();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Non-admin with no project: show helpful message
-  if (!projectLoading && !currentProject && !isAdmin) {
+  // No project state
+  if (!projectLoading && !currentProject) {
+    // Admin with no project: CTA to create first project
+    if (isAdmin) {
+      return (
+        <Layout>
+          <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
+            <div className="text-center px-6 py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 flex items-center justify-center">
+                <svg className="w-8 h-8 text-[#4F46E5] dark:text-[#818CF8]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">Set Up Your First Project</h2>
+              <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto mb-6">
+                Create a project to start collecting and managing requests from your team.
+              </p>
+              <Link to="/onboarding" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl text-sm font-medium transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Create Project
+              </Link>
+            </div>
+          </div>
+        </Layout>
+      );
+    }
+
+    // Non-admin with no project: show helpful message
     return (
       <Layout>
         <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
