@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Spinner } from '../components/ui/Spinner';
 import { superAdmin, users as usersApi, projects as projectsApi } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 const STAT_CARDS = [
   { key: 'totalProjects', label: 'Projects', color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' },
@@ -25,6 +26,7 @@ const STATUS_COLORS = {
 
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [trends, setTrends] = useState([]);
@@ -43,6 +45,10 @@ export function SuperAdminDashboard() {
   const [adminForm, setAdminForm] = useState({ name: '', email: '', password: '', project_id: '' });
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [addAdminError, setAddAdminError] = useState('');
+
+  // Delete user state
+  const [deletingUserId, setDeletingUserId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -110,6 +116,19 @@ export function SuperAdminDashboard() {
       setAddAdminError(err.message || 'Failed to create admin');
     } finally {
       setAddingAdmin(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    setDeletingUserId(userId);
+    try {
+      await usersApi.delete(userId);
+      setAdminsList((prev) => prev.filter((a) => a.id !== userId));
+      setConfirmDeleteId(null);
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -373,6 +392,7 @@ export function SuperAdminDashboard() {
                   <th className="text-left px-5 py-2.5 text-xs font-medium text-neutral-500 dark:text-[#8B949E]">Email</th>
                   <th className="text-left px-5 py-2.5 text-xs font-medium text-neutral-500 dark:text-[#8B949E]">Role</th>
                   <th className="text-left px-5 py-2.5 text-xs font-medium text-neutral-500 dark:text-[#8B949E]">Joined</th>
+                  <th className="px-5 py-2.5 w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -392,6 +412,37 @@ export function SuperAdminDashboard() {
                     <td className="px-5 py-3 text-neutral-500 dark:text-[#8B949E]">
                       {new Date(admin.created_at).toLocaleDateString()}
                     </td>
+                    <td className="px-5 py-3">
+                      {admin.id !== currentUser?.id && (
+                        confirmDeleteId === admin.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleDeleteUser(admin.id)}
+                              disabled={deletingUserId === admin.id}
+                              className="text-[11px] px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded font-medium transition-colors disabled:opacity-50"
+                            >
+                              {deletingUserId === admin.id ? '...' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-[11px] px-2 py-1 text-neutral-500 dark:text-[#8B949E] hover:text-neutral-700 dark:hover:text-[#E6EDF3] transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(admin.id)}
+                            className="p-1.5 text-neutral-400 dark:text-[#484F58] hover:text-red-500 dark:hover:text-red-400 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#21262D] transition-colors"
+                            title="Delete user"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                          </button>
+                        )
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -407,13 +458,44 @@ export function SuperAdminDashboard() {
                     <p className="font-medium text-neutral-900 dark:text-[#E6EDF3] truncate">{admin.name}</p>
                     <p className="text-xs text-neutral-500 dark:text-[#8B949E] truncate">{admin.email}</p>
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-2 ${
-                    admin.role === 'super_admin'
-                      ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
-                      : 'bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8]'
-                  }`}>
-                    {admin.role === 'super_admin' ? 'super admin' : 'admin'}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                      admin.role === 'super_admin'
+                        ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+                        : 'bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8]'
+                    }`}>
+                      {admin.role === 'super_admin' ? 'super admin' : 'admin'}
+                    </span>
+                    {admin.id !== currentUser?.id && (
+                      confirmDeleteId === admin.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleDeleteUser(admin.id)}
+                            disabled={deletingUserId === admin.id}
+                            className="text-[11px] px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded font-medium transition-colors disabled:opacity-50"
+                          >
+                            {deletingUserId === admin.id ? '...' : 'Yes'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-[11px] px-2 py-1 text-neutral-500 dark:text-[#8B949E] transition-colors"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(admin.id)}
+                          className="p-1 text-neutral-400 dark:text-[#484F58] hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                          title="Delete user"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                          </svg>
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs text-neutral-400 dark:text-[#6E7681] mt-1">
                   Joined {new Date(admin.created_at).toLocaleDateString()}
