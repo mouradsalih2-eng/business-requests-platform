@@ -4,12 +4,19 @@ import { ForbiddenError } from '../errors/AppError.js';
 
 /**
  * Extract project_id from X-Project-Id header and attach to req.
+ * Falls back to the default project when no header is sent.
  * Validates the project exists and user is a member (or super_admin).
  */
 export async function requireProject(req, res, next) {
-  const projectId = parseInt(req.headers['x-project-id'], 10);
+  let projectId = parseInt(req.headers['x-project-id'], 10);
+
+  // Fall back to default project when no header is sent
   if (!projectId) {
-    return res.status(400).json({ error: 'X-Project-Id header is required' });
+    const defaultProject = await projectRepository.findBySlug('default');
+    if (!defaultProject) {
+      return res.status(400).json({ error: 'X-Project-Id header is required (no default project found)' });
+    }
+    projectId = defaultProject.id;
   }
 
   const project = await projectRepository.findById(projectId);

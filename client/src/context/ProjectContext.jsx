@@ -28,7 +28,12 @@ export function ProjectProvider({ children }) {
       const savedId = localStorage.getItem(STORAGE_KEY);
       const savedProject = savedId ? data.find(p => p.id === parseInt(savedId, 10)) : null;
       const defaultProject = data.find(p => p.slug === 'default') || data[0];
-      setCurrentProject(savedProject || defaultProject || null);
+      const selected = savedProject || defaultProject || null;
+      setCurrentProject(selected);
+      // Persist to localStorage so api.js can read it immediately
+      if (selected) {
+        localStorage.setItem(STORAGE_KEY, String(selected.id));
+      }
     } catch (err) {
       console.error('Failed to load projects:', err);
       setProjects([]);
