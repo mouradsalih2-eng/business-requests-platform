@@ -172,7 +172,18 @@ export function Onboarding() {
       <div className="max-w-3xl mx-auto px-4 py-8 sm:py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-xl font-bold gradient-text">Set Up Your Project</h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="p-1.5 rounded-lg text-neutral-400 dark:text-[#484F58] hover:text-neutral-700 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D] transition-colors"
+              title="Back to Dashboard"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+            </button>
+            <h1 className="text-xl font-bold gradient-text">Set Up Your Project</h1>
+          </div>
           <span className="text-xs font-medium text-neutral-500 dark:text-[#484F58] bg-neutral-100 dark:bg-[#21262D] px-2.5 py-1 rounded-full">Step {currentStep + 1} of {STEPS.length}</span>
         </div>
         <p className="text-sm text-neutral-500 dark:text-[#6E7681] mb-8">Get your team started in a few minutes</p>

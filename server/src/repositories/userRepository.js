@@ -43,10 +43,10 @@ export const userRepository = {
   },
 
   async findAllWithRequestCount() {
-    // Supabase can count related rows via the select syntax
+    // Disambiguate FK: requests has user_id, posted_by_admin_id, on_behalf_of_user_id → users
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, email, name, role, created_at, requests(count)')
+      .select('id, email, name, role, created_at, requests!requests_user_id_fkey(count)')
       .order('created_at', { ascending: false });
     if (error) handleError(error, 'findAllWithRequestCount');
     return users.map(u => ({

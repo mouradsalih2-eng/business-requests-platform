@@ -702,25 +702,27 @@ export function AdminPanel() {
           </div>
         </div>
 
-        {/* Stats Grid - 2 cols mobile, 4 cols desktop */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.total}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Total</div>
+        {/* Stats Grid - only show when there are requests */}
+        {stats.total > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+              <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.total}</div>
+              <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Total</div>
+            </div>
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+              <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.pending}</div>
+              <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Pending</div>
+            </div>
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+              <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.inProgress}</div>
+              <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">In Progress</div>
+            </div>
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
+              <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.completed}</div>
+              <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Completed</div>
+            </div>
           </div>
-          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.pending}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Pending</div>
-          </div>
-          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.inProgress}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">In Progress</div>
-          </div>
-          <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-3 sm:p-4 text-center">
-            <div className="text-2xl sm:text-3xl font-semibold text-neutral-900 dark:text-[#E6EDF3]">{stats.completed}</div>
-            <div className="text-xs sm:text-sm text-neutral-500 dark:text-[#8B949E]">Completed</div>
-          </div>
-        </div>
+        )}
 
         {/* Tabs - pill container style */}
         <div className="flex gap-1 p-1 mb-6 bg-white dark:bg-[#161B22] rounded-xl border border-neutral-200 dark:border-[#30363D]/40 overflow-x-auto scrollbar-hide">

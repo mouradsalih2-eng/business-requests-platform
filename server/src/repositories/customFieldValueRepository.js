@@ -47,13 +47,30 @@ export const customFieldValueRepository = {
   async findCardValuesForRequests(requestIds, projectId) {
     if (!requestIds.length) return {};
     // Fetch custom field values for show_on_card fields across multiple requests
-    const { data: cardFields, error: cfError } = await supabase
+    // Select without is_enabled first; column may not exist if migration 009 hasn't been applied
+    let cardFields;
+    const { data: cfData, error: cfError } = await supabase
       .from('project_custom_fields')
       .select('id, label, field_type, color, is_enabled')
       .eq('project_id', projectId)
       .eq('show_on_card', true);
-    if (cfError) handleError(cfError, 'findCardValuesForRequests.fields');
-    if (!cardFields || cardFields.length === 0) return {};
+    if (cfError) {
+      // Fallback: is_enabled column may not exist yet
+      if (cfError.message?.includes('is_enabled')) {
+        const { data: fallback, error: fbError } = await supabase
+          .from('project_custom_fields')
+          .select('id, label, field_type, color')
+          .eq('project_id', projectId)
+          .eq('show_on_card', true);
+        if (fbError) handleError(fbError, 'findCardValuesForRequests.fields');
+        cardFields = (fallback || []).map(f => ({ ...f, is_enabled: true }));
+      } else {
+        handleError(cfError, 'findCardValuesForRequests.fields');
+      }
+    } else {
+      cardFields = cfData || [];
+    }
+    if (!cardFields.length) return {};
 
     const fieldIds = cardFields.map(f => f.id);
     const { data: values, error: vError } = await supabase
@@ -75,7 +92,7 @@ export const customFieldValueRepository = {
         field_label: field.label,
         field_type: field.field_type,
         color: field.color,
-        is_enabled: field.is_enabled,
+        is_enabled: field.is_enabled !== false,
         value: extractValue(v),
       });
     }
