@@ -46,6 +46,14 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
+
+    // Auto-logout on 401 — user was deleted or token invalidated
+    if (response.status === 401 && token && endpoint !== '/auth/me') {
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+      throw new Error('Session expired');
+    }
+
     throw new Error(error.error || 'Request failed');
   }
 
