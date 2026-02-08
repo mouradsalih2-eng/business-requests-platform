@@ -378,7 +378,7 @@ function OverviewView({ stats, trendData, projects, statusBreakdown, recentActiv
 // ═══════════════════════════════════════════════════════════════
 function ProjectsView({ projects, statusBreakdown, membersByProject }) {
   const navigate = useNavigate();
-  const { projects: userProjects } = useProject();
+  const { projects: userProjects, switchProject, refresh } = useProject();
   const [expandedProjects, setExpandedProjects] = useState(new Set());
 
   const userProjectIds = useMemo(() => new Set(userProjects.map(p => p.id)), [userProjects]);
@@ -529,10 +529,10 @@ function ProjectsView({ projects, statusBreakdown, membersByProject }) {
                     {isMember ? (
                       <Button
                         size="sm"
-                        onClick={() => {
-                          localStorage.setItem('selectedProjectId', String(project.id));
+                        onClick={async () => {
+                          switchProject({ id: project.id, name: project.name, slug: project.slug, icon: project.icon, logo_url: project.logo_url });
+                          await refresh();
                           navigate('/dashboard');
-                          window.location.reload();
                         }}
                       >
                         Enter Project

@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
   const lastActivityRef = useRef(Date.now());
   const warningShownRef = useRef(false);
   const timeoutCheckRef = useRef(null);
+  const userRef = useRef(null);
 
   const navigate = useNavigate();
 
@@ -92,6 +93,11 @@ export function AuthProvider({ children }) {
     };
   }, [user, updateActivity, checkTimeout]);
 
+  // Keep userRef in sync so onAuthStateChange closure has current value
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   // Initialize auth state from Supabase session
   useEffect(() => {
     let mounted = true;
@@ -131,7 +137,7 @@ export function AuthProvider({ children }) {
         setSessionWarning(false);
         warningShownRef.current = false;
         setLoading(false);
-      } else if (event === 'SIGNED_IN' && session && !user) {
+      } else if (event === 'SIGNED_IN' && session && !userRef.current) {
         // OAuth redirect or fresh sign-in — fetch app user data
         try {
           const userData = await authApi.me();
@@ -144,13 +150,14 @@ export function AuthProvider({ children }) {
         } finally {
           if (mounted) setLoading(false);
         }
-      } else if (event === 'TOKEN_REFRESHED' && session && !user) {
+      } else if (event === 'TOKEN_REFRESHED' && session && !userRef.current) {
         // Token was refreshed but we lost the user state — refetch
         try {
           const userData = await authApi.me();
           setUser(userData);
         } catch {
-          await supabase.auth.signOut();
+          // Don't sign out on transient failures (rate limit, network)
+          // Only the 401 handler in api.js should trigger sign-out
         } finally {
           if (mounted) setLoading(false);
         }

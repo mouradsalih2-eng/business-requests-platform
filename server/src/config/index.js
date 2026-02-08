@@ -42,7 +42,7 @@ export const config = {
 
   rateLimit: {
     general: { windowMs: 15 * 60 * 1000, max: 500 },
-    auth: { windowMs: 15 * 60 * 1000, max: process.env.NODE_ENV === 'production' ? 10 : 100 },
+    auth: { windowMs: 15 * 60 * 1000, max: process.env.NODE_ENV === 'production' ? 30 : 100 },
     passwordReset: { windowMs: 15 * 60 * 1000, max: 5 },
   },
 
