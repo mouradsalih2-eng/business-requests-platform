@@ -125,6 +125,17 @@ export const userRepository = {
     return data;
   },
 
+  async updateSettings(id, updates) {
+    const { data, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', id)
+      .select('id, email, name, profile_picture, theme_preference, auto_watch_on_comment, auto_watch_on_vote, auth_provider')
+      .single();
+    if (error) handleError(error, 'updateSettings');
+    return data;
+  },
+
   async updateProfilePicture(id, path) {
     const { data, error } = await supabase
       .from('users')

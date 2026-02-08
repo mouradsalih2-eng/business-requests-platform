@@ -19,6 +19,7 @@ const mockUserRepository = {
   updateRole: jest.fn(),
   updatePassword: jest.fn(),
   updateTheme: jest.fn(),
+  updateSettings: jest.fn(),
   updateProfilePicture: jest.fn(),
   delete: jest.fn(),
   count: jest.fn(),
@@ -196,7 +197,7 @@ describe('User Settings API', () => {
 
       expect(mockUserRepository.findByIdOrFail).toHaveBeenCalledWith(
         1,
-        'id, email, name, profile_picture, theme_preference'
+        'id, email, name, profile_picture, theme_preference, auto_watch_on_comment, auto_watch_on_vote, auth_provider'
       );
     });
   });
@@ -223,7 +224,7 @@ describe('User Settings API', () => {
     });
 
     it('updates theme to light successfully', async () => {
-      mockUserRepository.updateTheme.mockResolvedValue({
+      mockUserRepository.updateSettings.mockResolvedValue({
         id: 1, email: 'user@example.com', name: 'Test User',
         profile_picture: null, theme_preference: 'light',
       });
@@ -235,11 +236,11 @@ describe('User Settings API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.theme_preference).toBe('light');
-      expect(mockUserRepository.updateTheme).toHaveBeenCalledWith(1, 'light');
+      expect(mockUserRepository.updateSettings).toHaveBeenCalledWith(1, { theme_preference: 'light' });
     });
 
     it('updates theme to dark successfully', async () => {
-      mockUserRepository.updateTheme.mockResolvedValue({
+      mockUserRepository.updateSettings.mockResolvedValue({
         id: 1, email: 'user@example.com', name: 'Test User',
         profile_picture: null, theme_preference: 'dark',
       });
@@ -254,7 +255,7 @@ describe('User Settings API', () => {
     });
 
     it('updates theme to system successfully', async () => {
-      mockUserRepository.updateTheme.mockResolvedValue({
+      mockUserRepository.updateSettings.mockResolvedValue({
         id: 1, email: 'user@example.com', name: 'Test User',
         profile_picture: null, theme_preference: 'system',
       });
@@ -281,8 +282,8 @@ describe('User Settings API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.theme_preference).toBe('dark');
-      expect(mockUserRepository.updateTheme).not.toHaveBeenCalled();
-      expect(mockUserRepository.findById).toHaveBeenCalledWith(1, 'id, email, name, profile_picture, theme_preference');
+      expect(mockUserRepository.updateSettings).not.toHaveBeenCalled();
+      expect(mockUserRepository.findById).toHaveBeenCalledWith(1, 'id, email, name, profile_picture, theme_preference, auto_watch_on_comment, auto_watch_on_vote, auth_provider');
     });
 
     it('treats empty string theme as no-op (falsy)', async () => {
@@ -297,7 +298,7 @@ describe('User Settings API', () => {
         .send({ theme_preference: '' });
 
       expect(res.status).toBe(200);
-      expect(mockUserRepository.updateTheme).not.toHaveBeenCalled();
+      expect(mockUserRepository.updateSettings).not.toHaveBeenCalled();
     });
   });
 
@@ -331,7 +332,7 @@ describe('User Settings API', () => {
 
     validThemes.forEach(theme => {
       it(`accepts valid theme: "${theme}"`, async () => {
-        mockUserRepository.updateTheme.mockResolvedValue({
+        mockUserRepository.updateSettings.mockResolvedValue({
           id: 1, email: 'user@example.com', name: 'Test',
           profile_picture: null, theme_preference: theme,
         });
@@ -392,7 +393,7 @@ describe('User Settings API', () => {
 
   describe('Concurrent requests', () => {
     it('handles multiple simultaneous settings updates', async () => {
-      mockUserRepository.updateTheme
+      mockUserRepository.updateSettings
         .mockResolvedValueOnce({
           id: 1, email: 'user@example.com', name: 'Test',
           profile_picture: null, theme_preference: 'dark',
@@ -415,7 +416,7 @@ describe('User Settings API', () => {
 
       expect(res1.status).toBe(200);
       expect(res2.status).toBe(200);
-      expect(mockUserRepository.updateTheme).toHaveBeenCalledTimes(2);
+      expect(mockUserRepository.updateSettings).toHaveBeenCalledTimes(2);
     });
   });
 });

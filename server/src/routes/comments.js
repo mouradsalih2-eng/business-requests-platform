@@ -3,6 +3,8 @@ import { authenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requestRepository } from '../repositories/requestRepository.js';
 import { commentRepository, mentionRepository } from '../repositories/commentRepository.js';
+import { watcherRepository } from '../repositories/watcherRepository.js';
+import { userRepository } from '../repositories/userRepository.js';
 import { ValidationError, ForbiddenError } from '../errors/AppError.js';
 
 const router = Router();
@@ -53,6 +55,14 @@ router.post('/:requestId/comments', authenticateToken, asyncHandler(async (req, 
 
   await requestRepository.findByIdOrFail(requestId);
   const { id: commentId } = await commentRepository.create(requestId, req.user.id, content.trim());
+
+  // Auto-watch on comment (if user preference allows)
+  try {
+    const user = await userRepository.findById(req.user.id, 'id, auto_watch_on_comment');
+    if (user?.auto_watch_on_comment !== false) {
+      await watcherRepository.watch(requestId, req.user.id, true);
+    }
+  } catch { /* non-critical */ }
 
   const mentions = await processMentions(commentId, content);
   const comment = await commentRepository.findByIdWithAuthor(commentId);

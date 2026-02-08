@@ -38,6 +38,7 @@ export function MyRequests() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'mine');
 
   // Initialize filters from URL params
   const [filters, setFilters] = useState({
@@ -48,6 +49,7 @@ export function MyRequests() {
   });
 
   const [requestsList, setRequestsList] = useState([]);
+  const [watchingList, setWatchingList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
@@ -65,17 +67,23 @@ export function MyRequests() {
   // Sync filters to URL
   useEffect(() => {
     const params = new URLSearchParams();
+    if (activeTab !== 'mine') params.set('tab', activeTab);
     if (filters.status) params.set('status', filters.status);
     if (filters.category) params.set('category', filters.category);
     if (filters.sort && filters.sort !== 'recency') params.set('sort', filters.sort);
     if (filters.search) params.set('search', filters.search);
     setSearchParams(params, { replace: true });
-  }, [filters, setSearchParams]);
+  }, [filters, activeTab, setSearchParams]);
 
   // Load requests from API
   useEffect(() => {
-    loadRequests();
-  }, [filters.status, filters.category, filters.search]);
+    if (activeTab === 'mine') loadRequests();
+  }, [filters.status, filters.category, filters.search, activeTab]);
+
+  // Load watching list
+  useEffect(() => {
+    if (activeTab === 'watching') loadWatching();
+  }, [activeTab]);
 
   const loadRequests = async () => {
     setLoading(true);
@@ -90,6 +98,18 @@ export function MyRequests() {
       previousOrderRef.current = data.map(r => r.id);
     } catch (err) {
       console.error('Failed to load requests:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadWatching = async () => {
+    setLoading(true);
+    try {
+      const data = await requestsApi.getWatching();
+      setWatchingList(data);
+    } catch (err) {
+      console.error('Failed to load watching list:', err);
     } finally {
       setLoading(false);
     }
@@ -231,82 +251,138 @@ export function MyRequests() {
           </Link>
         </div>
 
-        {/* Search and Filter Row */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1">
-            <SearchInput
-              value={filters.search}
-              onChange={(value) => handleFilterChange('search', value)}
-              onSelect={handleSearchSelect}
-              placeholder="Search by title or requester..."
+        {/* Tabs: Mine / Watching */}
+        <div className="flex gap-1 p-1 bg-neutral-100 dark:bg-[#21262D] rounded-lg mb-4">
+          <button
+            onClick={() => setActiveTab('mine')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+              activeTab === 'mine'
+                ? 'bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3] shadow-sm'
+                : 'text-neutral-500 dark:text-[#8B949E] hover:text-neutral-700 dark:hover:text-neutral-300'
+            }`}
+          >
+            My Requests
+          </button>
+          <button
+            onClick={() => setActiveTab('watching')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'watching'
+                ? 'bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3] shadow-sm'
+                : 'text-neutral-500 dark:text-[#8B949E] hover:text-neutral-700 dark:hover:text-neutral-300'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+            </svg>
+            Watching
+          </button>
+        </div>
+
+        {activeTab === 'mine' && (
+          <>
+            {/* Search and Filter Row - only for Mine tab */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1">
+                <SearchInput
+                  value={filters.search}
+                  onChange={(value) => handleFilterChange('search', value)}
+                  onSelect={handleSearchSelect}
+                  placeholder="Search by title or requester..."
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(true)}
+                className={`
+                  relative flex items-center justify-center w-11 h-11 rounded-lg border transition-all duration-200
+                  ${hasActiveFilters
+                    ? 'bg-[#4F46E5] dark:bg-[#6366F1] border-[#4F46E5] dark:border-[#6366F1] text-white'
+                    : 'bg-white dark:bg-[#21262D] border-neutral-200 dark:border-[#30363D] text-neutral-600 dark:text-[#8B949E] hover:border-neutral-300 dark:hover:border-[#484F58] hover:bg-neutral-50 dark:hover:bg-[#2D333B]'
+                  }
+                `}
+                title="Filters"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+                </svg>
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs font-medium rounded-full flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Active Filter Chips */}
+            <FilterChips
+              filters={filters}
+              onRemove={(key) => handleFilterChange(key, '')}
+              onClearAll={clearFilters}
             />
-          </div>
-          <button
-            onClick={() => setShowFilters(true)}
-            className={`
-              relative flex items-center justify-center w-11 h-11 rounded-lg border transition-all duration-200
-              ${hasActiveFilters
-                ? 'bg-[#4F46E5] dark:bg-[#6366F1] border-[#4F46E5] dark:border-[#6366F1] text-white'
-                : 'bg-white dark:bg-[#21262D] border-neutral-200 dark:border-[#30363D] text-neutral-600 dark:text-[#8B949E] hover:border-neutral-300 dark:hover:border-[#484F58] hover:bg-neutral-50 dark:hover:bg-[#2D333B]'
-              }
-            `}
-            title="Filters"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-            </svg>
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs font-medium rounded-full flex items-center justify-center">
-                {activeFilterCount}
-              </span>
+
+            {/* Request count and sort toggle */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-neutral-500 dark:text-[#8B949E]">
+                {sortedRequests.length} request{sortedRequests.length !== 1 ? 's' : ''}
+              </p>
+              <button
+                onClick={toggleSort}
+                className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] transition-colors"
+                title={filters.sort === 'recency' ? 'Sorted by recent' : 'Sorted by votes'}
+              >
+                <span className="text-neutral-400 dark:text-[#6E7681]">
+                  {filters.sort === 'recency' ? 'Recent' : 'Votes'}
+                </span>
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${filters.sort === 'votes' ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Request List */}
+            {loading ? (
+              <SkeletonList count={3} />
+            ) : (
+              <RequestList
+                requests={sortedRequests}
+                onRequestClick={handleRequestClick}
+                onVoteChange={handleVoteChange}
+                positionChanges={positionChanges}
+                exitingIds={archivingIds}
+                emptyMessage="You haven't submitted any requests yet"
+              />
             )}
-          </button>
-        </div>
+          </>
+        )}
 
-        {/* Active Filter Chips */}
-        <FilterChips
-          filters={filters}
-          onRemove={(key) => handleFilterChange(key, '')}
-          onClearAll={clearFilters}
-        />
-
-        {/* Request count and sort toggle */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-neutral-500 dark:text-[#8B949E]">
-            {sortedRequests.length} request{sortedRequests.length !== 1 ? 's' : ''}
-          </p>
-          <button
-            onClick={toggleSort}
-            className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] transition-colors"
-            title={filters.sort === 'recency' ? 'Sorted by recent' : 'Sorted by votes'}
-          >
-            <span className="text-neutral-400 dark:text-[#6E7681]">
-              {filters.sort === 'recency' ? 'Recent' : 'Votes'}
-            </span>
-            <svg
-              className={`w-4 h-4 transition-transform duration-200 ${filters.sort === 'votes' ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Request List */}
-        {loading ? (
-          <SkeletonList count={3} />
-        ) : (
-          <RequestList
-            requests={sortedRequests}
-            onRequestClick={handleRequestClick}
-            onVoteChange={handleVoteChange}
-            positionChanges={positionChanges}
-            exitingIds={archivingIds}
-            emptyMessage="You haven't submitted any requests yet"
-          />
+        {activeTab === 'watching' && (
+          <>
+            {loading ? (
+              <SkeletonList count={3} />
+            ) : watchingList.length === 0 ? (
+              <div className="text-center py-12">
+                <svg className="w-12 h-12 mx-auto text-neutral-300 dark:text-neutral-600 mb-4" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+                <p className="text-neutral-500 dark:text-[#8B949E] text-sm mb-1">No watched requests</p>
+                <p className="text-neutral-400 dark:text-[#6E7681] text-xs">
+                  Watch requests to track their updates here
+                </p>
+              </div>
+            ) : (
+              <RequestList
+                requests={watchingList}
+                onRequestClick={handleRequestClick}
+                onVoteChange={handleVoteChange}
+                emptyMessage="No watched requests"
+              />
+            )}
+          </>
         )}
 
         {/* Filter Side Sheet */}

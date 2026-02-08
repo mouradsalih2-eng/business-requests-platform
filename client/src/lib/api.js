@@ -7,10 +7,18 @@ const STORAGE_KEY = 'selectedProjectId';
 /**
  * Get the current Supabase access token.
  * Returns null if no active session.
+ * Includes a 5-second timeout to prevent hanging on stale sessions.
  */
 async function getToken() {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || null;
+  try {
+    const result = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('getToken timeout')), 5000)),
+    ]);
+    return result?.data?.session?.access_token || null;
+  } catch {
+    return null;
+  }
 }
 
 function getProjectId() {
@@ -151,6 +159,20 @@ export const requests = {
         merge_comments: options.mergeComments ?? false,
       }),
     }),
+
+  // Watch/Subscribe
+  watch: (id) =>
+    request(`/requests/${id}/watch`, { method: 'POST' }),
+
+  unwatch: (id) =>
+    request(`/requests/${id}/watch`, { method: 'DELETE' }),
+
+  getWatching: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/requests/watching/list${query ? `?${query}` : ''}`);
+  },
+
+  getWatchers: (id) => request(`/requests/${id}/watchers`),
 };
 
 // Votes

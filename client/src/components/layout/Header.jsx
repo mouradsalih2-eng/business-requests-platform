@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import Avatar from '../ui/Avatar';
 import { ProjectSwitcher } from './ProjectSwitcher';
 
@@ -10,6 +11,7 @@ export function Header({ onMenuClick }) {
   const dropdownRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
 
   const handleLogoClick = (e) => {
     if (location.pathname === '/dashboard') {
@@ -33,7 +35,18 @@ export function Header({ onMenuClick }) {
   const profilePictureUrl = user?.profile_picture || null;
 
   return (
-    <header className="h-14 bg-white dark:bg-[#0D1117] border-b border-neutral-100 dark:border-[#30363D] px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30">
+    <>
+    {!isOnline && (
+      <div className="bg-amber-500 text-white text-center text-xs font-medium py-1.5 px-4 sticky top-0 z-40">
+        <span className="inline-flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M12 12h.01" />
+          </svg>
+          You're offline — some features may be unavailable
+        </span>
+      </div>
+    )}
+    <header className={`h-14 bg-white dark:bg-[#0D1117] border-b border-neutral-100 dark:border-[#30363D] px-4 lg:px-6 flex items-center justify-between sticky ${isOnline ? 'top-0' : 'top-7'} z-30`}>
       {/* Left: Menu button (mobile) + Logo */}
       <div className="flex items-center gap-3">
         {/* Hamburger menu - mobile only */}
@@ -131,5 +144,6 @@ export function Header({ onMenuClick }) {
         )}
       </div>
     </header>
+    </>
   );
 }

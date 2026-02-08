@@ -25,18 +25,27 @@ const avatarUpload = multer({
 // ── Settings routes (before :id) ─────────────────────────────
 
 router.get('/me/settings', authenticateToken, asyncHandler(async (req, res) => {
-  const user = await userRepository.findByIdOrFail(req.user.id, 'id, email, name, profile_picture, theme_preference');
+  const user = await userRepository.findByIdOrFail(req.user.id, 'id, email, name, profile_picture, theme_preference, auto_watch_on_comment, auto_watch_on_vote, auth_provider');
   res.json(user);
 }));
 
 router.patch('/me/settings', authenticateToken, asyncHandler(async (req, res) => {
-  const { theme_preference } = req.body;
+  const { theme_preference, auto_watch_on_comment, auto_watch_on_vote } = req.body;
   if (theme_preference && !['light', 'dark', 'system'].includes(theme_preference)) {
     throw new ValidationError('Invalid theme preference');
   }
-  const user = theme_preference
-    ? await userRepository.updateTheme(req.user.id, theme_preference)
-    : await userRepository.findById(req.user.id, 'id, email, name, profile_picture, theme_preference');
+
+  const updates = {};
+  if (theme_preference) updates.theme_preference = theme_preference;
+  if (auto_watch_on_comment !== undefined) updates.auto_watch_on_comment = !!auto_watch_on_comment;
+  if (auto_watch_on_vote !== undefined) updates.auto_watch_on_vote = !!auto_watch_on_vote;
+
+  let user;
+  if (Object.keys(updates).length > 0) {
+    user = await userRepository.updateSettings(req.user.id, updates);
+  } else {
+    user = await userRepository.findById(req.user.id, 'id, email, name, profile_picture, theme_preference, auto_watch_on_comment, auto_watch_on_vote, auth_provider');
+  }
   res.json(user);
 }));
 

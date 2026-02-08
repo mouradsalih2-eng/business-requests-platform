@@ -13,6 +13,7 @@ import { storageService } from '../services/storageService.js';
 import { commentRepository } from '../repositories/commentRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
 import { customFieldValueRepository } from '../repositories/customFieldValueRepository.js';
+import { watcherRepository } from '../repositories/watcherRepository.js';
 import { ValidationError, ForbiddenError, NotFoundError } from '../errors/AppError.js';
 
 const router = Router();
@@ -54,6 +55,20 @@ router.get('/search', authenticateToken, requireProject, asyncHandler(async (req
   res.json(results);
 }));
 
+// Watched requests list — before /:id
+router.get('/watching/list', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+  const watchedIds = await watcherRepository.getWatchedRequestIds(req.user.id);
+  if (watchedIds.length === 0) return res.json([]);
+
+  const requests = await requestRepository.findAll({
+    ...req.query,
+    userId: req.user.id,
+    projectId: req.project.id,
+    ids: watchedIds,
+  });
+  res.json(requests);
+}));
+
 // List all requests
 router.get('/', authenticateToken, requireProject, asyncHandler(async (req, res) => {
   const requests = await requestRepository.findAll({ ...req.query, userId: req.user.id, projectId: req.project.id });
@@ -61,17 +76,19 @@ router.get('/', authenticateToken, requireProject, asyncHandler(async (req, res)
 
   // Batch-fetch all enrichment data in parallel (avoids N+1 queries)
   const requestIds = requests.map(r => r.id);
-  const [cardCustomValues, userVotesMap, readSet] = await Promise.all([
+  const [cardCustomValues, userVotesMap, readSet, watchSet] = await Promise.all([
     customFieldValueRepository.findCardValuesForRequests(requestIds, req.project.id),
     voteRepository.getUserVotesForMultiple(requestIds, req.user.id),
     isAdmin ? adminReadRepository.getReadStatusForMultiple(requestIds, req.user.id) : Promise.resolve(new Set()),
+    watcherRepository.getWatchStatusForMultiple(requestIds, req.user.id),
   ]);
 
-  // Enrich with user votes, read status, and card custom field values (sync — no DB calls)
+  // Enrich with user votes, read status, watch status, and card custom field values (sync — no DB calls)
   const enriched = requests.map((request) => ({
     ...request,
     userVotes: userVotesMap[request.id] || [],
     isRead: isAdmin ? readSet.has(request.id) : true,
+    isWatching: watchSet.has(request.id),
     cardCustomValues: cardCustomValues[request.id] || [],
   }));
 
@@ -83,13 +100,15 @@ router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
   const request = await requestRepository.findByIdWithCounts(req.params.id);
   if (!request) return res.status(404).json({ error: 'Request not found' });
 
-  const [attachments, userVotes, customFieldValues] = await Promise.all([
+  const [attachments, userVotes, customFieldValues, isWatching, watcherCount] = await Promise.all([
     attachmentRepository.findByRequest(req.params.id),
     voteRepository.getUserVoteTypes(req.params.id, req.user.id),
     customFieldValueRepository.findByRequest(req.params.id),
+    watcherRepository.isWatching(req.params.id, req.user.id),
+    watcherRepository.getWatcherCount(req.params.id),
   ]);
 
-  res.json({ ...request, attachments, userVotes, customFieldValues });
+  res.json({ ...request, attachments, userVotes, customFieldValues, isWatching, watcherCount });
 }));
 
 // Get interactions (upvoters, likers, commenters)
@@ -167,9 +186,12 @@ router.post('/', authenticateToken, requireProject, upload.array('attachments', 
     }
   }
 
+  // Auto-watch: creator always watches their own request
+  await watcherRepository.watch(request.id, req.user.id, true);
+
   const attachments = await attachmentRepository.findByRequest(request.id);
   const customFieldValues = await customFieldValueRepository.findByRequest(request.id);
-  res.status(201).json({ ...request, attachments, customFieldValues });
+  res.status(201).json({ ...request, attachments, customFieldValues, isWatching: true });
 }));
 
 // Update request
@@ -244,6 +266,29 @@ router.post('/:id/read', authenticateToken, requireProject, requireAdmin, asyncH
   await requestRepository.findByIdOrFail(req.params.id);
   await adminReadRepository.markRead(req.params.id, req.user.id);
   res.json({ message: 'Request marked as read' });
+}));
+
+// ── Watch/Subscribe endpoints ────────────────────────────────
+
+// Watch a request
+router.post('/:id/watch', authenticateToken, asyncHandler(async (req, res) => {
+  await requestRepository.findByIdOrFail(req.params.id);
+  await watcherRepository.watch(req.params.id, req.user.id, false);
+  const watcherCount = await watcherRepository.getWatcherCount(req.params.id);
+  res.json({ isWatching: true, watcherCount });
+}));
+
+// Unwatch a request
+router.delete('/:id/watch', authenticateToken, asyncHandler(async (req, res) => {
+  await watcherRepository.unwatch(req.params.id, req.user.id);
+  const watcherCount = await watcherRepository.getWatcherCount(req.params.id);
+  res.json({ isWatching: false, watcherCount });
+}));
+
+// Get watchers for a request (admin only)
+router.get('/:id/watchers', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
+  const watchers = await watcherRepository.getWatchers(req.params.id);
+  res.json(watchers);
 }));
 
 export default router;

@@ -6,6 +6,7 @@ import { users } from '../lib/api';
 import ProfileSection from '../components/settings/ProfileSection';
 import PasswordSection from '../components/settings/PasswordSection';
 import ThemeSection from '../components/settings/ThemeSection';
+import NotificationSection from '../components/settings/NotificationSection';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -90,6 +91,7 @@ export default function Settings() {
           {(!user?.auth_provider || user.auth_provider === 'email') && (
             <PasswordSection />
           )}
+          <NotificationSection user={user} onUpdate={handleUserUpdate} />
           <ThemeSection />
         </div>
       </div>

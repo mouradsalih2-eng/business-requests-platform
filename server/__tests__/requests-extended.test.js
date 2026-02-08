@@ -168,6 +168,18 @@ jest.unstable_mockModule('../src/repositories/customFieldValueRepository.js', ()
   },
 }));
 
+jest.unstable_mockModule('../src/repositories/watcherRepository.js', () => ({
+  watcherRepository: {
+    isWatching: jest.fn().mockResolvedValue(false),
+    watch: jest.fn().mockResolvedValue(),
+    unwatch: jest.fn().mockResolvedValue(),
+    getWatchers: jest.fn().mockResolvedValue([]),
+    getWatcherCount: jest.fn().mockResolvedValue(0),
+    getWatchedRequestIds: jest.fn().mockResolvedValue([]),
+    getWatchStatusForMultiple: jest.fn().mockResolvedValue(new Set()),
+  },
+}));
+
 // Dynamic imports AFTER all mocks are registered
 const { default: requestsRoutes } = await import('../src/routes/requests.js');
 const { errorHandler } = await import('../src/middleware/errorHandler.js');

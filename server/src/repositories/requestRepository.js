@@ -46,10 +46,11 @@ export const requestRepository = {
   /**
    * Builds and runs a filtered, sorted query against the requests_with_counts view.
    */
-  async findAll({ status, category, priority, sort, order, myRequests, timePeriod, search, userId, projectId }) {
+  async findAll({ status, category, priority, sort, order, myRequests, timePeriod, search, userId, projectId, ids }) {
     let query = supabase.from('requests_with_counts').select('*');
 
     if (projectId) query = query.eq('project_id', projectId);
+    if (ids?.length) query = query.in('id', ids);
 
     // Exclude archived unless specifically filtering for them
     if (status !== 'archived') {

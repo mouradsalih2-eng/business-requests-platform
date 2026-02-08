@@ -53,6 +53,9 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
   const [deleting, setDeleting] = useState(false);
   const [activityLog, setActivityLog] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+  const [isWatching, setIsWatching] = useState(false);
+  const [watcherCount, setWatcherCount] = useState(0);
+  const [togglingWatch, setTogglingWatch] = useState(false);
 
   // Merge state
   const [showMergeUI, setShowMergeUI] = useState(false);
@@ -63,10 +66,12 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
   const [merging, setMerging] = useState(false);
   const [searchingMerge, setSearchingMerge] = useState(false);
 
-  // Sync status when request changes
+  // Sync status and watch state when request changes
   useEffect(() => {
     if (request) {
       setStatus(request.status);
+      setIsWatching(request.isWatching || false);
+      setWatcherCount(request.watcherCount || 0);
     }
   }, [request]);
 
@@ -197,6 +202,22 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
     }
   };
 
+  const handleToggleWatch = async () => {
+    if (togglingWatch) return;
+    setTogglingWatch(true);
+    try {
+      const result = isWatching
+        ? await requestsApi.unwatch(request.id)
+        : await requestsApi.watch(request.id);
+      setIsWatching(result.isWatching);
+      setWatcherCount(result.watcherCount);
+    } catch (err) {
+      console.error('Failed to toggle watch:', err);
+    } finally {
+      setTogglingWatch(false);
+    }
+  };
+
   // Format date
   const formattedDate = new Date(request.created_at).toLocaleDateString('en-US', {
     month: 'long',
@@ -236,7 +257,7 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
           </div>
         </div>
 
-        {/* Status and Votes - stack on mobile */}
+        {/* Status, Votes, and Watch - stack on mobile */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
           <div className="flex items-center gap-3">
             <span className="text-sm text-neutral-500 dark:text-neutral-400">Status</span>
@@ -252,12 +273,38 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
               <StatusBadge status={request.status} />
             )}
           </div>
-          <VoteButtons
-            requestId={request.id}
-            initialUpvotes={request.upvotes}
-            initialLikes={request.likes}
-            initialUserVotes={request.userVotes || []}
-          />
+          <div className="flex items-center gap-3">
+            <VoteButtons
+              requestId={request.id}
+              initialUpvotes={request.upvotes}
+              initialLikes={request.likes}
+              initialUserVotes={request.userVotes || []}
+            />
+            <button
+              onClick={handleToggleWatch}
+              disabled={togglingWatch}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                isWatching
+                  ? 'bg-[#4F46E5]/10 dark:bg-[#6366F1]/20 text-[#4F46E5] dark:text-[#818CF8] border border-[#4F46E5]/30 dark:border-[#6366F1]/30'
+                  : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-transparent'
+              } ${togglingWatch ? 'opacity-50' : ''}`}
+              title={isWatching ? 'Stop watching' : 'Watch this request'}
+            >
+              {isWatching ? (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5.85 3.5a.75.75 0 00-1.117-1 9.719 9.719 0 00-2.348 4.876.75.75 0 001.479.248A8.219 8.219 0 015.85 3.5zM19.267 2.5a.75.75 0 10-1.118 1 8.22 8.22 0 011.987 4.124.75.75 0 001.48-.248A9.72 9.72 0 0019.266 2.5zM12 2.5A7.25 7.25 0 004.75 9.75c0 2.123-.8 4.057-2.122 5.52a.75.75 0 00.573 1.23h17.598a.75.75 0 00.573-1.23A7.722 7.722 0 0119.25 9.75 7.25 7.25 0 0012 2.5zM9.5 20.5a.75.75 0 00-.75.75c0 1.38 1.455 2.25 3.25 2.25s3.25-.87 3.25-2.25a.75.75 0 00-.75-.75h-5z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+              )}
+              <span className="hidden sm:inline text-xs">{isWatching ? 'Watching' : 'Watch'}</span>
+              {watcherCount > 0 && (
+                <span className="text-xs opacity-70">{watcherCount}</span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Merged Into Indicator */}

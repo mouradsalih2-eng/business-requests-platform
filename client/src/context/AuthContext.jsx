@@ -130,6 +130,7 @@ export function AuthProvider({ children }) {
         setUser(null);
         setSessionWarning(false);
         warningShownRef.current = false;
+        setLoading(false);
       } else if (event === 'SIGNED_IN' && session && !user) {
         // OAuth redirect or fresh sign-in — fetch app user data
         try {
@@ -140,6 +141,8 @@ export function AuthProvider({ children }) {
           }
         } catch {
           // User not provisioned yet or error — will be handled on next page load
+        } finally {
+          if (mounted) setLoading(false);
         }
       } else if (event === 'TOKEN_REFRESHED' && session && !user) {
         // Token was refreshed but we lost the user state — refetch
@@ -148,6 +151,8 @@ export function AuthProvider({ children }) {
           setUser(userData);
         } catch {
           await supabase.auth.signOut();
+        } finally {
+          if (mounted) setLoading(false);
         }
       }
     });

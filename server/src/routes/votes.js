@@ -3,6 +3,8 @@ import { authenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requestRepository } from '../repositories/requestRepository.js';
 import { voteRepository } from '../repositories/voteRepository.js';
+import { watcherRepository } from '../repositories/watcherRepository.js';
+import { userRepository } from '../repositories/userRepository.js';
 import { ValidationError, NotFoundError } from '../errors/AppError.js';
 
 const router = Router();
@@ -18,6 +20,14 @@ router.post('/:requestId/vote', authenticateToken, asyncHandler(async (req, res)
 
   await requestRepository.findByIdOrFail(requestId);
   await voteRepository.create(requestId, req.user.id, type);
+
+  // Auto-watch on vote (if user preference allows)
+  try {
+    const user = await userRepository.findById(req.user.id, 'id, auto_watch_on_vote');
+    if (user?.auto_watch_on_vote) {
+      await watcherRepository.watch(requestId, req.user.id, true);
+    }
+  } catch { /* non-critical */ }
 
   const [counts, userVotes] = await Promise.all([
     voteRepository.getCounts(requestId),
