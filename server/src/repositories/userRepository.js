@@ -7,7 +7,7 @@ function handleError(error, context) {
 }
 
 export const userRepository = {
-  async findById(id, columns = 'id, email, name, role, profile_picture, theme_preference, created_at') {
+  async findById(id, columns = 'id, email, name, role, profile_picture, theme_preference, must_change_password, created_at') {
     const { data, error } = await supabase
       .from('users')
       .select(columns)
@@ -71,15 +71,15 @@ export const userRepository = {
   async findByAuthId(authId) {
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, name, role, profile_picture, theme_preference')
+      .select('id, email, name, role, profile_picture, theme_preference, must_change_password')
       .eq('auth_id', authId)
       .maybeSingle();
     if (error) handleError(error, 'findByAuthId');
     return data;
   },
 
-  async create({ email, password, name, role = 'employee', auth_id, auth_provider = 'email' }) {
-    const insertData = { email, name, role, auth_provider };
+  async create({ email, password, name, role = 'employee', auth_id, auth_provider = 'email', must_change_password = false }) {
+    const insertData = { email, name, role, auth_provider, must_change_password };
     if (password) insertData.password = password;
     if (auth_id) insertData.auth_id = auth_id;
 
@@ -139,6 +139,17 @@ export const userRepository = {
   async delete(id) {
     const { error } = await supabase.from('users').delete().eq('id', id);
     if (error) handleError(error, 'delete');
+  },
+
+  async clearMustChangePassword(id) {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ must_change_password: false })
+      .eq('id', id)
+      .select('id, email, name, role, profile_picture, theme_preference, must_change_password')
+      .single();
+    if (error) handleError(error, 'clearMustChangePassword');
+    return data;
   },
 
   async count() {

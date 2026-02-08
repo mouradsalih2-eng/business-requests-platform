@@ -11,6 +11,19 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/Toast';
 import { useFeatureFlag } from '../../context/FeatureFlagContext';
 import { requests as requestsApi } from '../../lib/api';
+import { useFieldVisibility } from '../../hooks/useFieldVisibility';
+
+function formatCustomFieldValue(cv) {
+  if (cv.value === null || cv.value === undefined) return '';
+  if (cv.field_type === 'checkbox') return cv.value ? 'Yes' : 'No';
+  if (cv.field_type === 'rating') return `${'★'.repeat(Number(cv.value))}${'☆'.repeat(Math.max(0, 5 - Number(cv.value)))}`;
+  if (cv.field_type === 'multi_select' && Array.isArray(cv.value)) return cv.value.join(', ');
+  if (cv.field_type === 'date') {
+    try { return new Date(cv.value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch { return String(cv.value); }
+  }
+  return String(cv.value);
+}
 
 /**
  * RequestDetail modal - Mobile-first responsive design
@@ -33,6 +46,7 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
   const navigate = useNavigate();
   const toast = useToast();
   const mergingEnabled = useFeatureFlag('request_merging');
+  const { isFieldVisible } = useFieldVisibility();
   const [status, setStatus] = useState(request?.status || '');
   const [updating, setUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -217,8 +231,8 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
           <div className="flex items-center gap-2 flex-wrap">
             <CategoryBadge category={request.category} />
             <PriorityBadge priority={request.priority} />
-            {request.team && <TeamBadge team={request.team} />}
-            {request.region && <RegionBadge region={request.region} />}
+            {isFieldVisible('team') && request.team && <TeamBadge team={request.team} />}
+            {isFieldVisible('region') && request.region && <RegionBadge region={request.region} />}
           </div>
         </div>
 
@@ -377,40 +391,52 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
 
         {/* Business Context */}
         <div className="space-y-4">
-          {request.business_problem && (
-            <div>
+          {request.business_problem && (isFieldVisible('business_problem') || isAdmin) && (
+            <div className={!isFieldVisible('business_problem') ? 'opacity-40' : ''}>
               <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">
                 Business Problem
+                {!isFieldVisible('business_problem') && isAdmin && (
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 normal-case tracking-normal">hidden</span>
+                )}
               </h4>
               <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
                 {request.business_problem}
               </p>
             </div>
           )}
-          {request.problem_size && (
-            <div>
+          {request.problem_size && (isFieldVisible('problem_size') || isAdmin) && (
+            <div className={!isFieldVisible('problem_size') ? 'opacity-40' : ''}>
               <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">
                 Problem Size
+                {!isFieldVisible('problem_size') && isAdmin && (
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 normal-case tracking-normal">hidden</span>
+                )}
               </h4>
               <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
                 {request.problem_size}
               </p>
             </div>
           )}
-          {request.business_expectations && (
-            <div>
+          {request.business_expectations && (isFieldVisible('business_expectations') || isAdmin) && (
+            <div className={!isFieldVisible('business_expectations') ? 'opacity-40' : ''}>
               <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">
                 Business Expectations
+                {!isFieldVisible('business_expectations') && isAdmin && (
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 normal-case tracking-normal">hidden</span>
+                )}
               </h4>
               <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
                 {request.business_expectations}
               </p>
             </div>
           )}
-          {request.expected_impact && (
-            <div>
+          {request.expected_impact && (isFieldVisible('expected_impact') || isAdmin) && (
+            <div className={!isFieldVisible('expected_impact') ? 'opacity-40' : ''}>
               <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">
                 Expected Impact
+                {!isFieldVisible('expected_impact') && isAdmin && (
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 normal-case tracking-normal">hidden</span>
+                )}
               </h4>
               <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
                 {request.expected_impact}
@@ -418,6 +444,36 @@ export function RequestDetail({ request, isOpen, onClose, onStatusUpdate, onDele
             </div>
           )}
         </div>
+
+        {/* Custom Field Values */}
+        {request.customFieldValues?.length > 0 && (
+          <div className="space-y-4">
+            {request.customFieldValues
+              .filter(cv => {
+                const visible = isFieldVisible(`custom_${cv.field_id}`);
+                // Regular users only see enabled fields; admins see all
+                return visible || isAdmin;
+              })
+              .map(cv => {
+                const visible = isFieldVisible(`custom_${cv.field_id}`);
+                const displayValue = formatCustomFieldValue(cv);
+                if (!displayValue && !isAdmin) return null;
+                return (
+                  <div key={cv.field_id} className={!visible ? 'opacity-40' : ''}>
+                    <h4 className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1.5">
+                      {cv.field_label}
+                      {!visible && isAdmin && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400 normal-case tracking-normal">hidden</span>
+                      )}
+                    </h4>
+                    <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
+                      {displayValue || <span className="italic text-neutral-400">No value</span>}
+                    </p>
+                  </div>
+                );
+              })}
+          </div>
+        )}
 
         {/* Attachments */}
         {request.attachments?.length > 0 && (

@@ -80,4 +80,40 @@ export const formConfigRepository = {
     const { error } = await supabase.from('project_custom_fields').delete().eq('id', id);
     if (error) handleError(error, 'deleteCustomField');
   },
+
+  async reorderFields(projectId, orderedIds) {
+    // Update sort_order for each custom field based on position in array
+    for (let i = 0; i < orderedIds.length; i++) {
+      const { error } = await supabase
+        .from('project_custom_fields')
+        .update({ sort_order: i })
+        .eq('id', orderedIds[i])
+        .eq('project_id', projectId);
+      if (error) handleError(error, 'reorderFields');
+    }
+  },
+
+  async bulkSave(projectId, { config, customFields }) {
+    // Upsert the form config
+    if (config) {
+      await this.upsertConfig(projectId, config);
+    }
+
+    // Sync custom fields — create new ones, update existing
+    if (customFields && Array.isArray(customFields)) {
+      for (const field of customFields) {
+        if (field.id) {
+          const { id, project_id, created_at, ...updates } = field;
+          await this.updateCustomField(id, updates);
+        } else {
+          await this.createCustomField(projectId, field);
+        }
+      }
+    }
+
+    // Return the full config
+    const savedConfig = await this.getConfig(projectId);
+    const savedFields = await this.getCustomFields(projectId);
+    return { config: savedConfig, customFields: savedFields };
+  },
 };

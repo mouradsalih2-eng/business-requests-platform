@@ -187,7 +187,7 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
       )}
 
       {/* Custom Fields (Level 3) */}
-      {customFields.filter(f => f.visibility === 'all').map(field => (
+      {customFields.filter(f => f.visibility === 'all' && f.is_enabled !== false).map(field => (
         <div key={field.id}>
           <label className={labelClass}>
             {field.label}{field.is_required && ' *'}

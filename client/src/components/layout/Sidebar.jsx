@@ -57,15 +57,6 @@ const adminItems = [
       </svg>
     ),
   },
-  {
-    to: '/project-settings',
-    label: 'Project Settings',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.1-3.26m0 0l-.563-.152A1.125 1.125 0 013.67 10.6v-.01c0-.45.267-.862.68-1.044l9.764-4.303a1.125 1.125 0 01.922 0l9.764 4.303c.413.182.68.594.68 1.044v.01c0 .449-.267.86-.68 1.043l-.563.152m-6.588 3.263l6.588-3.263m-6.588 3.263L12 21.019l-5.58-2.586m11.16-5.173l.563-.152a1.125 1.125 0 00.68-1.043V10.6a1.125 1.125 0 00-.68-1.044L12.922 5.253a1.125 1.125 0 00-.922 0L2.236 9.556a1.125 1.125 0 00-.68 1.044v.01c0 .449.267.86.68 1.043l.563.152" />
-      </svg>
-    ),
-  },
 ];
 
 const superAdminItems = [

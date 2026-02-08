@@ -11,9 +11,12 @@ import { Input } from '../components/ui/Input';
 import { SearchInput } from '../components/ui/SearchInput';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
-import { requests as requestsApi, users as usersApi, featureFlags as featureFlagsApi } from '../lib/api';
+import { requests as requestsApi, users as usersApi, featureFlags as featureFlagsApi, projects as projectsApi } from '../lib/api';
 import { Toggle } from '../components/ui/Toggle';
 import { useFeatureFlags } from '../context/FeatureFlagContext';
+import { FormBuilder } from '../components/form-builder/FormBuilder';
+import { useProject } from '../context/ProjectContext';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * TrendChart - Simple line chart for displaying trends with hover tooltips
@@ -320,6 +323,8 @@ const roleOptions = [
 export function AdminPanel() {
   const navigate = useNavigate();
   const { refresh: refreshFeatureFlags } = useFeatureFlags();
+  const { currentProject, refresh: refreshProjects } = useProject();
+  const { isSuperAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('requests');
   const [requestsList, setRequestsList] = useState([]);
   const [usersList, setUsersList] = useState([]);
@@ -362,6 +367,21 @@ export function AdminPanel() {
 
   // Archive animation state
   const [archivingIds, setArchivingIds] = useState(new Set());
+
+  // Settings tab state
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [projectIcon, setProjectIcon] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  // Initialize settings state from currentProject
+  useEffect(() => {
+    if (currentProject) {
+      setProjectName(currentProject.name || '');
+      setProjectDescription(currentProject.description || '');
+      setProjectIcon(currentProject.icon || '');
+    }
+  }, [currentProject]);
 
   useEffect(() => {
     if (activeTab === 'requests') {
@@ -578,6 +598,41 @@ export function AdminPanel() {
     }
   };
 
+  const handleSaveSettings = async () => {
+    if (!currentProject) return;
+    setSavingSettings(true);
+    try {
+      const updates = {};
+      if (projectName !== currentProject.name) updates.name = projectName;
+      if (projectDescription !== (currentProject.description || '')) updates.description = projectDescription;
+      if (projectIcon !== (currentProject.icon || '')) updates.icon = projectIcon;
+
+      if (Object.keys(updates).length > 0) {
+        await projectsApi.update(currentProject.id, updates);
+        await refreshProjects();
+      }
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!currentProject) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${currentProject.name}"? This action cannot be undone. All requests, roadmap items, and settings for this project will be permanently deleted.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await projectsApi.delete(currentProject.id);
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+    }
+  };
+
   // Stats
   const stats = {
     total: requestsList.length,
@@ -630,61 +685,35 @@ export function AdminPanel() {
           </div>
         </div>
 
-        {/* Tabs - full width on mobile */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab('requests')}
-            className={`
-              flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${activeTab === 'requests'
-                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
-                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
-              }
-            `}
-          >
-            Requests
-            {stats.unread > 0 && activeTab !== 'requests' && (
-              <span className="ml-2 px-1.5 py-0.5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-xs rounded-full">
-                {stats.unread}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`
-              flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${activeTab === 'analytics'
-                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
-                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
-              }
-            `}
-          >
-            Analytics
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`
-              flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${activeTab === 'users'
-                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
-                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
-              }
-            `}
-          >
-            Users
-          </button>
-          <button
-            onClick={() => setActiveTab('flags')}
-            className={`
-              flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${activeTab === 'flags'
-                ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
-                : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-200 dark:hover:bg-[#2D333B] active:bg-neutral-300 dark:active:bg-[#3D444D]'
-              }
-            `}
-          >
-            Flags
-          </button>
+        {/* Tabs - pill container style */}
+        <div className="flex gap-1 p-1 mb-6 bg-white dark:bg-[#161B22] rounded-xl border border-neutral-200 dark:border-[#30363D]/40 overflow-x-auto scrollbar-hide">
+          {[
+            { key: 'requests', label: 'Requests', badge: stats.unread > 0 ? stats.unread : null },
+            { key: 'analytics', label: 'Analytics' },
+            { key: 'users', label: 'Users' },
+            { key: 'form-builder', label: 'Form Builder' },
+            { key: 'flags', label: 'Features' },
+            { key: 'settings', label: 'Settings' },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`
+                flex-shrink-0 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap
+                ${activeTab === tab.key
+                  ? 'bg-neutral-100 dark:bg-[#21262D] text-neutral-900 dark:text-[#E6EDF3]'
+                  : 'text-neutral-500 dark:text-[#6E7681] hover:text-neutral-700 dark:hover:text-[#8B949E]'
+                }
+              `}
+            >
+              {tab.label}
+              {tab.badge && activeTab !== tab.key && (
+                <span className="ml-1.5 px-1.5 py-0.5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-[10px] rounded-full">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {activeTab === 'requests' ? (
@@ -864,49 +893,70 @@ export function AdminPanel() {
                   </div>
                 </div>
 
-                {/* Breakdowns - 2x2 grid */}
+                {/* Breakdowns - dynamic or legacy */}
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {/* Category Breakdown */}
-                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Category</h4>
-                    <div className="space-y-3">
-                      <BreakdownBar label="Bug" value={analyticsData.categoryBreakdown.bug} total={analyticsData.summary.total} color="bg-red-500" />
-                      <BreakdownBar label="New Feature" value={analyticsData.categoryBreakdown.new_feature} total={analyticsData.summary.total} color="bg-indigo-500" />
-                      <BreakdownBar label="Optimization" value={analyticsData.categoryBreakdown.optimization} total={analyticsData.summary.total} color="bg-green-500" />
-                    </div>
-                  </div>
-
-                  {/* Priority Breakdown */}
-                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Priority</h4>
-                    <div className="space-y-3">
-                      <BreakdownBar label="High" value={analyticsData.priorityBreakdown.high} total={analyticsData.summary.total} color="bg-red-500" />
-                      <BreakdownBar label="Medium" value={analyticsData.priorityBreakdown.medium} total={analyticsData.summary.total} color="bg-amber-500" />
-                      <BreakdownBar label="Low" value={analyticsData.priorityBreakdown.low} total={analyticsData.summary.total} color="bg-green-500" />
-                    </div>
-                  </div>
-
-                  {/* Team Breakdown */}
-                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Team</h4>
-                    <div className="space-y-3">
-                      <BreakdownBar label="Manufacturing" value={analyticsData.teamBreakdown?.Manufacturing || 0} total={analyticsData.summary.total} color="bg-indigo-500" />
-                      <BreakdownBar label="Sales" value={analyticsData.teamBreakdown?.Sales || 0} total={analyticsData.summary.total} color="bg-emerald-500" />
-                      <BreakdownBar label="Service" value={analyticsData.teamBreakdown?.Service || 0} total={analyticsData.summary.total} color="bg-orange-500" />
-                      <BreakdownBar label="Energy" value={analyticsData.teamBreakdown?.Energy || 0} total={analyticsData.summary.total} color="bg-cyan-500" />
-                    </div>
-                  </div>
-
-                  {/* Region Breakdown */}
-                  <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
-                    <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Region</h4>
-                    <div className="space-y-3">
-                      <BreakdownBar label="EMEA" value={analyticsData.regionBreakdown?.EMEA || 0} total={analyticsData.summary.total} color="bg-violet-500" />
-                      <BreakdownBar label="North America" value={analyticsData.regionBreakdown?.['North America'] || 0} total={analyticsData.summary.total} color="bg-rose-500" />
-                      <BreakdownBar label="APAC" value={analyticsData.regionBreakdown?.APAC || 0} total={analyticsData.summary.total} color="bg-teal-500" />
-                      <BreakdownBar label="Global" value={analyticsData.regionBreakdown?.Global || 0} total={analyticsData.summary.total} color="bg-slate-500" />
-                    </div>
-                  </div>
+                  {analyticsData.breakdowns ? (
+                    /* Dynamic breakdowns from analytics_fields config */
+                    analyticsData.breakdowns.map((bd) => {
+                      const colors = ['bg-indigo-500', 'bg-emerald-500', 'bg-orange-500', 'bg-cyan-500', 'bg-rose-500', 'bg-violet-500', 'bg-amber-500', 'bg-teal-500', 'bg-red-500', 'bg-green-500'];
+                      const entries = Object.entries(bd.values);
+                      return (
+                        <div key={bd.key} className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                          <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">
+                            By {bd.label}
+                            {bd.type === 'custom' && (
+                              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-[#6366F1]/10 text-[#818CF8] border border-[#6366F1]/20">custom</span>
+                            )}
+                          </h4>
+                          <div className="space-y-3">
+                            {entries.length > 0 ? entries.map(([label, value], i) => (
+                              <BreakdownBar key={label} label={label} value={value} total={analyticsData.summary.total} color={colors[i % colors.length]} />
+                            )) : (
+                              <p className="text-xs text-neutral-400 dark:text-[#6E7681]">No data</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    /* Legacy hardcoded breakdowns */
+                    <>
+                      <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                        <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Category</h4>
+                        <div className="space-y-3">
+                          <BreakdownBar label="Bug" value={analyticsData.categoryBreakdown.bug} total={analyticsData.summary.total} color="bg-red-500" />
+                          <BreakdownBar label="New Feature" value={analyticsData.categoryBreakdown.new_feature} total={analyticsData.summary.total} color="bg-indigo-500" />
+                          <BreakdownBar label="Optimization" value={analyticsData.categoryBreakdown.optimization} total={analyticsData.summary.total} color="bg-green-500" />
+                        </div>
+                      </div>
+                      <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                        <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Priority</h4>
+                        <div className="space-y-3">
+                          <BreakdownBar label="High" value={analyticsData.priorityBreakdown.high} total={analyticsData.summary.total} color="bg-red-500" />
+                          <BreakdownBar label="Medium" value={analyticsData.priorityBreakdown.medium} total={analyticsData.summary.total} color="bg-amber-500" />
+                          <BreakdownBar label="Low" value={analyticsData.priorityBreakdown.low} total={analyticsData.summary.total} color="bg-green-500" />
+                        </div>
+                      </div>
+                      <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                        <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Team</h4>
+                        <div className="space-y-3">
+                          <BreakdownBar label="Manufacturing" value={analyticsData.teamBreakdown?.Manufacturing || 0} total={analyticsData.summary.total} color="bg-indigo-500" />
+                          <BreakdownBar label="Sales" value={analyticsData.teamBreakdown?.Sales || 0} total={analyticsData.summary.total} color="bg-emerald-500" />
+                          <BreakdownBar label="Service" value={analyticsData.teamBreakdown?.Service || 0} total={analyticsData.summary.total} color="bg-orange-500" />
+                          <BreakdownBar label="Energy" value={analyticsData.teamBreakdown?.Energy || 0} total={analyticsData.summary.total} color="bg-cyan-500" />
+                        </div>
+                      </div>
+                      <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
+                        <h4 className="text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-4">By Region</h4>
+                        <div className="space-y-3">
+                          <BreakdownBar label="EMEA" value={analyticsData.regionBreakdown?.EMEA || 0} total={analyticsData.summary.total} color="bg-violet-500" />
+                          <BreakdownBar label="North America" value={analyticsData.regionBreakdown?.['North America'] || 0} total={analyticsData.summary.total} color="bg-rose-500" />
+                          <BreakdownBar label="APAC" value={analyticsData.regionBreakdown?.APAC || 0} total={analyticsData.summary.total} color="bg-teal-500" />
+                          <BreakdownBar label="Global" value={analyticsData.regionBreakdown?.Global || 0} total={analyticsData.summary.total} color="bg-slate-500" />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </>
             ) : (
@@ -1056,6 +1106,11 @@ export function AdminPanel() {
           </div>
         )}
 
+        {/* Form Builder Section */}
+        {activeTab === 'form-builder' && (
+          <FormBuilder />
+        )}
+
         {/* Feature Flags Section */}
         {activeTab === 'flags' && (
           <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-xl p-4 sm:p-6">
@@ -1091,6 +1146,132 @@ export function AdminPanel() {
                     />
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings Section */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            {/* Project Settings */}
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-xl p-4 sm:p-6">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3]">Project Settings</h2>
+                <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
+                  Configure your project name, description, and branding.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                {/* Project Name */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                    Project Name
+                  </label>
+                  <input
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-200 dark:border-[#30363D] rounded-lg bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-colors"
+                    placeholder="My Project"
+                  />
+                </div>
+
+                {/* Slug (read-only) */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                    Slug
+                  </label>
+                  <input
+                    type="text"
+                    value={currentProject?.slug || ''}
+                    readOnly
+                    className="w-full px-3 py-2 border border-neutral-200 dark:border-[#30363D] rounded-lg bg-neutral-50 dark:bg-[#0D1117] text-neutral-500 dark:text-[#8B949E] text-sm cursor-not-allowed"
+                  />
+                  <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">
+                    The slug is auto-generated and cannot be changed.
+                  </p>
+                </div>
+
+                {/* Branding */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                    Branding
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-neutral-100 dark:bg-[#161B22] border border-neutral-200 dark:border-[#30363D] flex items-center justify-center text-2xl">
+                      {projectIcon || currentProject?.icon || (currentProject?.name ? currentProject.name.charAt(0).toUpperCase() : 'P')}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        // Placeholder for icon/emoji picker
+                      }}
+                    >
+                      Change
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    value={projectDescription}
+                    onChange={(e) => setProjectDescription(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-neutral-200 dark:border-[#30363D] rounded-lg bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-colors resize-none"
+                    placeholder="A brief description of this project..."
+                  />
+                </div>
+
+                {/* Save Button */}
+                <div className="pt-2">
+                  <Button
+                    onClick={handleSaveSettings}
+                    disabled={savingSettings}
+                  >
+                    {savingSettings ? (
+                      <span className="flex items-center gap-2">
+                        <Spinner size="sm" />
+                        Saving...
+                      </span>
+                    ) : (
+                      'Save Changes'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Danger Zone */}
+            {isSuperAdmin && (
+              <div className="bg-white dark:bg-[#21262D] border border-red-200 dark:border-red-900/50 rounded-xl p-4 sm:p-6">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h2>
+                  <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
+                    Irreversible and destructive actions.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border border-red-200 dark:border-red-900/50 rounded-lg">
+                  <div>
+                    <h3 className="font-medium text-neutral-900 dark:text-[#E6EDF3]">Delete this project</h3>
+                    <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-0.5">
+                      Once deleted, all data associated with this project will be permanently removed.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleDeleteProject}
+                    className="flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Delete Project
+                  </button>
+                </div>
               </div>
             )}
           </div>

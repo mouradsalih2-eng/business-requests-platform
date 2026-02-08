@@ -102,12 +102,13 @@ router.post('/', authenticateToken, requireAdmin, asyncHandler(async (req, res) 
   });
   if (authError) throw new AppError(`Failed to create auth account: ${authError.message}`, 500);
 
-  // Create our app user linked to Supabase Auth
+  // Create our app user linked to Supabase Auth (must_change_password for email/password users)
   const user = await userRepository.create({
     email,
     name,
     role: userRole,
     auth_id: authData.user.id,
+    must_change_password: true,
   });
   res.status(201).json(user);
 }));

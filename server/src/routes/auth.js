@@ -33,6 +33,13 @@ router.post('/register/resend', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+// Force password change (first login with temp password)
+router.post('/force-password-change', authenticateToken, asyncHandler(async (req, res) => {
+  const { new_password } = req.body;
+  const result = await authService.forcePasswordChange(req.user.id, new_password);
+  res.json(result);
+}));
+
 // Request password change (authenticated)
 router.post('/password/request-change', authenticateToken, asyncHandler(async (req, res) => {
   const { old_password, new_password } = req.body;

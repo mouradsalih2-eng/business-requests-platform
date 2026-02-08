@@ -331,6 +331,7 @@ describe('Users API', () => {
         name: 'New User',
         role: 'employee',
         auth_id: 'mock-uuid',
+        must_change_password: true,
       });
     });
 

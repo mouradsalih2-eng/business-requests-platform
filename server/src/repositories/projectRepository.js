@@ -55,10 +55,10 @@ export const projectRepository = {
     }));
   },
 
-  async create({ name, slug, description, logo_url, created_by }) {
+  async create({ name, slug, description, icon, logo_url, created_by }) {
     const { data, error } = await supabase
       .from('projects')
-      .insert({ name, slug, description, logo_url, created_by })
+      .insert({ name, slug, description, icon, logo_url, created_by })
       .select('*')
       .single();
     if (error) {

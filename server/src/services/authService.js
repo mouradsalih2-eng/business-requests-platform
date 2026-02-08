@@ -42,6 +42,29 @@ export const authService = {
     return user;
   },
 
+  // ── Force password change (first login with temp password) ──
+
+  async forcePasswordChange(userId, newPassword) {
+    if (!newPassword) throw new ValidationError('New password is required');
+    if (newPassword.length < 6) throw new ValidationError('Password must be at least 6 characters long');
+
+    const user = await userRepository.findById(userId, 'id, email, auth_id, must_change_password');
+    if (!user) throw new NotFoundError('User');
+    if (!user.must_change_password) throw new ValidationError('Password change is not required');
+    if (!user.auth_id) throw new AppError('User account configuration error', 500);
+
+    // Update password via Supabase Auth Admin API
+    const { error } = await supabase.auth.admin.updateUserById(user.auth_id, {
+      password: newPassword,
+    });
+    if (error) throw new AppError('Failed to update password', 500);
+
+    // Clear the must_change_password flag
+    const updatedUser = await userRepository.clearMustChangePassword(userId);
+
+    return { user: updatedUser, message: 'Password changed successfully' };
+  },
+
   // ── Registration flow ──────────────────────────────────────
 
   async initiateRegistration(email, password, name) {

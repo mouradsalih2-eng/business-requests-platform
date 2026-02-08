@@ -4,6 +4,7 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+import { ChangePassword } from './pages/ChangePassword';
 import { Dashboard } from './pages/Dashboard';
 import { NewRequest } from './pages/NewRequest';
 import { MyRequests } from './pages/MyRequests';
@@ -11,10 +12,10 @@ import { AdminPanel } from './pages/AdminPanel';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import Settings from './pages/Settings';
 import { Roadmap } from './pages/Roadmap';
-import ProjectSettings from './pages/ProjectSettings';
+import { Onboarding } from './pages/Onboarding';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 
-function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false }) {
+function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false, allowPasswordChange = false }) {
   const { user, loading, isAdmin, isSuperAdmin } = useAuth();
 
   if (loading) {
@@ -27,6 +28,11 @@ function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false })
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Force password change — block all routes except /change-password
+  if (user.must_change_password && !allowPasswordChange) {
+    return <Navigate to="/change-password" replace />;
   }
 
   if (superAdminOnly && !isSuperAdmin) {
@@ -95,6 +101,16 @@ export default function App() {
         }
       />
 
+      {/* Force Password Change (protected but allowed when must_change_password) */}
+      <Route
+        path="/change-password"
+        element={
+          <ProtectedRoute allowPasswordChange>
+            <ChangePassword />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Protected Routes */}
       <Route
         path="/dashboard"
@@ -154,10 +170,10 @@ export default function App() {
       />
 
       <Route
-        path="/project-settings"
+        path="/onboarding"
         element={
           <ProtectedRoute adminOnly>
-            <ProjectSettings />
+            <Onboarding />
           </ProtectedRoute>
         }
       />

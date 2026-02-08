@@ -2,6 +2,8 @@ import { requestRepository } from '../repositories/requestRepository.js';
 import { voteRepository } from '../repositories/voteRepository.js';
 import { commentRepository } from '../repositories/commentRepository.js';
 import { activityRepository } from '../repositories/activityRepository.js';
+import { formConfigRepository } from '../repositories/formConfigRepository.js';
+import { customFieldValueRepository } from '../repositories/customFieldValueRepository.js';
 import { AppError, NotFoundError, ValidationError, ForbiddenError } from '../errors/AppError.js';
 
 export const requestService = {
@@ -58,6 +60,8 @@ export const requestService = {
 
   /**
    * Compute analytics data for the admin dashboard.
+   * If analytics_fields is configured, produces dynamic breakdowns.
+   * Always includes legacy hardcoded keys for backwards compatibility.
    */
   async getAnalytics(period, projectId) {
     const now = new Date();
@@ -98,6 +102,131 @@ export const requestService = {
 
     const count = (fn) => requests.filter(fn).length;
 
+    // Legacy hardcoded breakdowns (always included for backwards compat)
+    const categoryBreakdown = {
+      bug: count(r => r.category === 'bug'),
+      new_feature: count(r => r.category === 'new_feature'),
+      optimization: count(r => r.category === 'optimization'),
+    };
+    const priorityBreakdown = {
+      high: count(r => r.priority === 'high'),
+      medium: count(r => r.priority === 'medium'),
+      low: count(r => r.priority === 'low'),
+    };
+    const teamBreakdown = {
+      Manufacturing: count(r => r.team === 'Manufacturing'),
+      Sales: count(r => r.team === 'Sales'),
+      Service: count(r => r.team === 'Service'),
+      Energy: count(r => r.team === 'Energy'),
+    };
+    const regionBreakdown = {
+      EMEA: count(r => r.region === 'EMEA'),
+      'North America': count(r => r.region === 'North America'),
+      APAC: count(r => r.region === 'APAC'),
+      Global: count(r => r.region === 'Global'),
+    };
+
+    // Load form config to check for analytics_fields
+    let formConfig = null;
+    let customFields = [];
+    try {
+      if (projectId) {
+        formConfig = await formConfigRepository.getConfig(projectId);
+        customFields = await formConfigRepository.getCustomFields(projectId);
+      }
+    } catch { /* ignore — fall back to hardcoded */ }
+
+    const analyticsFieldKeys = formConfig?.analytics_fields;
+
+    // Build dynamic breakdowns if configured
+    let breakdowns;
+    if (Array.isArray(analyticsFieldKeys) && analyticsFieldKeys.length > 0) {
+      breakdowns = [];
+
+      // Built-in field label/option mappings
+      const builtinDefs = {
+        category: {
+          label: 'Category',
+          getOptions: () => formConfig?.custom_categories?.length
+            ? formConfig.custom_categories
+            : [{ value: 'bug', label: 'Bug' }, { value: 'new_feature', label: 'New Feature' }, { value: 'optimization', label: 'Optimization' }],
+          getValue: (r) => r.category,
+        },
+        priority: {
+          label: 'Priority',
+          getOptions: () => formConfig?.custom_priorities?.length
+            ? formConfig.custom_priorities
+            : [{ value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }],
+          getValue: (r) => r.priority,
+        },
+        team: {
+          label: 'Team',
+          getOptions: () => formConfig?.custom_teams?.length
+            ? formConfig.custom_teams
+            : [{ value: 'Manufacturing', label: 'Manufacturing' }, { value: 'Sales', label: 'Sales' }, { value: 'Service', label: 'Service' }, { value: 'Energy', label: 'Energy' }],
+          getValue: (r) => r.team,
+        },
+        region: {
+          label: 'Region',
+          getOptions: () => formConfig?.custom_regions?.length
+            ? formConfig.custom_regions
+            : [{ value: 'EMEA', label: 'EMEA' }, { value: 'North America', label: 'North America' }, { value: 'APAC', label: 'APAC' }, { value: 'Global', label: 'Global' }],
+          getValue: (r) => r.region,
+        },
+      };
+
+      // Process built-in fields in analytics config
+      for (const key of analyticsFieldKeys) {
+        if (builtinDefs[key]) {
+          const def = builtinDefs[key];
+          const values = {};
+          const opts = def.getOptions();
+          for (const opt of opts) {
+            const label = typeof opt === 'string' ? opt : (opt.label || opt.value);
+            const val = typeof opt === 'string' ? opt : opt.value;
+            values[label] = count(r => def.getValue(r) === val);
+          }
+          breakdowns.push({ key, label: def.label, type: 'builtin', values });
+        }
+      }
+
+      // Process custom fields in analytics config
+      const customFieldKeys = analyticsFieldKeys.filter(k => k.startsWith('custom_'));
+      if (customFieldKeys.length > 0) {
+        const customFieldIds = customFieldKeys
+          .map(k => parseInt(k.replace('custom_', ''), 10))
+          .filter(id => !isNaN(id));
+
+        let customFieldValues = [];
+        try {
+          customFieldValues = await customFieldValueRepository.findForAnalytics(startDate, projectId, customFieldIds);
+        } catch { /* ignore */ }
+
+        for (const key of customFieldKeys) {
+          const fieldId = parseInt(key.replace('custom_', ''), 10);
+          const cf = customFields.find(f => f.id === fieldId);
+          if (!cf) continue;
+
+          const values = {};
+          const fieldValues = customFieldValues.filter(v => v.field_id === fieldId);
+
+          for (const v of fieldValues) {
+            // multi_select: value_json is an array; select: value_text is a string
+            if (Array.isArray(v.value_json)) {
+              for (const item of v.value_json) {
+                const label = String(item);
+                values[label] = (values[label] || 0) + 1;
+              }
+            } else if (v.value_text) {
+              values[v.value_text] = (values[v.value_text] || 0) + 1;
+            }
+          }
+
+          breakdowns.push({ key, label: cf.label, type: 'custom', values });
+        }
+      }
+    }
+
     return {
       trendData: data,
       summary: {
@@ -107,28 +236,13 @@ export const requestService = {
         inProgress: count(r => r.status === 'in_progress'),
         archived: count(r => r.status === 'archived'),
       },
-      categoryBreakdown: {
-        bug: count(r => r.category === 'bug'),
-        new_feature: count(r => r.category === 'new_feature'),
-        optimization: count(r => r.category === 'optimization'),
-      },
-      priorityBreakdown: {
-        high: count(r => r.priority === 'high'),
-        medium: count(r => r.priority === 'medium'),
-        low: count(r => r.priority === 'low'),
-      },
-      teamBreakdown: {
-        Manufacturing: count(r => r.team === 'Manufacturing'),
-        Sales: count(r => r.team === 'Sales'),
-        Service: count(r => r.team === 'Service'),
-        Energy: count(r => r.team === 'Energy'),
-      },
-      regionBreakdown: {
-        EMEA: count(r => r.region === 'EMEA'),
-        'North America': count(r => r.region === 'North America'),
-        APAC: count(r => r.region === 'APAC'),
-        Global: count(r => r.region === 'Global'),
-      },
+      // Dynamic breakdowns (undefined if no config)
+      breakdowns,
+      // Legacy keys for backwards compat
+      categoryBreakdown,
+      priorityBreakdown,
+      teamBreakdown,
+      regionBreakdown,
     };
   },
 

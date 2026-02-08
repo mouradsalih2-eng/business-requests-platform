@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { StatusBadge, CategoryBadge, PriorityBadge, TeamBadge, RegionBadge } from '../ui/Badge';
 import { votes as votesApi, requests as requestsApi } from '../../lib/api';
+import { useFieldVisibility } from '../../hooks/useFieldVisibility';
 
 /**
  * RequestCard - Mobile-first responsive card with inline voting
@@ -26,6 +27,7 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
   } = request;
 
   const isUnread = showUnreadBadge && !isRead;
+  const { isFieldVisible } = useFieldVisibility();
 
   const [upvotes, setUpvotes] = useState(initialUpvotes);
   const [likes, setLikes] = useState(initialLikes);
@@ -154,13 +156,12 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
     <article
       onClick={onClick}
       className={`
-        relative group bg-white dark:bg-[#161B22] border rounded-lg p-4 sm:p-5 cursor-pointer
-        transition-all duration-300 ease-out
-        hover:border-neutral-200 dark:hover:border-[#484F58] hover:shadow-sm
+        relative group bg-white dark:bg-[#161B22] border rounded-xl p-4 sm:p-5 cursor-pointer
+        card-lift
         active:scale-[0.99] active:bg-neutral-50 dark:active:bg-[#21262D]
         ${isUnread
-          ? 'border-[#4F46E5]/30 dark:border-[#6366F1]/40 shadow-[0_0_12px_rgba(99,102,241,0.2)] ring-1 ring-[#4F46E5]/20 dark:ring-[#6366F1]/30'
-          : 'border-neutral-100 dark:border-[#30363D]'}
+          ? 'border-[#4F46E5]/30 dark:border-[#6366F1]/40 shadow-[0_0_12px_rgba(99,102,241,0.15)] ring-1 ring-[#4F46E5]/20 dark:ring-[#6366F1]/30'
+          : 'border-neutral-100 dark:border-[#30363D]/60'}
         ${positionChange === 'up' ? 'animate-slide-up ring-2 ring-green-200 dark:ring-green-500/30' : ''}
         ${positionChange === 'down' ? 'animate-slide-down ring-2 ring-amber-200 dark:ring-amber-500/30' : ''}
       `}
@@ -190,8 +191,27 @@ export function RequestCard({ request, onClick, onVoteChange, positionChange, sh
           <span className="hidden sm:inline-flex">
             <PriorityBadge priority={priority} />
           </span>
-          {team && <TeamBadge team={team} />}
-          {region && <RegionBadge region={region} />}
+          {isFieldVisible('team') && team && <TeamBadge team={team} />}
+          {isFieldVisible('region') && region && <RegionBadge region={region} />}
+          {/* Custom field badges (show_on_card fields from list enrichment) */}
+          {request.cardCustomValues?.filter(cv => cv.is_enabled !== false && isFieldVisible(`custom_${cv.field_id}`)).map(cv => {
+            const displayValue = Array.isArray(cv.value) ? cv.value.join(', ') : String(cv.value ?? '');
+            if (!displayValue) return null;
+            return (
+              <span
+                key={cv.field_id}
+                className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border"
+                style={{
+                  backgroundColor: cv.color ? `${cv.color}15` : '#6366F115',
+                  color: cv.color || '#6366F1',
+                  borderColor: cv.color ? `${cv.color}30` : '#6366F130',
+                }}
+              >
+                {cv.color && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: cv.color }} />}
+                {displayValue.length > 20 ? `${displayValue.slice(0, 20)}...` : displayValue}
+              </span>
+            );
+          })}
         </div>
         {/* Status: dot on mobile, badge on desktop */}
         <div className="sm:hidden flex-shrink-0" title={status?.replace('_', ' ')}>

@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Requests Platform - Onboarding Flow Mocks</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: { primary: '#010409', secondary: '#0D1117', tertiary: '#161B22', elevated: '#21262D' },
+            border: { default: '#30363D', muted: '#21262D' },
+            text: { primary: '#E6EDF3', secondary: '#8B949E', muted: '#484F58' },
+            accent: { DEFAULT: '#4F46E5', light: '#6366F1', hover: '#4338CA', muted: '#818CF8' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #010409; color: #E6EDF3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .nav-btn.active { background: #4F46E5; color: white; }
+    .step-dot.active { background: #4F46E5; }
+    .step-dot.completed { background: #3FB950; }
+    .step-line.completed { background: #3FB950; }
+    .step-line.active { background: #4F46E5; }
+    .toggle-on { background: #4F46E5; }
+    .toggle-off { background: #30363D; }
+    .toggle-knob-on { transform: translateX(18px); }
+    .toggle-knob-off { transform: translateX(3px); }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+    .field-card { transition: all 0.2s; }
+    .field-card:hover { background: #21262D; }
+    .tab-btn { transition: all 0.2s; }
+    .tab-btn.active { background: #4F46E5; color: white; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .emoji-btn:hover { background: #21262D; transform: scale(1.2); }
+    .emoji-btn.selected { background: #4F46E5; border-radius: 8px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Navigation Bar -->
+  <nav class="fixed top-0 left-0 right-0 z-50 bg-[#0D1117] border-b border-[#30363D] px-4 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-[#4F46E5] rounded-lg flex items-center justify-center text-white font-bold text-sm">BR</div>
+        <span class="font-semibold text-[#E6EDF3]">Business Requests Platform</span>
+      </div>
+      <div class="flex items-center gap-2 overflow-x-auto">
+        <button onclick="showScreen('login')" class="nav-btn px-3 py-1.5 text-xs rounded-lg bg-[#21262D] text-[#8B949E] hover:text-white whitespace-nowrap">Login</button>
+        <button onclick="showScreen('change-password')" class="nav-btn px-3 py-1.5 text-xs rounded-lg bg-[#21262D] text-[#8B949E] hover:text-white whitespace-nowrap">Change Password</button>
+        <button onclick="showScreen('onboarding')" class="nav-btn px-3 py-1.5 text-xs rounded-lg bg-[#21262D] text-[#8B949E] hover:text-white whitespace-nowrap">Onboarding</button>
+        <button onclick="showScreen('admin')" class="nav-btn px-3 py-1.5 text-xs rounded-lg bg-[#21262D] text-[#8B949E] hover:text-white whitespace-nowrap">Admin Panel</button>
+        <button onclick="showScreen('card-preview')" class="nav-btn px-3 py-1.5 text-xs rounded-lg bg-[#21262D] text-[#8B949E] hover:text-white whitespace-nowrap">Request Cards</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="pt-16">
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SCREEN 1: LOGIN PAGE                       -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="screen-login" class="screen active">
+      <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+          <div class="text-center mb-8">
+            <div class="w-12 h-12 bg-[#4F46E5] rounded-xl mx-auto mb-4 flex items-center justify-center text-white font-bold text-xl">BR</div>
+            <h1 class="text-2xl font-semibold text-[#E6EDF3]">Welcome back</h1>
+            <p class="text-sm text-[#8B949E] mt-1">Sign in to your account</p>
+          </div>
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Email</label>
+              <input type="email" value="john@company.com" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm focus:outline-none focus:border-[#4F46E5]" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Password</label>
+              <input type="password" value="temp1234" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm focus:outline-none focus:border-[#4F46E5]" />
+              <p class="text-xs text-[#8B949E] mt-1">Use the temporary password provided by your admin</p>
+            </div>
+            <button onclick="showScreen('change-password')" class="w-full py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-lg text-sm font-medium transition-colors">
+              Sign In
+            </button>
+            <div class="relative my-4">
+              <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-[#30363D]"></div></div>
+              <div class="relative flex justify-center text-xs"><span class="bg-[#161B22] px-2 text-[#8B949E]">or</span></div>
+            </div>
+            <button class="w-full py-2.5 bg-[#21262D] hover:bg-[#30363D] text-[#E6EDF3] rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-[#30363D]">
+              <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Sign in with Google
+            </button>
+            <button class="w-full py-2.5 bg-[#21262D] hover:bg-[#30363D] text-[#E6EDF3] rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-[#30363D]">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="#E6EDF3"><path d="M3 3h8.5v8.5H3V3zm9.5 0H21v8.5h-8.5V3zM3 12.5h8.5V21H3v-8.5zm9.5 0H21V21h-8.5v-8.5z"/></svg>
+              Sign in with Microsoft
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SCREEN 2: FORCE PASSWORD CHANGE            -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="screen-change-password" class="screen">
+      <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+          <div class="text-center mb-8">
+            <div class="w-12 h-12 bg-amber-500/20 rounded-xl mx-auto mb-4 flex items-center justify-center">
+              <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            </div>
+            <h1 class="text-2xl font-semibold text-[#E6EDF3]">Change Your Password</h1>
+            <p class="text-sm text-[#8B949E] mt-1">Your admin set a temporary password. Please create a new one to continue.</p>
+          </div>
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">New Password</label>
+              <input type="password" value="newpass123" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm focus:outline-none focus:border-[#4F46E5]" />
+              <!-- Strength indicator -->
+              <div class="mt-2 flex gap-1">
+                <div class="h-1 flex-1 rounded-full bg-[#3FB950]"></div>
+                <div class="h-1 flex-1 rounded-full bg-[#3FB950]"></div>
+                <div class="h-1 flex-1 rounded-full bg-[#3FB950]"></div>
+                <div class="h-1 flex-1 rounded-full bg-[#30363D]"></div>
+              </div>
+              <p class="text-xs text-[#3FB950] mt-1">Strong password</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Confirm Password</label>
+              <input type="password" value="newpass123" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm focus:outline-none focus:border-[#4F46E5]" />
+              <p class="text-xs text-[#3FB950] mt-1 flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                Passwords match
+              </p>
+            </div>
+            <div class="space-y-1.5 text-xs text-[#8B949E]">
+              <p class="flex items-center gap-1.5"><svg class="w-3 h-3 text-[#3FB950]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg> At least 8 characters</p>
+              <p class="flex items-center gap-1.5"><svg class="w-3 h-3 text-[#3FB950]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg> Contains uppercase letter</p>
+              <p class="flex items-center gap-1.5"><svg class="w-3 h-3 text-[#3FB950]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg> Contains number</p>
+            </div>
+            <button onclick="showScreen('onboarding')" class="w-full py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-lg text-sm font-medium transition-colors">
+              Set New Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SCREEN 3: ONBOARDING STEPPER               -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="screen-onboarding" class="screen">
+      <div class="max-w-4xl mx-auto p-4 sm:p-6">
+        <!-- Progress bar -->
+        <div class="mb-8">
+          <div class="flex items-center justify-between mb-4">
+            <h1 class="text-xl font-semibold text-[#E6EDF3]">Set Up Your Project</h1>
+            <span class="text-sm text-[#8B949E]">Step <span id="step-current">1</span> of 5</span>
+          </div>
+          <div class="flex items-center gap-0">
+            <div id="dot-1" class="step-dot w-8 h-8 rounded-full bg-[#4F46E5] flex items-center justify-center text-white text-xs font-medium flex-shrink-0 cursor-pointer" onclick="goToStep(1)">1</div>
+            <div id="line-1" class="step-line h-0.5 flex-1 bg-[#30363D]"></div>
+            <div id="dot-2" class="step-dot w-8 h-8 rounded-full bg-[#30363D] flex items-center justify-center text-[#8B949E] text-xs font-medium flex-shrink-0 cursor-pointer" onclick="goToStep(2)">2</div>
+            <div id="line-2" class="step-line h-0.5 flex-1 bg-[#30363D]"></div>
+            <div id="dot-3" class="step-dot w-8 h-8 rounded-full bg-[#30363D] flex items-center justify-center text-[#8B949E] text-xs font-medium flex-shrink-0 cursor-pointer" onclick="goToStep(3)">3</div>
+            <div id="line-3" class="step-line h-0.5 flex-1 bg-[#30363D]"></div>
+            <div id="dot-4" class="step-dot w-8 h-8 rounded-full bg-[#30363D] flex items-center justify-center text-[#8B949E] text-xs font-medium flex-shrink-0 cursor-pointer" onclick="goToStep(4)">4</div>
+            <div id="line-4" class="step-line h-0.5 flex-1 bg-[#30363D]"></div>
+            <div id="dot-5" class="step-dot w-8 h-8 rounded-full bg-[#30363D] flex items-center justify-center text-[#8B949E] text-xs font-medium flex-shrink-0 cursor-pointer" onclick="goToStep(5)">5</div>
+          </div>
+          <div class="flex justify-between mt-2 text-xs text-[#484F58]">
+            <span>Name</span>
+            <span>Members</span>
+            <span>Form</span>
+            <span>Flags</span>
+            <span>Launch</span>
+          </div>
+        </div>
+
+        <!-- Step 1: Name Your Project -->
+        <div id="step-1" class="step-content fade-in">
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-[#E6EDF3] mb-1">Name Your Project</h2>
+            <p class="text-sm text-[#8B949E] mb-6">Choose a name and branding for your project</p>
+            <div class="space-y-5">
+              <div>
+                <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Project Name <span class="text-red-400">*</span></label>
+                <input type="text" value="Acme Engineering" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm focus:outline-none focus:border-[#4F46E5]" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Slug</label>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-[#484F58]">/</span>
+                  <input type="text" value="acme-engineering" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#8B949E] text-sm focus:outline-none focus:border-[#4F46E5]" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-[#E6EDF3] mb-3">Branding</label>
+                <div class="flex gap-4 mb-4">
+                  <button class="px-4 py-2 bg-[#4F46E5] text-white text-sm rounded-lg">Emoji</button>
+                  <button class="px-4 py-2 bg-[#21262D] text-[#8B949E] text-sm rounded-lg hover:text-white">Upload Logo</button>
+                  <button class="px-4 py-2 bg-[#21262D] text-[#8B949E] text-sm rounded-lg hover:text-white">URL</button>
+                </div>
+                <div class="grid grid-cols-8 sm:grid-cols-12 gap-2 p-4 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                  <button class="emoji-btn selected p-2 text-xl rounded transition-all text-center">&#x1F680;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F4BC;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x2699;&#xFE0F;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F4A1;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F3AF;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F527;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F4CA;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F3E2;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x2B50;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F525;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F48E;</button>
+                  <button class="emoji-btn p-2 text-xl rounded transition-all text-center">&#x1F30D;</button>
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Description <span class="text-[#484F58]">(optional)</span></label>
+                <textarea rows="3" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm focus:outline-none focus:border-[#4F46E5] resize-none" placeholder="Describe your project...">Engineering team feature request tracker</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Invite Members -->
+        <div id="step-2" class="step-content" style="display:none">
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6 fade-in">
+            <div class="flex items-center justify-between mb-1">
+              <h2 class="text-lg font-semibold text-[#E6EDF3]">Invite Members</h2>
+              <button class="text-sm text-[#818CF8] hover:underline">Skip for now</button>
+            </div>
+            <p class="text-sm text-[#8B949E] mb-6">Add team members to your project</p>
+
+            <!-- Add member form -->
+            <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D] mb-6">
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div class="sm:col-span-5">
+                  <label class="block text-xs font-medium text-[#8B949E] mb-1">Email</label>
+                  <input type="email" placeholder="user@company.com" class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm" />
+                </div>
+                <div class="sm:col-span-3">
+                  <label class="block text-xs font-medium text-[#8B949E] mb-1">Role</label>
+                  <select class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm">
+                    <option>Member</option>
+                    <option>Admin</option>
+                  </select>
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-medium text-[#8B949E] mb-1">Auth</label>
+                  <select class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm">
+                    <option>Google</option>
+                    <option>Email</option>
+                  </select>
+                </div>
+                <div class="sm:col-span-2 flex items-end">
+                  <button class="w-full px-3 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-lg text-sm font-medium">Add</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Member list -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between p-3 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-[#4F46E5] rounded-full flex items-center justify-center text-white text-xs font-medium">MS</div>
+                  <div>
+                    <p class="text-sm text-[#E6EDF3] font-medium">mourad.salih2@gmail.com</p>
+                    <p class="text-xs text-[#8B949E]">You (Admin)</p>
+                  </div>
+                </div>
+                <span class="text-xs px-2 py-1 bg-[#4F46E5]/20 text-[#818CF8] rounded-full">Owner</span>
+              </div>
+              <div class="flex items-center justify-between p-3 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-medium">JD</div>
+                  <div>
+                    <p class="text-sm text-[#E6EDF3] font-medium">john.doe@company.com</p>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-[#8B949E]">Member</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded">Temp password</span>
+                    </div>
+                  </div>
+                </div>
+                <button class="text-[#484F58] hover:text-red-400 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <div class="flex items-center justify-between p-3 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-rose-600 rounded-full flex items-center justify-center text-white text-xs font-medium">SL</div>
+                  <div>
+                    <p class="text-sm text-[#E6EDF3] font-medium">sarah.lee@company.com</p>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-[#8B949E]">Admin</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Google SSO</span>
+                    </div>
+                  </div>
+                </div>
+                <button class="text-[#484F58] hover:text-red-400 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Form Builder -->
+        <div id="step-3" class="step-content" style="display:none">
+          <div class="fade-in">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 class="text-lg font-semibold text-[#E6EDF3]">Build Your Form</h2>
+                <p class="text-sm text-[#8B949E]">Configure which fields appear on the request form</p>
+              </div>
+              <button class="px-3 py-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm rounded-lg">+ Add Field</button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <!-- Left: Field editor -->
+              <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-4">
+                <h3 class="text-sm font-medium text-[#8B949E] mb-3 uppercase tracking-wider">Fields</h3>
+                <div class="space-y-1">
+                  <!-- Title (locked) -->
+                  <div class="field-card flex items-center gap-3 p-3 rounded-lg bg-[#0D1117] border border-[#30363D]">
+                    <svg class="w-4 h-4 text-[#484F58]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                    <div class="flex-1 flex items-center gap-2">
+                      <span class="text-sm text-[#E6EDF3] font-medium">Title</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-[#21262D] text-[#8B949E] rounded">text</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded">required</span>
+                    </div>
+                    <span class="text-xs text-[#484F58]">locked</span>
+                    <button class="text-[#818CF8]" title="Show on card"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
+                  </div>
+                  <!-- Category -->
+                  <div class="field-card flex items-center gap-3 p-3 rounded-lg cursor-move" draggable="true">
+                    <svg class="w-4 h-4 text-[#484F58] drag-handle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                    <div class="flex-1 flex items-center gap-2">
+                      <span class="text-sm text-[#E6EDF3] font-medium">Category</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-[#21262D] text-[#8B949E] rounded">select</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded">required</span>
+                    </div>
+                    <div class="w-9 h-5 toggle-on rounded-full relative"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+                    <button class="text-[#818CF8]"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
+                    <button class="text-[#484F58] hover:text-[#E6EDF3]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+                  </div>
+                  <!-- Priority -->
+                  <div class="field-card flex items-center gap-3 p-3 rounded-lg cursor-move" draggable="true">
+                    <svg class="w-4 h-4 text-[#484F58] drag-handle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                    <div class="flex-1 flex items-center gap-2">
+                      <span class="text-sm text-[#E6EDF3] font-medium">Priority</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-[#21262D] text-[#8B949E] rounded">select</span>
+                    </div>
+                    <div class="w-9 h-5 toggle-on rounded-full relative"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+                    <button class="text-[#818CF8]"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
+                    <button class="text-[#484F58] hover:text-[#E6EDF3]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+                  </div>
+                  <!-- Team -->
+                  <div class="field-card flex items-center gap-3 p-3 rounded-lg cursor-move" draggable="true">
+                    <svg class="w-4 h-4 text-[#484F58] drag-handle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                    <div class="flex-1 flex items-center gap-2">
+                      <span class="text-sm text-[#E6EDF3] font-medium">Team</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-[#21262D] text-[#8B949E] rounded">select</span>
+                    </div>
+                    <div class="w-9 h-5 toggle-on rounded-full relative"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+                    <button class="text-[#484F58]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg></button>
+                    <button class="text-[#484F58] hover:text-[#E6EDF3]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+                  </div>
+                  <!-- Region (disabled) -->
+                  <div class="field-card flex items-center gap-3 p-3 rounded-lg opacity-50 cursor-move" draggable="true">
+                    <svg class="w-4 h-4 text-[#484F58] drag-handle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                    <div class="flex-1 flex items-center gap-2">
+                      <span class="text-sm text-[#E6EDF3] font-medium">Region</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-[#21262D] text-[#8B949E] rounded">select</span>
+                    </div>
+                    <div class="w-9 h-5 toggle-off rounded-full relative"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-off transition-transform"></div></div>
+                    <button class="text-[#484F58]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg></button>
+                    <button class="text-[#484F58]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+                  </div>
+                  <!-- Business Problem -->
+                  <div class="field-card flex items-center gap-3 p-3 rounded-lg cursor-move" draggable="true">
+                    <svg class="w-4 h-4 text-[#484F58] drag-handle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                    <div class="flex-1 flex items-center gap-2">
+                      <span class="text-sm text-[#E6EDF3] font-medium">Business Problem</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-[#21262D] text-[#8B949E] rounded">textarea</span>
+                    </div>
+                    <div class="w-9 h-5 toggle-on rounded-full relative"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+                    <button class="text-[#484F58]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg></button>
+                    <button class="text-[#484F58] hover:text-[#E6EDF3]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+                  </div>
+                  <!-- Custom field: Urgency -->
+                  <div class="field-card flex items-center gap-3 p-3 rounded-lg border border-dashed border-[#30363D] cursor-move" draggable="true">
+                    <svg class="w-4 h-4 text-[#484F58] drag-handle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+                    <div class="flex-1 flex items-center gap-2">
+                      <span class="text-sm text-[#E6EDF3] font-medium">Urgency Level</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded">custom</span>
+                      <span class="text-xs px-1.5 py-0.5 bg-[#21262D] text-[#8B949E] rounded">rating</span>
+                    </div>
+                    <div class="w-9 h-5 toggle-on rounded-full relative"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+                    <button class="text-[#818CF8]"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
+                    <button class="text-[#484F58] hover:text-[#E6EDF3]"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Live preview -->
+              <div class="space-y-4">
+                <!-- Form Preview -->
+                <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-4">
+                  <h3 class="text-sm font-medium text-[#8B949E] mb-3 uppercase tracking-wider">Form Preview</h3>
+                  <div class="space-y-4 p-4 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                    <div>
+                      <label class="block text-sm font-medium text-[#E6EDF3] mb-1">Title <span class="text-red-400">*</span></label>
+                      <input type="text" class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#484F58] text-sm" placeholder="Enter request title..." />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-sm font-medium text-[#E6EDF3] mb-1">Category <span class="text-red-400">*</span></label>
+                        <select class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#484F58] text-sm"><option>Select...</option></select>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-[#E6EDF3] mb-1">Priority</label>
+                        <select class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#484F58] text-sm"><option>Select...</option></select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-[#E6EDF3] mb-1">Team</label>
+                      <select class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#484F58] text-sm"><option>Select...</option></select>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-[#E6EDF3] mb-1">Business Problem</label>
+                      <textarea rows="2" class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#484F58] text-sm resize-none" placeholder="Describe the problem..."></textarea>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-[#E6EDF3] mb-1">Urgency Level</label>
+                      <div class="flex gap-1">
+                        <span class="text-lg cursor-pointer">&#x2B50;</span>
+                        <span class="text-lg cursor-pointer">&#x2B50;</span>
+                        <span class="text-lg cursor-pointer">&#x2B50;</span>
+                        <span class="text-lg cursor-pointer opacity-30">&#x2B50;</span>
+                        <span class="text-lg cursor-pointer opacity-30">&#x2B50;</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card Preview -->
+                <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-4">
+                  <h3 class="text-sm font-medium text-[#8B949E] mb-3 uppercase tracking-wider">Card Preview</h3>
+                  <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                    <div class="flex items-start justify-between mb-2">
+                      <h4 class="text-sm font-medium text-[#E6EDF3]">Improve search performance</h4>
+                      <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">pending</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                      <span class="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full">New Feature</span>
+                      <span class="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded-full">High</span>
+                      <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full">&#x2B50; 3/5</span>
+                    </div>
+                    <div class="flex items-center gap-4 mt-3 text-xs text-[#484F58]">
+                      <span>12 upvotes</span>
+                      <span>3 comments</span>
+                    </div>
+                  </div>
+                  <p class="text-xs text-[#484F58] mt-2">Fields with the eye icon enabled appear as badges on request cards</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Feature Flags -->
+        <div id="step-4" class="step-content" style="display:none">
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6 fade-in">
+            <h2 class="text-lg font-semibold text-[#E6EDF3] mb-1">Configure Features</h2>
+            <p class="text-sm text-[#8B949E] mb-6">Enable or disable platform features for this project</p>
+            <div class="space-y-4">
+              <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D] flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-medium text-[#E6EDF3]">Roadmap Kanban</h3>
+                  <p class="text-xs text-[#8B949E] mt-0.5">Visual kanban board for tracking request progress through stages</p>
+                </div>
+                <div class="w-9 h-5 toggle-on rounded-full relative cursor-pointer"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+              </div>
+              <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D] flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-medium text-[#E6EDF3]">Request Merging</h3>
+                  <p class="text-xs text-[#8B949E] mt-0.5">Merge duplicate requests and consolidate votes and comments</p>
+                </div>
+                <div class="w-9 h-5 toggle-on rounded-full relative cursor-pointer"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+              </div>
+              <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D] flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-medium text-[#E6EDF3]">Duplicate Detection</h3>
+                  <p class="text-xs text-[#8B949E] mt-0.5">Automatically suggest similar existing requests when creating new ones</p>
+                </div>
+                <div class="w-9 h-5 toggle-off rounded-full relative cursor-pointer"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-off transition-transform"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5: Review & Launch -->
+        <div id="step-5" class="step-content" style="display:none">
+          <div class="fade-in space-y-4">
+            <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6">
+              <h2 class="text-lg font-semibold text-[#E6EDF3] mb-1">Review & Launch</h2>
+              <p class="text-sm text-[#8B949E] mb-6">Review your project setup before launching</p>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Project info -->
+                <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                  <h3 class="text-xs font-medium text-[#8B949E] uppercase tracking-wider mb-3">Project</h3>
+                  <div class="flex items-center gap-3">
+                    <span class="text-3xl">&#x1F680;</span>
+                    <div>
+                      <p class="text-[#E6EDF3] font-medium">Acme Engineering</p>
+                      <p class="text-xs text-[#484F58]">/acme-engineering</p>
+                    </div>
+                  </div>
+                </div>
+                <!-- Members -->
+                <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                  <h3 class="text-xs font-medium text-[#8B949E] uppercase tracking-wider mb-3">Members</h3>
+                  <div class="flex -space-x-2">
+                    <div class="w-8 h-8 bg-[#4F46E5] rounded-full border-2 border-[#0D1117] flex items-center justify-center text-white text-xs font-medium">MS</div>
+                    <div class="w-8 h-8 bg-emerald-600 rounded-full border-2 border-[#0D1117] flex items-center justify-center text-white text-xs font-medium">JD</div>
+                    <div class="w-8 h-8 bg-rose-600 rounded-full border-2 border-[#0D1117] flex items-center justify-center text-white text-xs font-medium">SL</div>
+                  </div>
+                  <p class="text-sm text-[#8B949E] mt-2">3 members (1 admin, 2 members)</p>
+                </div>
+                <!-- Form fields -->
+                <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                  <h3 class="text-xs font-medium text-[#8B949E] uppercase tracking-wider mb-3">Form Fields</h3>
+                  <p class="text-2xl font-semibold text-[#E6EDF3]">6</p>
+                  <p class="text-xs text-[#8B949E]">5 built-in + 1 custom</p>
+                </div>
+                <!-- Features -->
+                <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D]">
+                  <h3 class="text-xs font-medium text-[#8B949E] uppercase tracking-wider mb-3">Features</h3>
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-2 text-sm">
+                      <svg class="w-4 h-4 text-[#3FB950]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                      <span class="text-[#E6EDF3]">Roadmap Kanban</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm">
+                      <svg class="w-4 h-4 text-[#3FB950]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                      <span class="text-[#E6EDF3]">Request Merging</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm">
+                      <svg class="w-4 h-4 text-[#484F58]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                      <span class="text-[#484F58]">Duplicate Detection</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="showScreen('admin')" class="w-full py-3 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/></svg>
+              Launch Project
+            </button>
+          </div>
+        </div>
+
+        <!-- Step Navigation -->
+        <div class="flex justify-between mt-6">
+          <button id="prev-btn" onclick="prevStep()" class="px-4 py-2 bg-[#21262D] text-[#8B949E] rounded-lg text-sm hover:text-white transition-colors" style="visibility:hidden">
+            &larr; Previous
+          </button>
+          <button id="next-btn" onclick="nextStep()" class="px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-lg text-sm font-medium transition-colors">
+            Next &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SCREEN 4: UNIFIED ADMIN PANEL (6 tabs)     -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="screen-admin" class="screen">
+      <div class="max-w-6xl mx-auto p-4 sm:p-6">
+        <div class="flex items-center gap-4 mb-6">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-semibold text-[#E6EDF3]">Admin</h1>
+            <p class="text-sm text-[#8B949E]">Manage your project</p>
+          </div>
+        </div>
+
+        <!-- 6-tab bar -->
+        <div class="flex gap-1 mb-6 overflow-x-auto pb-1">
+          <button onclick="showAdminTab('a-requests')" class="tab-btn active px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap">Requests</button>
+          <button onclick="showAdminTab('a-analytics')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium bg-[#21262D] text-[#8B949E] whitespace-nowrap">Analytics</button>
+          <button onclick="showAdminTab('a-users')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium bg-[#21262D] text-[#8B949E] whitespace-nowrap">Users</button>
+          <button onclick="showAdminTab('a-formbuilder')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium bg-[#21262D] text-[#8B949E] whitespace-nowrap">Form Builder</button>
+          <button onclick="showAdminTab('a-flags')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium bg-[#21262D] text-[#8B949E] whitespace-nowrap">Flags</button>
+          <button onclick="showAdminTab('a-settings')" class="tab-btn px-3 py-2 rounded-lg text-sm font-medium bg-[#21262D] text-[#8B949E] whitespace-nowrap">Settings</button>
+        </div>
+
+        <!-- Tab: Requests -->
+        <div id="tab-a-requests" class="admin-tab">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-[#21262D] border border-[#30363D] rounded-lg p-4 text-center">
+              <div class="text-2xl font-semibold text-[#E6EDF3]">47</div>
+              <div class="text-xs text-[#8B949E]">Total</div>
+            </div>
+            <div class="bg-[#21262D] border border-[#30363D] rounded-lg p-4 text-center">
+              <div class="text-2xl font-semibold text-amber-400">12</div>
+              <div class="text-xs text-[#8B949E]">Pending</div>
+            </div>
+            <div class="bg-[#21262D] border border-[#30363D] rounded-lg p-4 text-center">
+              <div class="text-2xl font-semibold text-indigo-400">8</div>
+              <div class="text-xs text-[#8B949E]">In Progress</div>
+            </div>
+            <div class="bg-[#21262D] border border-[#30363D] rounded-lg p-4 text-center">
+              <div class="text-2xl font-semibold text-[#3FB950]">27</div>
+              <div class="text-xs text-[#8B949E]">Completed</div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <!-- Request with "New" badge -->
+            <div class="p-4 bg-[#161B22] border border-[#30363D] rounded-lg flex items-start gap-3 hover:bg-[#21262D] transition-colors cursor-pointer">
+              <div class="w-2 h-2 bg-[#4F46E5] rounded-full mt-2 flex-shrink-0"></div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-medium text-[#E6EDF3]">Add dark mode toggle to dashboard</h4>
+                  <span class="text-[10px] px-1.5 py-0.5 bg-[#4F46E5] text-white rounded font-medium">NEW</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mt-1.5">
+                  <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">pending</span>
+                  <span class="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full">New Feature</span>
+                  <span class="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded-full">High</span>
+                  <span class="text-xs text-[#484F58]">by John Doe &middot; 2h ago</span>
+                </div>
+              </div>
+              <div class="text-xs text-[#484F58]">5 votes</div>
+            </div>
+            <!-- Regular request -->
+            <div class="p-4 bg-[#161B22] border border-[#30363D] rounded-lg flex items-start gap-3 hover:bg-[#21262D] transition-colors cursor-pointer">
+              <div class="w-2 h-2 bg-transparent rounded-full mt-2 flex-shrink-0"></div>
+              <div class="flex-1">
+                <h4 class="text-sm font-medium text-[#E6EDF3]">Optimize database query performance</h4>
+                <div class="flex flex-wrap items-center gap-2 mt-1.5">
+                  <span class="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full">in_progress</span>
+                  <span class="text-xs px-2 py-0.5 bg-green-500/20 text-green-300 rounded-full">Optimization</span>
+                  <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full">Medium</span>
+                  <span class="text-xs text-[#484F58]">by Sarah Lee &middot; 1d ago</span>
+                </div>
+              </div>
+              <div class="text-xs text-[#484F58]">12 votes</div>
+            </div>
+            <div class="p-4 bg-[#161B22] border border-[#30363D] rounded-lg flex items-start gap-3 hover:bg-[#21262D] transition-colors cursor-pointer">
+              <div class="w-2 h-2 bg-[#4F46E5] rounded-full mt-2 flex-shrink-0"></div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-medium text-[#E6EDF3]">Fix login redirect on mobile Safari</h4>
+                  <span class="text-[10px] px-1.5 py-0.5 bg-[#4F46E5] text-white rounded font-medium">NEW</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mt-1.5">
+                  <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full">pending</span>
+                  <span class="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded-full">Bug</span>
+                  <span class="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded-full">High</span>
+                  <span class="text-xs text-[#484F58]">by Alex Kim &middot; 5h ago</span>
+                </div>
+              </div>
+              <div class="text-xs text-[#484F58]">3 votes</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Analytics (placeholder) -->
+        <div id="tab-a-analytics" class="admin-tab" style="display:none">
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6 text-center">
+            <p class="text-[#8B949E]">Analytics charts and breakdowns render here (same as current AdminPanel analytics tab)</p>
+          </div>
+        </div>
+
+        <!-- Tab: Users (merged Users + Members) -->
+        <div id="tab-a-users" class="admin-tab" style="display:none">
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl">
+            <div class="flex items-center justify-between p-4 border-b border-[#30363D]">
+              <h3 class="font-medium text-[#E6EDF3]">Project Members (3)</h3>
+              <button class="px-3 py-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm rounded-lg">Add User</button>
+            </div>
+            <div class="divide-y divide-[#30363D]">
+              <div class="flex items-center justify-between p-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-[#4F46E5] rounded-full flex items-center justify-center text-white text-xs">MS</div>
+                  <div>
+                    <p class="text-sm text-[#E6EDF3] font-medium">Mourad Salih</p>
+                    <p class="text-xs text-[#8B949E]">mourad.salih2@gmail.com</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="text-xs px-2 py-1 bg-[#4F46E5]/20 text-[#818CF8] rounded-full">admin</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between p-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xs">JD</div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <p class="text-sm text-[#E6EDF3] font-medium">John Doe</p>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded font-medium">Must change password</span>
+                    </div>
+                    <p class="text-xs text-[#8B949E]">john.doe@company.com</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <select class="text-sm bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1 text-[#E6EDF3]">
+                    <option selected>member</option>
+                    <option>admin</option>
+                  </select>
+                  <button class="text-[#484F58] hover:text-red-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between p-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-rose-600 rounded-full flex items-center justify-center text-white text-xs">SL</div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <p class="text-sm text-[#E6EDF3] font-medium">Sarah Lee</p>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Google SSO</span>
+                    </div>
+                    <p class="text-xs text-[#8B949E]">sarah.lee@company.com</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <select class="text-sm bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1 text-[#E6EDF3]">
+                    <option>member</option>
+                    <option selected>admin</option>
+                  </select>
+                  <button class="text-[#484F58] hover:text-red-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Form Builder -->
+        <div id="tab-a-formbuilder" class="admin-tab" style="display:none">
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6 text-center">
+            <p class="text-[#8B949E]">Full Form Builder with split-view (same as Onboarding Step 3)</p>
+            <p class="text-xs text-[#484F58] mt-2">See the Onboarding &rarr; Step 3 for live preview</p>
+          </div>
+        </div>
+
+        <!-- Tab: Flags -->
+        <div id="tab-a-flags" class="admin-tab" style="display:none">
+          <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6">
+            <h2 class="text-lg font-semibold text-[#E6EDF3] mb-4">Feature Flags</h2>
+            <div class="space-y-4">
+              <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D] flex items-center justify-between">
+                <div><h3 class="text-sm font-medium text-[#E6EDF3]">Roadmap Kanban</h3><p class="text-xs text-[#8B949E] mt-0.5">Visual kanban board</p></div>
+                <div class="w-9 h-5 toggle-on rounded-full relative cursor-pointer"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+              </div>
+              <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D] flex items-center justify-between">
+                <div><h3 class="text-sm font-medium text-[#E6EDF3]">Request Merging</h3><p class="text-xs text-[#8B949E] mt-0.5">Merge duplicate requests</p></div>
+                <div class="w-9 h-5 toggle-on rounded-full relative cursor-pointer"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-on transition-transform"></div></div>
+              </div>
+              <div class="p-4 bg-[#0D1117] rounded-lg border border-[#30363D] flex items-center justify-between">
+                <div><h3 class="text-sm font-medium text-[#E6EDF3]">Duplicate Detection</h3><p class="text-xs text-[#8B949E] mt-0.5">Auto-suggest similar requests</p></div>
+                <div class="w-9 h-5 toggle-off rounded-full relative cursor-pointer"><div class="w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] toggle-knob-off transition-transform"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Settings -->
+        <div id="tab-a-settings" class="admin-tab" style="display:none">
+          <div class="space-y-6">
+            <div class="bg-[#161B22] border border-[#30363D] rounded-xl p-6">
+              <h2 class="text-lg font-semibold text-[#E6EDF3] mb-4">Project Settings</h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Project Name</label>
+                  <input type="text" value="Acme Engineering" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Slug</label>
+                  <input type="text" value="acme-engineering" disabled class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#484F58] text-sm cursor-not-allowed" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Branding</label>
+                  <div class="flex items-center gap-3">
+                    <span class="text-3xl">&#x1F680;</span>
+                    <button class="text-xs text-[#818CF8] hover:underline">Change</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-[#E6EDF3] mb-1.5">Description</label>
+                  <textarea rows="3" class="w-full px-3 py-2.5 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm resize-none">Engineering team feature request tracker</textarea>
+                </div>
+                <button class="px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-lg text-sm font-medium">Save Changes</button>
+              </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="bg-[#161B22] border border-red-900/50 rounded-xl p-6">
+              <h2 class="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
+              <p class="text-sm text-[#8B949E] mb-4">Once deleted, a project and all its data cannot be recovered.</p>
+              <button class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium">Delete Project</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SCREEN 5: REQUEST CARD PREVIEW             -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="screen-card-preview" class="screen">
+      <div class="max-w-2xl mx-auto p-4 sm:p-6">
+        <h1 class="text-xl font-semibold text-[#E6EDF3] mb-2">Request Cards with Custom Fields</h1>
+        <p class="text-sm text-[#8B949E] mb-6">Shows how custom field badges appear on request cards</p>
+
+        <div class="space-y-3">
+          <!-- Card 1 -->
+          <div class="p-4 bg-[#161B22] border border-[#30363D] rounded-xl hover:bg-[#21262D] transition-colors cursor-pointer">
+            <div class="flex items-start justify-between mb-2">
+              <h4 class="text-sm font-medium text-[#E6EDF3]">Implement SSO for enterprise clients</h4>
+              <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full flex-shrink-0 ml-2">pending</span>
+            </div>
+            <p class="text-xs text-[#8B949E] mb-3 line-clamp-2">Multiple enterprise clients have requested single sign-on integration with their existing identity providers.</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full">New Feature</span>
+              <span class="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded-full">High</span>
+              <span class="text-xs px-2 py-0.5 bg-cyan-500/20 text-cyan-300 rounded-full">Engineering</span>
+              <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full">&#x2B50; 4/5</span>
+            </div>
+            <div class="flex items-center gap-4 mt-3 text-xs text-[#484F58]">
+              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"/></svg> 24</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/></svg> 8</span>
+              <span>by Alex Kim &middot; 2 days ago</span>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="p-4 bg-[#161B22] border border-[#30363D] rounded-xl hover:bg-[#21262D] transition-colors cursor-pointer">
+            <div class="flex items-start justify-between mb-2">
+              <h4 class="text-sm font-medium text-[#E6EDF3]">Fix export to CSV timeout on large datasets</h4>
+              <span class="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full flex-shrink-0 ml-2">in_progress</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded-full">Bug</span>
+              <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full">Medium</span>
+              <span class="text-xs px-2 py-0.5 bg-violet-500/20 text-violet-300 rounded-full">EMEA</span>
+            </div>
+            <div class="flex items-center gap-4 mt-3 text-xs text-[#484F58]">
+              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"/></svg> 7</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/></svg> 2</span>
+              <span>by Sarah Lee &middot; 5 days ago</span>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="p-4 bg-[#161B22] border border-[#30363D] rounded-xl hover:bg-[#21262D] transition-colors cursor-pointer">
+            <div class="flex items-start justify-between mb-2">
+              <h4 class="text-sm font-medium text-[#E6EDF3]">Add bulk import for legacy data</h4>
+              <span class="text-xs px-2 py-0.5 bg-[#3FB950]/20 text-[#3FB950] rounded-full flex-shrink-0 ml-2">completed</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full">New Feature</span>
+              <span class="text-xs px-2 py-0.5 bg-green-500/20 text-green-300 rounded-full">Low</span>
+              <span class="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full">Sales</span>
+              <span class="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full">&#x2B50; 2/5</span>
+            </div>
+            <div class="flex items-center gap-4 mt-3 text-xs text-[#484F58]">
+              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"/></svg> 15</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/></svg> 4</span>
+              <span>by Mourad S. &middot; 1 week ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 5;
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + screenId).classList.add('active');
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+
+    function goToStep(step) {
+      currentStep = step;
+      updateStepper();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) {
+        currentStep++;
+        updateStepper();
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        currentStep--;
+        updateStepper();
+      }
+    }
+
+    function updateStepper() {
+      // Hide all steps
+      for (let i = 1; i <= totalSteps; i++) {
+        document.getElementById('step-' + i).style.display = i === currentStep ? 'block' : 'none';
+      }
+
+      // Update dots and lines
+      for (let i = 1; i <= totalSteps; i++) {
+        const dot = document.getElementById('dot-' + i);
+        if (i < currentStep) {
+          dot.className = 'step-dot w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 cursor-pointer bg-[#3FB950] text-white';
+          dot.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
+        } else if (i === currentStep) {
+          dot.className = 'step-dot w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 cursor-pointer bg-[#4F46E5] text-white';
+          dot.textContent = i;
+        } else {
+          dot.className = 'step-dot w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 cursor-pointer bg-[#30363D] text-[#8B949E]';
+          dot.textContent = i;
+        }
+
+        if (i < totalSteps) {
+          const line = document.getElementById('line-' + i);
+          if (i < currentStep) {
+            line.className = 'step-line h-0.5 flex-1 bg-[#3FB950]';
+          } else if (i === currentStep) {
+            line.className = 'step-line h-0.5 flex-1 bg-[#4F46E5]';
+          } else {
+            line.className = 'step-line h-0.5 flex-1 bg-[#30363D]';
+          }
+        }
+      }
+
+      // Update step counter
+      document.getElementById('step-current').textContent = currentStep;
+
+      // Update nav buttons
+      document.getElementById('prev-btn').style.visibility = currentStep > 1 ? 'visible' : 'hidden';
+      if (currentStep === totalSteps) {
+        document.getElementById('next-btn').style.display = 'none';
+      } else {
+        document.getElementById('next-btn').style.display = 'block';
+      }
+    }
+
+    function showAdminTab(tabId) {
+      document.querySelectorAll('.admin-tab').forEach(t => t.style.display = 'none');
+      document.getElementById('tab-' + tabId).style.display = 'block';
+      // Update tab buttons
+      document.querySelectorAll('#screen-admin .tab-btn').forEach(b => {
+        b.classList.remove('active');
+        if (!b.classList.contains('active')) {
+          b.className = 'tab-btn px-3 py-2 rounded-lg text-sm font-medium bg-[#21262D] text-[#8B949E] whitespace-nowrap';
+        }
+      });
+      event.target.className = 'tab-btn active px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap';
+    }
+
+    // Toggle click handlers
+    document.querySelectorAll('.toggle-on, .toggle-off').forEach(toggle => {
+      toggle.addEventListener('click', function() {
+        const isOn = this.classList.contains('toggle-on');
+        const knob = this.querySelector('div');
+        if (isOn) {
+          this.classList.remove('toggle-on');
+          this.classList.add('toggle-off');
+          knob.classList.remove('toggle-knob-on');
+          knob.classList.add('toggle-knob-off');
+        } else {
+          this.classList.remove('toggle-off');
+          this.classList.add('toggle-on');
+          knob.classList.remove('toggle-knob-off');
+          knob.classList.add('toggle-knob-on');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

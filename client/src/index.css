@@ -236,3 +236,51 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Brand utilities */
+.gradient-text {
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow-brand {
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.1), 0 0 80px rgba(99, 102, 241, 0.03);
+}
+
+.glow-sm {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.08);
+}
+
+.input-glow:focus {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 0 15px rgba(99, 102, 241, 0.06);
+}
+
+.card-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.dark .card-lift:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Light mode gradient text uses darker palette */
+:root .gradient-text {
+  background: linear-gradient(135deg, #171717 0%, #4F46E5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dark .gradient-text {
+  background: linear-gradient(135deg, #E6EDF3 0%, #818CF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

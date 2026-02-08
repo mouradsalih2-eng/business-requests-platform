@@ -176,6 +176,7 @@ jest.unstable_mockModule('../src/repositories/customFieldValueRepository.js', ()
   customFieldValueRepository: {
     findByRequest: jest.fn().mockResolvedValue([]),
     upsertValues: jest.fn().mockResolvedValue([]),
+    findCardValuesForRequests: jest.fn().mockResolvedValue({}),
   },
 }));
 

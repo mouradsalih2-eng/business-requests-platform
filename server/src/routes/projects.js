@@ -26,9 +26,13 @@ router.get('/:id', authenticateToken, requireProject, asyncHandler(async (req, r
   res.json({ ...req.project, stats });
 }));
 
-// Create project (super_admin only)
-router.post('/', authenticateToken, requireSuperAdmin, asyncHandler(async (req, res) => {
-  const { name, slug, description } = req.body;
+// Create project (admin or super_admin)
+router.post('/', authenticateToken, asyncHandler(async (req, res) => {
+  if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
+    throw new ValidationError('Only admins can create projects');
+  }
+
+  const { name, slug, description, icon, logo_url } = req.body;
   if (!name?.trim()) throw new ValidationError('Project name is required');
   if (!slug?.trim()) throw new ValidationError('Project slug is required');
 
@@ -41,6 +45,8 @@ router.post('/', authenticateToken, requireSuperAdmin, asyncHandler(async (req, 
     name: name.trim(),
     slug: slug.trim().toLowerCase(),
     description: description?.trim() || null,
+    icon: icon || null,
+    logo_url: logo_url || null,
     created_by: req.user.id,
   });
 
@@ -52,10 +58,12 @@ router.post('/', authenticateToken, requireSuperAdmin, asyncHandler(async (req, 
 
 // Update project (project admin or super_admin)
 router.patch('/:id', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
-  const { name, description } = req.body;
+  const { name, description, icon, logo_url } = req.body;
   const updates = {};
   if (name !== undefined) updates.name = name.trim();
   if (description !== undefined) updates.description = description?.trim() || null;
+  if (icon !== undefined) updates.icon = icon;
+  if (logo_url !== undefined) updates.logo_url = logo_url;
 
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: 'No fields to update' });

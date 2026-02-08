@@ -70,6 +70,10 @@ export function useFormConfig() {
     return config[`show_${fieldName}`] !== false;
   };
 
+  // Card fields — which built-in fields show on request cards
+  const cardFields = config?.card_fields || [];
+  const fieldOrder = config?.field_order || [];
+
   return {
     config,
     customFields,
@@ -79,6 +83,8 @@ export function useFormConfig() {
     teams,
     regions,
     showField,
+    cardFields,
+    fieldOrder,
     refresh: loadConfig,
   };
 }

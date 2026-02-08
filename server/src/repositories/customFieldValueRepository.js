@@ -43,6 +43,56 @@ export const customFieldValueRepository = {
       .eq('request_id', requestId);
     if (error) handleError(error, 'deleteByRequest');
   },
+
+  async findCardValuesForRequests(requestIds, projectId) {
+    if (!requestIds.length) return {};
+    // Fetch custom field values for show_on_card fields across multiple requests
+    const { data: cardFields, error: cfError } = await supabase
+      .from('project_custom_fields')
+      .select('id, label, field_type, color, is_enabled')
+      .eq('project_id', projectId)
+      .eq('show_on_card', true);
+    if (cfError) handleError(cfError, 'findCardValuesForRequests.fields');
+    if (!cardFields || cardFields.length === 0) return {};
+
+    const fieldIds = cardFields.map(f => f.id);
+    const { data: values, error: vError } = await supabase
+      .from('request_custom_field_values')
+      .select('request_id, field_id, value_text, value_number, value_boolean, value_date, value_json')
+      .in('request_id', requestIds)
+      .in('field_id', fieldIds);
+    if (vError) handleError(vError, 'findCardValuesForRequests.values');
+
+    // Build a map: { requestId: [{ field_id, field_label, field_type, color, is_enabled, value }] }
+    const fieldMap = new Map(cardFields.map(f => [f.id, f]));
+    const result = {};
+    for (const v of (values || [])) {
+      if (!result[v.request_id]) result[v.request_id] = [];
+      const field = fieldMap.get(v.field_id);
+      if (!field) continue;
+      result[v.request_id].push({
+        field_id: v.field_id,
+        field_label: field.label,
+        field_type: field.field_type,
+        color: field.color,
+        is_enabled: field.is_enabled,
+        value: extractValue(v),
+      });
+    }
+    return result;
+  },
+
+  async findForAnalytics(startDate, projectId, fieldIds) {
+    let query = supabase
+      .from('request_custom_field_values')
+      .select('field_id, value_text, value_json, requests!inner(created_at, project_id)')
+      .in('field_id', fieldIds)
+      .gte('requests.created_at', startDate.toISOString());
+    if (projectId) query = query.eq('requests.project_id', projectId);
+    const { data, error } = await query;
+    if (error) handleError(error, 'findForAnalytics');
+    return data;
+  },
 };
 
 function extractValue(row) {

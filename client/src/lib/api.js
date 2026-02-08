@@ -83,6 +83,12 @@ export const auth = {
       body: JSON.stringify({ token, password }),
     }),
 
+  forcePasswordChange: (newPassword) =>
+    request('/auth/force-password-change', {
+      method: 'POST',
+      body: JSON.stringify({ new_password: newPassword }),
+    }),
+
   logout: async () => {
     await supabase.auth.signOut();
   },
@@ -331,6 +337,18 @@ export const formConfig = {
   deleteField: (fieldId) =>
     request(`/form-config/fields/${fieldId}`, {
       method: 'DELETE',
+    }),
+
+  bulkSave: (data) =>
+    request('/form-config/bulk', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  reorderFields: (orderedIds) =>
+    request('/form-config/fields/reorder', {
+      method: 'PATCH',
+      body: JSON.stringify({ orderedIds }),
     }),
 };
 

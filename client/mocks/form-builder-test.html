@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form Builder — Interactive Test</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class'}</script>
+<style>
+  body { background: #010409; color: #E6EDF3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .drag-over { border-top: 2px solid #6366F1 !important; }
+  .field-dragging { opacity: 0.4; }
+  @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  .slide-in { animation: slideIn 0.2s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .fade-in { animation: fadeIn 0.15s ease-out; }
+  .card-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .card-lift:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+</style>
+</head>
+<body class="min-h-screen p-4 sm:p-6">
+
+<div class="max-w-6xl mx-auto">
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-lg font-bold text-[#E6EDF3]">Form Builder</h1>
+      <p class="text-xs text-[#6E7681]">Configure your request form and card display — all changes reflect instantly in preview</p>
+    </div>
+    <div id="action-log" class="text-[10px] text-[#6E7681] max-w-xs text-right"></div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+    <!-- LEFT: Field Configuration (3 cols) -->
+    <div class="lg:col-span-3 space-y-4">
+      <div class="bg-[#0D1117] border border-[#30363D]/60 rounded-xl p-4 sm:p-5">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-sm font-semibold text-[#E6EDF3]">Standard Fields</h3>
+        </div>
+        <p class="text-xs text-[#6E7681] mb-3">
+          <span class="hidden sm:inline">Built-in fields available for every request. Use the toggle for form visibility and the eye icon for card badge visibility.</span>
+          <span class="sm:hidden">Toggle fields on/off and set card badge visibility.</span>
+        </p>
+
+        <!-- Legend -->
+        <div class="flex items-center gap-3 sm:gap-5 mb-3 px-2 sm:px-3 py-2 bg-[#161B22] rounded-lg text-[10px] text-[#6E7681] uppercase tracking-wider">
+          <span class="flex items-center gap-1.5">
+            <span class="w-6 h-3 rounded-full bg-[#6366F1] inline-block"></span>
+            On form
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3 h-3 text-[#818CF8]" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+            On card
+          </span>
+        </div>
+
+        <!-- Field list (rendered by JS) -->
+        <div id="field-list" class="space-y-1"></div>
+
+        <!-- Add custom field button -->
+        <div class="mt-3 pt-3 border-t border-[#30363D]/40">
+          <button id="add-field-btn" onclick="openAddFieldModal()" class="w-full py-2.5 rounded-lg border border-dashed border-[#30363D]/60 text-[#484F58] text-xs hover:border-[#6366F1]/40 hover:text-[#818CF8] transition-colors flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Add custom field
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Preview (2 cols) -->
+    <div class="lg:col-span-2">
+      <div class="lg:sticky lg:top-6 space-y-4">
+        <!-- Preview tab switcher -->
+        <div class="flex gap-1 p-1 bg-[#0D1117] rounded-xl border border-[#30363D]/40">
+          <button id="tab-form" onclick="switchTab('form')" class="flex-1 py-2 text-xs font-medium rounded-lg transition-all bg-[#21262D] text-[#E6EDF3]">
+            Request Form
+          </button>
+          <button id="tab-card" onclick="switchTab('card')" class="flex-1 py-2 text-xs font-medium rounded-lg transition-all text-[#6E7681] hover:text-[#8B949E]">
+            Request Card
+          </button>
+        </div>
+
+        <!-- Form Preview -->
+        <div id="preview-form" class="bg-[#0D1117] border border-[#30363D]/60 rounded-xl p-4 sm:p-5">
+          <div class="flex items-center gap-2 mb-1">
+            <svg class="w-4 h-4 text-[#6E7681]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <h3 class="text-sm font-semibold text-[#E6EDF3]">New Request Form</h3>
+          </div>
+          <p class="text-[11px] text-[#6E7681] mb-4">This is what users see when submitting a new request</p>
+          <div id="form-preview-content" class="space-y-3.5 p-4 bg-[#161B22] rounded-lg border border-[#30363D]/30"></div>
+          <p class="text-[10px] text-[#484F58] mt-3 flex items-center gap-1.5">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Toggle fields on/off in the field list to control what appears here
+          </p>
+        </div>
+
+        <!-- Card Preview -->
+        <div id="preview-card" class="hidden bg-[#0D1117] border border-[#30363D]/60 rounded-xl p-4 sm:p-5">
+          <div class="flex items-center gap-2 mb-1">
+            <svg class="w-4 h-4 text-[#6E7681]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <h3 class="text-sm font-semibold text-[#E6EDF3]">Request Card</h3>
+          </div>
+          <p class="text-[11px] text-[#6E7681] mb-4">How requests appear in the dashboard list. Fields with the eye icon show as badges.</p>
+          <div id="card-preview-content"></div>
+          <div id="card-badge-summary" class="mt-4"></div>
+          <p class="text-[10px] text-[#484F58] mt-3 flex items-center gap-1.5">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Use the eye icon on each field to toggle card badge visibility
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Field Modal -->
+<div id="add-field-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="fixed inset-0 bg-black/60" onclick="closeAddFieldModal()"></div>
+  <div class="relative bg-[#0D1117] border border-[#30363D] rounded-xl p-5 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto fade-in">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-[#E6EDF3]">Add Custom Field</h3>
+      <button onclick="closeAddFieldModal()" class="p-1.5 text-[#6E7681] hover:text-[#E6EDF3] hover:bg-[#21262D] rounded-lg transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="text-xs text-[#6E7681] -mt-2 mb-5">Create a new field for your request form</p>
+
+    <div class="space-y-5">
+      <!-- Field Name -->
+      <div>
+        <label class="block text-xs font-medium text-[#E6EDF3] mb-1.5">Field Name</label>
+        <input id="new-field-label" type="text" class="w-full px-3 py-2 bg-[#161B22] border border-[#30363D] rounded-lg text-[#E6EDF3] text-sm focus:outline-none focus:border-[#6366F1] placeholder-[#484F58]" placeholder="e.g. Sprint, Customer Tier, Revenue Impact...">
+      </div>
+
+      <!-- Field Type Grid -->
+      <div>
+        <label class="block text-xs font-medium text-[#E6EDF3] mb-2.5">Field Type</label>
+        <div id="type-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+      </div>
+
+      <!-- Options for select type -->
+      <div id="modal-options-section" class="hidden">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-medium text-[#E6EDF3]">Options</label>
+          <button onclick="addModalOption()" class="text-[10px] text-[#818CF8] hover:text-[#A5B4FC] transition-colors">+ Add option</button>
+        </div>
+        <div id="modal-options-list" class="space-y-1.5"></div>
+      </div>
+
+      <!-- Badge Color -->
+      <div>
+        <label class="block text-xs font-medium text-[#E6EDF3] mb-2">Badge Color</label>
+        <div id="modal-colors" class="flex gap-2"></div>
+      </div>
+
+      <!-- Toggles -->
+      <div class="flex items-center gap-6 pt-1">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <button id="modal-required-toggle" onclick="toggleModalRequired()" class="w-9 h-5 rounded-full relative flex-shrink-0 transition-colors bg-[#30363D]">
+            <div class="w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 translate-x-[2px]"></div>
+          </button>
+          <span class="text-xs text-[#E6EDF3]">Required</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <button id="modal-card-toggle" onclick="toggleModalShowOnCard()" class="w-9 h-5 rounded-full relative flex-shrink-0 transition-colors bg-[#6366F1]">
+            <div class="w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 translate-x-[18px]"></div>
+          </button>
+          <span class="text-xs text-[#E6EDF3]">Show on card</span>
+        </label>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center justify-end gap-3 pt-2 border-t border-[#30363D]/60">
+        <button onclick="closeAddFieldModal()" class="px-4 py-2 text-sm text-[#8B949E] hover:text-[#E6EDF3] transition-colors">Cancel</button>
+        <button id="create-field-btn" onclick="createField()" class="px-4 py-2 text-sm font-medium bg-[#6366F1] text-white rounded-lg hover:bg-[#818CF8] disabled:opacity-50 transition-colors">
+          Create Field
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+const BADGE_COLORS = ['#6366F1', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#06B6D4'];
+
+const STATUS_DOT_COLORS = {
+  pending: 'bg-amber-400',
+  backlog: 'bg-blue-400',
+  in_progress: 'bg-sky-500',
+  completed: 'bg-emerald-500',
+  rejected: 'bg-red-500',
+};
+
+let state = {
+  config: {
+    show_team: true,
+    show_region: true,
+    show_business_problem: true,
+    show_problem_size: false,
+    show_business_expectations: false,
+    show_expected_impact: true,
+    card_fields: ['category', 'priority'],
+  },
+  customFields: [
+    { id: 1, label: 'Sprint', name: 'sprint', field_type: 'select', is_required: false, show_on_card: true, color: '#3B82F6', options: [{value:'Sprint 1',label:'Sprint 1'},{value:'Sprint 2',label:'Sprint 2'},{value:'Sprint 3',label:'Sprint 3'}], sort_order: 0 },
+    { id: 2, label: 'Customer Tier', name: 'customer_tier', field_type: 'select', is_required: true, show_on_card: true, color: '#10B981', options: [{value:'Enterprise',label:'Enterprise'},{value:'Pro',label:'Pro'},{value:'Free',label:'Free'}], sort_order: 1 },
+  ],
+  previewTab: 'form',
+  dragFromIndex: null,
+  nextCustomId: 3,
+};
+
+// Modal state
+let modalState = {
+  selectedType: null,
+  selectedColor: '#6366F1',
+  required: false,
+  showOnCard: true,
+  options: [''],
+};
+
+const BUILTIN_FIELDS = [
+  { key: 'title', label: 'Title', type: 'text', required: true, locked: true, showOnCard: true },
+  { key: 'category', label: 'Category', type: 'select', required: true, configKey: null, showOnCard: true },
+  { key: 'priority', label: 'Priority', type: 'select', required: true, configKey: null, showOnCard: true },
+  { key: 'team', label: 'Team', type: 'select', configKey: 'show_team', showOnCard: false },
+  { key: 'region', label: 'Region', type: 'select', configKey: 'show_region', showOnCard: false },
+  { key: 'business_problem', label: 'Business Problem', type: 'textarea', configKey: 'show_business_problem', showOnCard: false },
+  { key: 'problem_size', label: 'Problem Size', type: 'textarea', configKey: 'show_problem_size', showOnCard: false },
+  { key: 'business_expectations', label: 'Business Expectations', type: 'textarea', configKey: 'show_business_expectations', showOnCard: false },
+  { key: 'expected_impact', label: 'Expected Impact', type: 'textarea', configKey: 'show_expected_impact', showOnCard: false },
+];
+
+const FIELD_TYPES = [
+  { value: 'text', label: 'Text', desc: 'Short answer' },
+  { value: 'textarea', label: 'Textarea', desc: 'Long answer' },
+  { value: 'select', label: 'Select', desc: 'Dropdown' },
+  { value: 'number', label: 'Number', desc: 'Numeric value' },
+  { value: 'date', label: 'Date', desc: 'Date picker' },
+  { value: 'checkbox', label: 'Checkbox', desc: 'Yes / No' },
+  { value: 'rating', label: 'Rating', desc: 'Star scale' },
+];
+
+// ============ COMPUTED FIELDS ============
+function getFields() {
+  const cardFieldKeys = state.config.card_fields || [];
+
+  const builtIn = BUILTIN_FIELDS.map(f => ({
+    ...f,
+    enabled: f.configKey ? state.config[f.configKey] !== false : true,
+    showOnCard: f.locked ? true : cardFieldKeys.includes(f.key) || f.showOnCard,
+    isCustom: false,
+  }));
+
+  const sortedCustom = [...state.customFields].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const custom = sortedCustom.map(f => ({
+    ...f,
+    key: `custom_${f.id}`,
+    type: f.field_type,
+    enabled: true,
+    required: f.is_required,
+    showOnCard: f.show_on_card || false,
+    isCustom: true,
+  }));
+
+  const combined = [...builtIn, ...custom];
+
+  // Apply saved field_order if it exists
+  const fieldOrder = state.config.field_order;
+  if (Array.isArray(fieldOrder) && fieldOrder.length > 0) {
+    const orderMap = new Map(fieldOrder.map((key, i) => [key, i]));
+    combined.sort((a, b) => {
+      const aKey = a.key || `custom_${a.id}`;
+      const bKey = b.key || `custom_${b.id}`;
+      const aIdx = orderMap.has(aKey) ? orderMap.get(aKey) : Infinity;
+      const bIdx = orderMap.has(bKey) ? orderMap.get(bKey) : Infinity;
+      return aIdx - bIdx;
+    });
+  }
+
+  return combined;
+}
+
+// ============ ACTION LOG ============
+let actionLogs = [];
+function logAction(msg) {
+  actionLogs.unshift(msg);
+  if (actionLogs.length > 3) actionLogs = actionLogs.slice(0, 3);
+  document.getElementById('action-log').innerHTML = actionLogs.map(l => `<div>${l}</div>`).join('');
+}
+
+// ============ RENDER FIELD LIST ============
+function renderFieldList() {
+  const fields = getFields();
+  const standard = fields.filter(f => !f.isCustom);
+  const custom = fields.filter(f => f.isCustom);
+  const container = document.getElementById('field-list');
+
+  let html = '';
+
+  // Standard fields
+  standard.forEach((field, sIdx) => {
+    const idx = fields.indexOf(field);
+    html += renderFieldRow(field, idx);
+  });
+
+  // Custom fields separator
+  if (custom.length > 0) {
+    html += `
+      <div class="pt-3 mt-2">
+        <div class="flex items-center gap-2 mb-2 px-1">
+          <div class="h-px flex-1 bg-[#30363D]/60"></div>
+          <span class="text-[10px] uppercase tracking-wider text-[#6E7681] font-medium">Custom Fields</span>
+          <span id="custom-count" class="text-[10px] px-1.5 py-0.5 rounded-full bg-[#6366F1]/10 text-[#818CF8] border border-[#6366F1]/20">${custom.length}</span>
+          <div class="h-px flex-1 bg-[#30363D]/60"></div>
+        </div>
+    `;
+    custom.forEach(field => {
+      const idx = fields.indexOf(field);
+      html += renderFieldRow(field, idx);
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function renderFieldRow(field, index) {
+  const isLocked = field.locked;
+  const isEnabled = field.enabled !== false;
+  const isCustom = field.isCustom;
+  const fieldType = field.type || field.field_type;
+  const optionCount = Array.isArray(field.options) ? field.options.length : 0;
+
+  return `
+    <div
+      class="group field-row flex items-center gap-3 py-3 px-3 rounded-lg transition-all duration-200
+        ${isLocked ? 'bg-[#161B22]/50 border border-[#30363D]/30' : 'hover:bg-[#161B22]/40'}
+        ${isCustom ? 'border-l-2 border-l-[#6366F1] bg-[#161B22]/30' : ''}
+        ${!isEnabled ? 'opacity-45' : ''}
+      "
+      draggable="${!isLocked}"
+      data-index="${index}"
+      data-field-key="${field.key || ''}"
+      data-field-id="${field.id || ''}"
+      ondragstart="handleDragStart(event, ${index})"
+      ondragover="handleDragOver(event, ${index})"
+      ondragleave="handleDragLeave(event)"
+      ondrop="handleDrop(event, ${index})"
+    >
+      ${!isLocked ? `
+        <div class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-grab text-[#484F58]">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 6h2v2H8V6zm6 0h2v2h-2V6zM8 11h2v2H8v-2zm6 0h2v2h-2v-2zm-6 5h2v2H8v-2zm6 0h2v2h-2v-2z"/></svg>
+        </div>
+      ` : ''}
+
+      ${isCustom && field.color ? `<div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color:${field.color}"></div>` : ''}
+
+      <div class="flex-1 flex items-center gap-2 min-w-0">
+        <span class="text-sm font-medium truncate ${isEnabled ? 'text-[#E6EDF3]' : 'text-[#8B949E]'}">${field.label}</span>
+        <span class="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-[#21262D] text-[#8B949E] flex-shrink-0">${fieldType}</span>
+        ${field.required ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 flex-shrink-0">req<span class="hidden sm:inline">uired</span></span>' : ''}
+        ${isCustom && optionCount > 0 ? `<span class="hidden sm:inline text-[10px] text-[#6E7681] flex-shrink-0">${optionCount} options</span>` : ''}
+      </div>
+
+      ${isLocked ? '<span class="text-[10px] text-[#484F58] uppercase tracking-wider flex-shrink-0">always visible</span>' : `
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <!-- Eye icon -->
+          <button onclick="toggleCardVisibility('${field.key || ''}', ${field.id || 0}, ${isCustom})" class="p-1.5 rounded-md transition-colors ${
+            field.showOnCard
+              ? 'text-[#818CF8] hover:bg-[#818CF8]/10'
+              : 'text-[#484F58] hover:text-[#8B949E] hover:bg-[#21262D]'
+          }" title="${field.showOnCard ? 'Visible on card' : 'Hidden from card'}">
+            ${field.showOnCard
+              ? '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>'
+              : '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>'
+            }
+          </button>
+
+          ${isCustom ? `
+            <button onclick="editField(${field.id})" class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-md text-[#6E7681] hover:text-[#E6EDF3] hover:bg-[#21262D] transition-all" title="Edit field">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          ` : ''}
+
+          ${!isCustom && field.configKey ? `
+            <button onclick="toggleField('${field.configKey}')" class="w-9 h-5 rounded-full relative flex-shrink-0 transition-colors ${isEnabled ? 'bg-[#6366F1]' : 'bg-[#30363D]'}">
+              <div class="w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${isEnabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}"></div>
+            </button>
+          ` : ''}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+// ============ RENDER FORM PREVIEW ============
+function renderFormPreview() {
+  const fields = getFields();
+  const enabled = fields.filter(f => f.enabled !== false);
+  const standard = enabled.filter(f => !f.isCustom);
+  const custom = enabled.filter(f => f.isCustom);
+  const container = document.getElementById('form-preview-content');
+
+  let html = '';
+
+  standard.forEach(field => {
+    html += renderFormField(field, false);
+  });
+
+  if (custom.length > 0) {
+    html += `
+      <div class="border-t border-[#30363D]/40 pt-3.5 mt-1">
+        <p class="text-[10px] uppercase tracking-wider text-[#6E7681] mb-3 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#6366F1]"></span>
+          Custom Fields
+        </p>
+        <div class="space-y-3.5">
+    `;
+    custom.forEach(field => {
+      html += renderFormField(field, true);
+    });
+    html += '</div></div>';
+  }
+
+  if (enabled.length === 0) {
+    html = '<p class="text-sm text-[#484F58] text-center py-4">No fields enabled</p>';
+  }
+
+  container.innerHTML = html;
+}
+
+function renderFormField(field, showColorDot) {
+  const type = field.type || field.field_type;
+  const label = field.label;
+  const required = field.required || field.is_required;
+  const v = field.validation || {};
+  const placeholder = v.placeholder || `Enter ${label.toLowerCase()}...`;
+
+  // Constraint hints
+  const hints = [];
+  if (v.min_length) hints.push(`min ${v.min_length} chars`);
+  if (v.max_length) hints.push(`max ${v.max_length} chars`);
+  if (v.min !== undefined && v.min !== '') hints.push(`min: ${v.min}`);
+  if (v.max !== undefined && v.max !== '') hints.push(`max: ${v.max}`);
+  if (v.step) hints.push(`step: ${v.step}`);
+  const constraintHint = hints.length > 0 ? hints.join(' &middot; ') : null;
+
+  let inputHtml = '';
+  if (type === 'textarea') {
+    inputHtml = `<textarea rows="${v.rows || 2}" class="w-full px-3 py-2 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#484F58] text-sm resize-none" placeholder="${v.placeholder || `Enter ${label.toLowerCase()}...`}" disabled></textarea>`;
+  } else if (type === 'select' || type === 'multi_select') {
+    const opts = Array.isArray(field.options) ? field.options.map(o => `<option>${typeof o === 'string' ? o : o.label}</option>`).join('') : '';
+    inputHtml = `<select class="w-full px-3 py-2 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#484F58] text-sm appearance-none" disabled><option>${type === 'multi_select' ? `Select ${label.toLowerCase()} (multiple)...` : `Select ${label.toLowerCase()}...`}</option>${opts}</select>`;
+  } else if (type === 'checkbox') {
+    inputHtml = `<label class="flex items-center gap-2"><input type="checkbox" disabled class="w-4 h-4 rounded"><span class="text-sm text-[#484F58]">${v.helper_text || label}</span></label>`;
+  } else if (type === 'rating') {
+    const maxRating = v.max_rating || 5;
+    const half = Math.ceil(maxRating / 2);
+    let stars = '';
+    for (let i = 0; i < maxRating; i++) {
+      stars += `<span class="text-lg ${i < half ? 'text-amber-400' : 'text-[#30363D]'}">&#9733;</span>`;
+    }
+    inputHtml = `<div class="flex gap-1">${stars}</div>`;
+  } else if (type === 'date') {
+    inputHtml = `<input type="date" class="w-full px-3 py-2 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#484F58] text-sm" disabled>`;
+  } else if (type === 'number') {
+    inputHtml = `<input type="number" class="w-full px-3 py-2 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#484F58] text-sm" placeholder="${v.placeholder || '0'}" disabled>`;
+  } else {
+    inputHtml = `<input type="text" class="w-full px-3 py-2 bg-[#0D1117] border border-[#30363D] rounded-lg text-[#484F58] text-sm" placeholder="${placeholder}" disabled>`;
+  }
+
+  return `
+    <div data-form-field="${field.key || `custom_${field.id}`}">
+      <label class="block text-xs font-medium text-[#E6EDF3] mb-1.5">
+        ${showColorDot && field.color ? `<span class="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style="background-color:${field.color}"></span>` : ''}
+        ${label} ${required ? '<span class="text-red-400">*</span>' : ''}
+      </label>
+      ${inputHtml}
+      ${constraintHint ? `<p class="text-[10px] text-[#6E7681] mt-1">${constraintHint}</p>` : ''}
+    </div>
+  `;
+}
+
+// ============ RENDER CARD PREVIEW ============
+function renderCardPreview() {
+  const fields = getFields();
+  const cardFields = fields.filter(f => f.showOnCard && f.enabled !== false);
+  const builtInBadges = cardFields.filter(f => !f.isCustom);
+  const customBadges = cardFields.filter(f => f.isCustom);
+
+  const cardContent = document.getElementById('card-preview-content');
+
+  // Build badges HTML
+  let badgesHtml = '';
+  builtInBadges.forEach(f => {
+    if (f.key === 'category') {
+      badgesHtml += `<span class="inline-flex items-center text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded bg-[#6366F1]/10 text-[#818CF8] border border-[#6366F1]/20">Feature</span>`;
+    } else if (f.key === 'priority') {
+      badgesHtml += `<span class="hidden sm:inline-flex items-center text-xs font-medium px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">High</span>`;
+    } else if (f.key === 'team') {
+      badgesHtml += `<span class="inline-flex items-center text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">Engineering</span>`;
+    } else if (f.key === 'region') {
+      badgesHtml += `<span class="inline-flex items-center text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">EMEA</span>`;
+    }
+  });
+
+  customBadges.forEach(f => {
+    const c = f.color || '#6366F1';
+    badgesHtml += `<span data-card-badge="custom_${f.id}" class="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded" style="background-color:${c}18;color:${c};border:1px solid ${c}30"><span class="truncate max-w-[60px] sm:max-w-none">${f.label}</span></span>`;
+  });
+
+  cardContent.innerHTML = `
+    <article class="bg-[#161B22] border border-[#30363D]/40 rounded-xl p-4 sm:p-5 card-lift">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap flex-1 min-w-0">
+          ${badgesHtml}
+        </div>
+        <div class="sm:hidden flex-shrink-0">
+          <span class="w-2.5 h-2.5 rounded-full inline-block ${STATUS_DOT_COLORS.pending}"></span>
+        </div>
+        <div class="hidden sm:block">
+          <span class="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Pending</span>
+        </div>
+      </div>
+      <h3 class="text-sm sm:text-base font-medium text-[#E6EDF3] mb-1.5 line-clamp-2">Improve search performance for large datasets</h3>
+      <p class="hidden sm:block text-xs text-[#8B949E] mb-4 line-clamp-2">Multiple users have reported slow search results when querying datasets with over 10,000 records...</p>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#30363D]/40">
+        <div class="text-xs text-[#6E7681] truncate">
+          <span class="text-[#8B949E]">Alex Kim</span>
+          <span class="mx-1.5">&middot;</span>
+          <span>2d ago</span>
+        </div>
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <span class="flex items-center gap-1.5 min-w-[44px] sm:min-w-0 justify-center px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg sm:rounded text-xs font-medium bg-[#6366F1] text-white">
+            <svg class="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="currentColor" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+            24
+          </span>
+          <span class="flex items-center gap-1.5 min-w-[44px] sm:min-w-0 justify-center px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg sm:rounded text-xs font-medium bg-[#21262D] text-[#8B949E]">
+            <svg class="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+            8
+          </span>
+          <span class="flex items-center gap-1.5 min-w-[44px] sm:min-w-0 justify-center px-2.5 sm:px-2 py-1.5 sm:py-1 text-xs text-[#6E7681]">
+            <svg class="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            5
+          </span>
+        </div>
+      </div>
+    </article>
+  `;
+
+  // Badge summary
+  const summaryEl = document.getElementById('card-badge-summary');
+  if (cardFields.length > 0) {
+    let badgeSummaryHtml = cardFields.map(f => {
+      const c = f.color;
+      const style = c ? `style="background-color:${c}12;color:${c};border:1px solid ${c}20"` : '';
+      return `<span class="text-[10px] px-2 py-0.5 rounded" ${style}>${f.label}</span>`;
+    }).join('');
+
+    summaryEl.innerHTML = `
+      <div class="p-3 bg-[#161B22]/50 rounded-lg border border-[#30363D]/30">
+        <p class="text-[11px] text-[#6E7681] font-medium mb-2">Visible on card (${cardFields.length} badge${cardFields.length !== 1 ? 's' : ''})</p>
+        <div class="flex flex-wrap gap-1.5">${badgeSummaryHtml}</div>
+        ${cardFields.length > 5 ? '<p class="text-[10px] text-amber-400 mt-2">' + cardFields.length + ' badges may be crowded. Consider 3-4 for best readability.</p>' : ''}
+      </div>
+    `;
+  } else {
+    summaryEl.innerHTML = '';
+  }
+}
+
+// ============ ACTIONS ============
+
+// Toggle built-in field on/off
+function toggleField(configKey) {
+  const currentValue = state.config[configKey] !== false;
+  state.config[configKey] = !currentValue;
+  logAction(`${!currentValue ? 'Enabled' : 'Disabled'} field: ${configKey.replace('show_', '')}`);
+  renderAll();
+}
+
+// Toggle card visibility
+function toggleCardVisibility(key, id, isCustom) {
+  if (isCustom) {
+    state.customFields = state.customFields.map(f =>
+      f.id === id ? { ...f, show_on_card: !f.show_on_card } : f
+    );
+    const field = state.customFields.find(f => f.id === id);
+    logAction(`${field.show_on_card ? 'Show' : 'Hide'} "${field.label}" on card`);
+  } else {
+    const cardFields = state.config.card_fields || [];
+    if (cardFields.includes(key)) {
+      state.config.card_fields = cardFields.filter(k => k !== key);
+      logAction(`Hide "${key}" from card`);
+    } else {
+      state.config.card_fields = [...cardFields, key];
+      logAction(`Show "${key}" on card`);
+    }
+  }
+  renderAll();
+}
+
+// Drag and drop
+function handleDragStart(e, index) {
+  state.dragFromIndex = index;
+  e.dataTransfer.setData('text/plain', index.toString());
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => { e.target.closest('.field-row').classList.add('field-dragging'); }, 0);
+}
+
+function handleDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  // Add visual indicator
+  document.querySelectorAll('.field-row').forEach(el => el.classList.remove('drag-over'));
+  e.target.closest('.field-row')?.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+  e.target.closest('.field-row')?.classList.remove('drag-over');
+}
+
+function handleDrop(e, toIndex) {
+  e.preventDefault();
+  document.querySelectorAll('.field-row').forEach(el => {
+    el.classList.remove('drag-over');
+    el.classList.remove('field-dragging');
+  });
+
+  const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+  if (fromIndex === toIndex) return;
+
+  const fields = getFields();
+  const reordered = [...fields];
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(toIndex, 0, moved);
+
+  // Update state: split back into built-in config and custom sort orders
+  const fieldOrder = reordered.map(f => f.key || `custom_${f.id}`);
+  state.config.field_order = fieldOrder;
+
+  const newCustom = reordered.filter(f => f.isCustom);
+  state.customFields = state.customFields.map(cf => {
+    const match = newCustom.findIndex(u => u.id === cf.id);
+    return match >= 0 ? { ...cf, sort_order: match } : cf;
+  });
+
+  logAction(`Reordered: moved "${moved.label}" to position ${toIndex + 1}`);
+  renderAll();
+}
+
+// Tab switching
+function switchTab(tab) {
+  state.previewTab = tab;
+  document.getElementById('preview-form').classList.toggle('hidden', tab !== 'form');
+  document.getElementById('preview-card').classList.toggle('hidden', tab !== 'card');
+  document.getElementById('tab-form').className = `flex-1 py-2 text-xs font-medium rounded-lg transition-all ${tab === 'form' ? 'bg-[#21262D] text-[#E6EDF3]' : 'text-[#6E7681] hover:text-[#8B949E]'}`;
+  document.getElementById('tab-card').className = `flex-1 py-2 text-xs font-medium rounded-lg transition-all ${tab === 'card' ? 'bg-[#21262D] text-[#E6EDF3]' : 'text-[#6E7681] hover:text-[#8B949E]'}`;
+}
+
+// ============ ADD FIELD MODAL ============
+function openAddFieldModal() {
+  modalState = { selectedType: null, selectedColor: '#6366F1', required: false, showOnCard: true, options: [''] };
+  document.getElementById('add-field-modal').classList.remove('hidden');
+  document.getElementById('new-field-label').value = '';
+  renderModalTypeGrid();
+  renderModalColors();
+  renderModalOptions();
+  updateModalToggles();
+}
+
+function closeAddFieldModal() {
+  document.getElementById('add-field-modal').classList.add('hidden');
+}
+
+function renderModalTypeGrid() {
+  const grid = document.getElementById('type-grid');
+  grid.innerHTML = FIELD_TYPES.map(t => `
+    <button onclick="selectType('${t.value}')" class="p-3 rounded-xl border text-center transition-all ${modalState.selectedType === t.value ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-[#30363D] hover:border-[#6366F1]/50'}">
+      <span class="text-xs font-medium text-[#E6EDF3] block">${t.label}</span>
+      <span class="text-[10px] text-[#6E7681] block">${t.desc}</span>
+    </button>
+  `).join('');
+}
+
+function selectType(type) {
+  modalState.selectedType = type;
+  renderModalTypeGrid();
+  document.getElementById('modal-options-section').classList.toggle('hidden', type !== 'select' && type !== 'multi_select');
+}
+
+function renderModalColors() {
+  const container = document.getElementById('modal-colors');
+  container.innerHTML = BADGE_COLORS.map(c => `
+    <button onclick="selectModalColor('${c}')" class="w-7 h-7 rounded-lg transition-all ${modalState.selectedColor === c ? 'ring-2 ring-offset-2 ring-offset-[#0D1117]' : 'hover:scale-110'}" style="background-color:${c};${modalState.selectedColor === c ? `--tw-ring-color:${c}` : ''}"></button>
+  `).join('');
+}
+
+function selectModalColor(c) {
+  modalState.selectedColor = c;
+  renderModalColors();
+}
+
+function renderModalOptions() {
+  const container = document.getElementById('modal-options-list');
+  container.innerHTML = modalState.options.map((opt, idx) => `
+    <div class="flex items-center gap-2">
+      <input value="${opt}" oninput="updateModalOption(${idx}, this.value)" class="flex-1 px-3 py-1.5 bg-[#161B22] border border-[#30363D] rounded-lg text-[#E6EDF3] text-xs focus:outline-none focus:border-[#6366F1] placeholder-[#484F58]" placeholder="Option ${idx + 1}">
+      ${modalState.options.length > 1 ? `<button onclick="removeModalOption(${idx})" class="p-1 text-[#484F58] hover:text-red-400 transition-colors"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>` : ''}
+    </div>
+  `).join('');
+}
+
+function addModalOption() { modalState.options.push(''); renderModalOptions(); }
+function removeModalOption(idx) { modalState.options.splice(idx, 1); renderModalOptions(); }
+function updateModalOption(idx, val) { modalState.options[idx] = val; }
+
+function toggleModalRequired() {
+  modalState.required = !modalState.required;
+  updateModalToggles();
+}
+
+function toggleModalShowOnCard() {
+  modalState.showOnCard = !modalState.showOnCard;
+  updateModalToggles();
+}
+
+function updateModalToggles() {
+  const reqBtn = document.getElementById('modal-required-toggle');
+  reqBtn.className = `w-9 h-5 rounded-full relative flex-shrink-0 transition-colors ${modalState.required ? 'bg-[#6366F1]' : 'bg-[#30363D]'}`;
+  reqBtn.innerHTML = `<div class="w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${modalState.required ? 'translate-x-[18px]' : 'translate-x-[2px]'}"></div>`;
+
+  const cardBtn = document.getElementById('modal-card-toggle');
+  cardBtn.className = `w-9 h-5 rounded-full relative flex-shrink-0 transition-colors ${modalState.showOnCard ? 'bg-[#6366F1]' : 'bg-[#30363D]'}`;
+  cardBtn.innerHTML = `<div class="w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${modalState.showOnCard ? 'translate-x-[18px]' : 'translate-x-[2px]'}"></div>`;
+}
+
+function createField() {
+  const label = document.getElementById('new-field-label').value.trim();
+  if (!label || !modalState.selectedType) return;
+
+  const name = label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+  const parsedOptions = ['select', 'multi_select'].includes(modalState.selectedType)
+    ? modalState.options.filter(Boolean).map(l => ({ value: l.trim(), label: l.trim() }))
+    : null;
+
+  const newField = {
+    id: state.nextCustomId++,
+    label,
+    name,
+    field_type: modalState.selectedType,
+    is_required: modalState.required,
+    show_on_card: modalState.showOnCard,
+    color: modalState.selectedColor,
+    options: parsedOptions,
+    sort_order: state.customFields.length,
+  };
+
+  state.customFields.push(newField);
+  logAction(`Added custom field: "${label}" (${modalState.selectedType})`);
+  closeAddFieldModal();
+  renderAll();
+}
+
+// Edit field (simplified — just log it)
+function editField(id) {
+  const field = state.customFields.find(f => f.id === id);
+  if (field) logAction(`Opening editor for: "${field.label}"`);
+}
+
+// ============ RENDER ALL ============
+function renderAll() {
+  renderFieldList();
+  renderFormPreview();
+  renderCardPreview();
+}
+
+// Initial render
+renderAll();
+</script>
+</body>
+</html>

@@ -31,6 +31,7 @@ router.patch('/', authenticateToken, requireProject, requireProjectAdmin, asyncH
     show_team, show_region, show_business_problem, show_problem_size,
     show_business_expectations, show_expected_impact,
     custom_categories, custom_priorities, custom_teams, custom_regions, custom_statuses,
+    field_order, card_fields, analytics_fields,
   } = req.body;
 
   const updates = {};
@@ -45,16 +46,34 @@ router.patch('/', authenticateToken, requireProject, requireProjectAdmin, asyncH
   if (custom_teams !== undefined) updates.custom_teams = custom_teams;
   if (custom_regions !== undefined) updates.custom_regions = custom_regions;
   if (custom_statuses !== undefined) updates.custom_statuses = custom_statuses;
+  if (field_order !== undefined) updates.field_order = field_order;
+  if (card_fields !== undefined) updates.card_fields = card_fields;
+  if (analytics_fields !== undefined) updates.analytics_fields = analytics_fields;
 
   const config = await formConfigRepository.upsertConfig(req.project.id, updates);
   res.json(config);
+}));
+
+// Bulk save form config + custom fields (for onboarding stepper)
+router.put('/bulk', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
+  const { config, customFields } = req.body;
+  const result = await formConfigRepository.bulkSave(req.project.id, { config, customFields });
+  res.json(result);
+}));
+
+// Reorder custom fields
+router.patch('/fields/reorder', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
+  const { orderedIds } = req.body;
+  if (!Array.isArray(orderedIds)) throw new ValidationError('orderedIds must be an array');
+  await formConfigRepository.reorderFields(req.project.id, orderedIds);
+  res.json({ message: 'Fields reordered' });
 }));
 
 // ── Custom Fields (Level 3) ──────────────────────────────
 
 // Create custom field
 router.post('/fields', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
-  const { name, label, field_type, options, is_required, sort_order, visibility } = req.body;
+  const { name, label, field_type, options, is_required, sort_order, visibility, show_on_card, icon, color } = req.body;
 
   if (!name?.trim()) throw new ValidationError('Field name is required');
   if (!label?.trim()) throw new ValidationError('Field label is required');
@@ -75,6 +94,9 @@ router.post('/fields', authenticateToken, requireProject, requireProjectAdmin, a
     is_required: is_required || false,
     sort_order: sort_order || 0,
     visibility: visibility || 'all',
+    show_on_card: show_on_card || false,
+    icon: icon || null,
+    color: color || null,
   });
 
   res.status(201).json(field);
@@ -87,13 +109,17 @@ router.patch('/fields/:fieldId', authenticateToken, requireProject, requireProje
   if (!existing) throw new NotFoundError('Custom field');
   if (existing.project_id !== req.project.id) throw new NotFoundError('Custom field');
 
-  const { label, options, is_required, sort_order, visibility } = req.body;
+  const { label, options, is_required, sort_order, visibility, show_on_card, icon, color, is_enabled } = req.body;
   const updates = {};
   if (label !== undefined) updates.label = label;
   if (options !== undefined) updates.options = options;
   if (is_required !== undefined) updates.is_required = is_required;
   if (sort_order !== undefined) updates.sort_order = sort_order;
   if (visibility !== undefined) updates.visibility = visibility;
+  if (show_on_card !== undefined) updates.show_on_card = show_on_card;
+  if (icon !== undefined) updates.icon = icon;
+  if (color !== undefined) updates.color = color;
+  if (is_enabled !== undefined) updates.is_enabled = is_enabled;
 
   const field = await formConfigRepository.updateCustomField(fieldId, updates);
   res.json(field);

@@ -103,6 +103,9 @@ export function AuthProvider({ children }) {
           const userData = await authApi.me();
           setUser(userData);
           updateActivity();
+          if (userData.must_change_password) {
+            navigate('/change-password', { replace: true });
+          }
         }
       } catch {
         // Session invalid or user not found in app — sign out
@@ -156,6 +159,12 @@ export function AuthProvider({ children }) {
     updateActivity();
     warningShownRef.current = false;
     setSessionWarning(false);
+
+    // Force password change redirect
+    if (userData.must_change_password) {
+      navigate('/change-password', { replace: true });
+    }
+
     return userData;
   };
 
