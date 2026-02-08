@@ -98,7 +98,12 @@ export function AuthProvider({ children }) {
 
     async function initAuth() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Race getSession against a timeout — stale sessions can hang on token refresh
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 5000)),
+        ]);
+        const session = sessionResult?.data?.session;
         if (session && mounted) {
           const userData = await authApi.me();
           setUser(userData);
@@ -108,8 +113,8 @@ export function AuthProvider({ children }) {
           }
         }
       } catch {
-        // Session invalid or user not found in app — sign out
-        await supabase.auth.signOut();
+        // Session invalid, timed out, or user not found in app — sign out
+        await supabase.auth.signOut().catch(() => {});
       } finally {
         if (mounted) setLoading(false);
       }
