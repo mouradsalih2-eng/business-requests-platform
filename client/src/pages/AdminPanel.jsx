@@ -352,6 +352,7 @@ export function AdminPanel() {
 
   // Add user modal state
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [inviteAuthMethod, setInviteAuthMethod] = useState('email');
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
@@ -363,6 +364,7 @@ export function AdminPanel() {
 
   // Seed data state
   const [seeding, setSeeding] = useState(false);
+  const [unseeding, setUnseeding] = useState(false);
   const [seedResult, setSeedResult] = useState(null);
 
   // Archive animation state
@@ -558,10 +560,20 @@ export function AdminPanel() {
     setAddingUser(true);
 
     try {
-      const createdUser = await usersApi.create(newUser);
+      const payload = {
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+        auth_method: inviteAuthMethod,
+      };
+      if (inviteAuthMethod === 'email') payload.password = newUser.password;
+      if (currentProject?.id) payload.project_id = currentProject.id;
+
+      const createdUser = await usersApi.invite(payload);
       setUsersList((prev) => [{ ...createdUser, request_count: 0 }, ...prev]);
       setShowAddUserModal(false);
       setNewUser({ name: '', email: '', password: '', role: 'employee' });
+      setInviteAuthMethod('email');
     } catch (err) {
       setAddUserError(err.message || 'Failed to create user');
     } finally {
@@ -582,19 +594,44 @@ export function AdminPanel() {
     try {
       const result = await usersApi.seedData();
       setSeedResult(result);
-      // Reload data after seeding
-      if (activeTab === 'users') {
-        loadUsers();
-      } else if (activeTab === 'requests') {
-        loadRequests();
-      } else if (activeTab === 'analytics') {
-        loadAnalytics();
-      }
+      // Reload relevant data after seeding
+      loadRequests();
+      loadUsers();
+      loadAnalytics();
     } catch (err) {
       console.error('Seed error:', err);
       setSeedResult({ error: err.message || 'Failed to seed data' });
     } finally {
       setSeeding(false);
+    }
+  };
+
+  const handleDeleteSeedData = async () => {
+    if (unseeding) return;
+
+    const confirmed = window.confirm(
+      'This will remove all generated test users and their requests, votes, and comments. Your real data will not be affected. Continue?'
+    );
+    if (!confirmed) return;
+
+    setUnseeding(true);
+    setSeedResult(null);
+    try {
+      const result = await usersApi.deleteSeedData();
+      setSeedResult({
+        deleted: true,
+        ...result.deleted,
+        message: result.message,
+      });
+      // Reload all data
+      loadRequests();
+      loadUsers();
+      loadAnalytics();
+    } catch (err) {
+      console.error('Unseed error:', err);
+      setSeedResult({ error: err.message || 'Failed to remove seed data' });
+    } finally {
+      setUnseeding(false);
     }
   };
 
@@ -853,7 +890,7 @@ export function AdminPanel() {
                 <Spinner size="md" className="mx-auto mb-2" />
                 <p className="text-neutral-500 dark:text-neutral-400 text-sm">Loading analytics...</p>
               </div>
-            ) : analyticsData ? (
+            ) : analyticsData && analyticsData.summary.total > 0 ? (
               <>
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -960,8 +997,16 @@ export function AdminPanel() {
                 </div>
               </>
             ) : (
-              <div className="text-center py-12 text-neutral-500 dark:text-neutral-400">
-                No analytics data available
+              <div className="text-center py-16">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-100 dark:bg-[#161B22] mb-4">
+                  <svg className="w-8 h-8 text-neutral-400 dark:text-[#6E7681]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-neutral-900 dark:text-[#E6EDF3] mb-1">No request data yet</h3>
+                <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto">
+                  Analytics will appear here once requests are submitted. You can generate sample data from the Settings tab.
+                </p>
               </div>
             )}
           </div>
@@ -970,50 +1015,6 @@ export function AdminPanel() {
         {/* Users Section */}
         {activeTab === 'users' && (
           <div className="space-y-4">
-            {/* Seed Data Card */}
-            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h3 className="font-medium text-neutral-900 dark:text-[#E6EDF3]">Generate Test Data</h3>
-                  <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
-                    Populate the platform with sample users, requests, votes, and comments for testing.
-                  </p>
-                </div>
-                <Button
-                  onClick={handleSeedData}
-                  disabled={seeding}
-                  variant="secondary"
-                  className="whitespace-nowrap"
-                >
-                  {seeding ? (
-                    <span className="flex items-center gap-2">
-                      <Spinner size="sm" />
-                      Generating...
-                    </span>
-                  ) : (
-                    'Generate Test Data'
-                  )}
-                </Button>
-              </div>
-
-              {seedResult && (
-                <div className={`mt-4 p-3 rounded-lg text-sm ${
-                  seedResult.error
-                    ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/50'
-                    : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-[#3FB950] border border-green-200 dark:border-green-800/50'
-                }`}>
-                  {seedResult.error ? (
-                    <p>{seedResult.error}</p>
-                  ) : (
-                    <p>
-                      Generated: {seedResult.users} users, {seedResult.requests} requests,{' '}
-                      {seedResult.votes} votes, {seedResult.comments} comments
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* Users Table */}
             <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-lg">
               {/* Users Header */}
@@ -1248,6 +1249,91 @@ export function AdminPanel() {
               </div>
             </div>
 
+            {/* Sample Data */}
+            <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-xl p-4 sm:p-6">
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3]">Sample Data</h2>
+                <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
+                  Generate or remove test data to explore the platform.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {/* Generate */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-neutral-50 dark:bg-[#161B22] rounded-lg border border-neutral-100 dark:border-[#30363D]">
+                  <div>
+                    <h3 className="font-medium text-sm text-neutral-900 dark:text-[#E6EDF3]">Generate Test Data</h3>
+                    <p className="text-xs text-neutral-500 dark:text-[#8B949E] mt-0.5">
+                      Creates 10 users, 115 requests with votes and comments.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleSeedData}
+                    disabled={seeding || unseeding}
+                    variant="secondary"
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    {seeding ? (
+                      <span className="flex items-center gap-2">
+                        <Spinner size="sm" />
+                        Generating...
+                      </span>
+                    ) : (
+                      'Generate'
+                    )}
+                  </Button>
+                </div>
+
+                {/* Remove */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-neutral-50 dark:bg-[#161B22] rounded-lg border border-neutral-100 dark:border-[#30363D]">
+                  <div>
+                    <h3 className="font-medium text-sm text-neutral-900 dark:text-[#E6EDF3]">Remove Test Data</h3>
+                    <p className="text-xs text-neutral-500 dark:text-[#8B949E] mt-0.5">
+                      Deletes all generated users and their requests. Your real data stays intact.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleDeleteSeedData}
+                    disabled={seeding || unseeding}
+                    className="flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {unseeding ? (
+                      <span className="flex items-center gap-2">
+                        <Spinner size="sm" />
+                        Removing...
+                      </span>
+                    ) : (
+                      'Remove Test Data'
+                    )}
+                  </button>
+                </div>
+
+                {/* Result message */}
+                {seedResult && (
+                  <div className={`p-3 rounded-lg text-sm ${
+                    seedResult.error
+                      ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/50'
+                      : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-[#3FB950] border border-green-200 dark:border-green-800/50'
+                  }`}>
+                    {seedResult.error ? (
+                      <p>{seedResult.error}</p>
+                    ) : seedResult.deleted ? (
+                      <p>
+                        Removed: {seedResult.users} users, {seedResult.requests} requests,{' '}
+                        {seedResult.votes} votes, {seedResult.comments} comments
+                      </p>
+                    ) : (
+                      <p>
+                        Generated: {seedResult.users} users, {seedResult.requests} requests,{' '}
+                        {seedResult.votes} votes, {seedResult.comments} comments
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Danger Zone */}
             {isSuperAdmin && (
               <div className="bg-white dark:bg-[#21262D] border border-red-200 dark:border-red-900/50 rounded-xl p-4 sm:p-6">
@@ -1293,8 +1379,9 @@ export function AdminPanel() {
             setShowAddUserModal(false);
             setAddUserError('');
             setNewUser({ name: '', email: '', password: '', role: 'employee' });
+            setInviteAuthMethod('email');
           }}
-          title="Add New User"
+          title="Invite User"
           size="md"
         >
           <form onSubmit={handleAddUser} className="space-y-4">
@@ -1303,6 +1390,35 @@ export function AdminPanel() {
                 {addUserError}
               </div>
             )}
+
+            {/* Auth method toggle */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Sign-in Method</label>
+              <div className="flex p-1 bg-neutral-100 dark:bg-[#21262D] rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setInviteAuthMethod('google')}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                    inviteAuthMethod === 'google'
+                      ? 'bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3] shadow-sm'
+                      : 'text-neutral-500 dark:text-[#8B949E] hover:text-neutral-700 dark:hover:text-[#E6EDF3]'
+                  }`}
+                >
+                  Google SSO
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInviteAuthMethod('email')}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                    inviteAuthMethod === 'email'
+                      ? 'bg-white dark:bg-[#161B22] text-neutral-900 dark:text-[#E6EDF3] shadow-sm'
+                      : 'text-neutral-500 dark:text-[#8B949E] hover:text-neutral-700 dark:hover:text-[#E6EDF3]'
+                  }`}
+                >
+                  Email + Password
+                </button>
+              </div>
+            </div>
 
             <Input
               label="Full Name"
@@ -1321,14 +1437,25 @@ export function AdminPanel() {
               required
             />
 
-            <Input
-              label="Password"
-              type="password"
-              value={newUser.password}
-              onChange={(e) => setNewUser((prev) => ({ ...prev, password: e.target.value }))}
-              placeholder="Minimum 6 characters"
-              required
-            />
+            {inviteAuthMethod === 'email' && (
+              <div>
+                <Input
+                  label="Temporary Password"
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="Minimum 6 characters"
+                  required
+                />
+                <p className="text-xs text-neutral-400 dark:text-[#6E7681] mt-1">User must change password on first login.</p>
+              </div>
+            )}
+
+            {inviteAuthMethod === 'google' && (
+              <p className="text-xs text-neutral-400 dark:text-[#6E7681] p-3 bg-neutral-50 dark:bg-[#21262D] rounded-lg">
+                User will sign in with their Google account. Their account will be linked automatically on first login.
+              </p>
+            )}
 
             <Select
               label="Role"
@@ -1346,12 +1473,13 @@ export function AdminPanel() {
                   setShowAddUserModal(false);
                   setAddUserError('');
                   setNewUser({ name: '', email: '', password: '', role: 'employee' });
+                  setInviteAuthMethod('email');
                 }}
               >
                 Cancel
               </Button>
               <Button type="submit" disabled={addingUser} className="w-full sm:w-auto">
-                {addingUser ? 'Creating...' : 'Create User'}
+                {addingUser ? 'Creating...' : 'Invite User'}
               </Button>
             </div>
           </form>

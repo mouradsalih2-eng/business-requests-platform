@@ -34,4 +34,10 @@ router.get('/status-breakdown', asyncHandler(async (_req, res) => {
   res.json(breakdown);
 }));
 
+// Get members by project with request counts
+router.get('/members-by-project', asyncHandler(async (_req, res) => {
+  const data = await superAdminService.getMembersByProject();
+  res.json(data);
+}));
+
 export default router;

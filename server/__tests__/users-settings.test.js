@@ -22,10 +22,22 @@ const mockUserRepository = {
   updateProfilePicture: jest.fn(),
   delete: jest.fn(),
   count: jest.fn(),
+  updateAuthId: jest.fn(),
+  findAdmins: jest.fn(),
 };
 
 jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
   userRepository: mockUserRepository,
+}));
+
+jest.unstable_mockModule('../src/repositories/projectMemberRepository.js', () => ({
+  projectMemberRepository: {
+    addMember: jest.fn(),
+    removeMember: jest.fn(),
+    findByProjectAndUser: jest.fn(),
+    findByProject: jest.fn(),
+    updateRole: jest.fn(),
+  },
 }));
 
 jest.unstable_mockModule('../src/db/supabase.js', () => ({
@@ -43,6 +55,7 @@ jest.unstable_mockModule('../src/db/supabase.js', () => ({
 
 jest.unstable_mockModule('../src/services/seedService.js', () => ({
   seedDatabase: jest.fn(),
+  unseedDatabase: jest.fn(),
 }));
 
 jest.unstable_mockModule('bcryptjs', () => ({
@@ -68,6 +81,15 @@ jest.unstable_mockModule('../src/middleware/auth.js', () => ({
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
     next();
   },
+}));
+
+jest.unstable_mockModule('../src/middleware/project.js', () => ({
+  requireSuperAdmin: (req, res, next) => {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ error: 'Super admin access required' });
+    next();
+  },
+  requireProject: (req, res, next) => next(),
+  requireProjectAdmin: (req, res, next) => next(),
 }));
 
 // Mock storageService instead of fs (files are now in Supabase Storage)

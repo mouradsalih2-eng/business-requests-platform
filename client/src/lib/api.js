@@ -239,10 +239,25 @@ export const users = {
       body: JSON.stringify({ code, new_password: newPassword }),
     }),
 
+  // Invite user (Google SSO or Email+Password)
+  invite: (data) =>
+    request('/users/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // List admin users (super_admin only)
+  getAdmins: () => request('/users/admins'),
+
   // Seed data (admin only)
   seedData: () =>
     request('/users/seed', {
       method: 'POST',
+    }),
+
+  deleteSeedData: () =>
+    request('/users/seed', {
+      method: 'DELETE',
     }),
 };
 
@@ -358,6 +373,7 @@ export const superAdmin = {
   getStats: () => request('/super-admin/stats'),
   getTrends: (days = 30) => request(`/super-admin/trends?days=${days}`),
   getStatusBreakdown: () => request('/super-admin/status-breakdown'),
+  getMembersByProject: () => request('/super-admin/members-by-project'),
 };
 
 // Projects

@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { requireSuperAdmin } from '../middleware/project.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { supabase } from '../db/supabase.js';
 import { userRepository } from '../repositories/userRepository.js';
+import { projectMemberRepository } from '../repositories/projectMemberRepository.js';
 import { storageService } from '../services/storageService.js';
-import { seedDatabase } from '../services/seedService.js';
+import { seedDatabase, unseedDatabase } from '../services/seedService.js';
 import { ValidationError, ForbiddenError, ConflictError, AppError } from '../errors/AppError.js';
 
 const router = Router();
@@ -113,6 +115,76 @@ router.post('/', authenticateToken, requireAdmin, asyncHandler(async (req, res) 
   res.status(201).json(user);
 }));
 
+// ── Invite user (Google SSO or Email+Password) ──────────────
+
+router.post('/invite', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
+  const { email, name, role, auth_method, password, project_id } = req.body;
+
+  if (!email || !name) throw new ValidationError('Email and name are required');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ValidationError('Please enter a valid email address');
+
+  const userRole = role || 'employee';
+  if (!['employee', 'admin'].includes(userRole)) throw new ValidationError('Role must be "employee" or "admin"');
+
+  if (!auth_method || !['google', 'email'].includes(auth_method)) {
+    throw new ValidationError('auth_method must be "google" or "email"');
+  }
+
+  const existing = await userRepository.findByEmail(email, 'id');
+  if (existing) throw new ConflictError('A user with this email already exists');
+
+  let user;
+
+  if (auth_method === 'google') {
+    // Create app user only — no Supabase Auth account
+    // auth_id will be linked when the user signs in with Google OAuth
+    user = await userRepository.create({
+      email,
+      name,
+      role: userRole,
+      auth_provider: 'google',
+      must_change_password: false,
+    });
+  } else {
+    // Email + password method
+    if (!password || password.length < 6) {
+      throw new ValidationError('Password must be at least 6 characters');
+    }
+
+    // Create Supabase Auth user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name, role: userRole },
+    });
+    if (authError) throw new AppError(`Failed to create auth account: ${authError.message}`, 500);
+
+    user = await userRepository.create({
+      email,
+      name,
+      role: userRole,
+      auth_id: authData.user.id,
+      must_change_password: true,
+    });
+  }
+
+  // Add to project if specified
+  if (project_id) {
+    const memberRole = userRole === 'admin' ? 'admin' : 'member';
+    await projectMemberRepository.addMember(project_id, user.id, memberRole);
+  }
+
+  res.status(201).json(user);
+}));
+
+// ── List admins (super_admin only) ──────────────────────────
+
+router.get('/admins', authenticateToken, requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const admins = await userRepository.findAdmins();
+  res.json(admins);
+}));
+
 router.patch('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
@@ -145,6 +217,11 @@ router.delete('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, 
 
 router.post('/seed', authenticateToken, requireAdmin, asyncHandler(async (_req, res) => {
   const result = await seedDatabase();
+  res.json(result);
+}));
+
+router.delete('/seed', authenticateToken, requireAdmin, asyncHandler(async (_req, res) => {
+  const result = await unseedDatabase();
   res.json(result);
 }));
 

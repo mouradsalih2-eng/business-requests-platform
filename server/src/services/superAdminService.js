@@ -107,6 +107,50 @@ export const superAdminService = {
   },
 
   /**
+   * Get members by project with request counts.
+   */
+  async getMembersByProject() {
+    const projects = await projectRepository.findAll();
+    const results = [];
+
+    for (const project of projects) {
+      // Get project members with user details
+      const { data: members, error: membersError } = await supabase
+        .from('project_members')
+        .select('role, joined_at, users(id, name, email)')
+        .eq('project_id', project.id);
+      if (membersError) handleError(membersError, 'getMembersByProject.members');
+
+      // Get request counts per user in this project
+      const { data: requestCounts, error: rcError } = await supabase
+        .from('requests')
+        .select('user_id')
+        .eq('project_id', project.id);
+      if (rcError) handleError(rcError, 'getMembersByProject.requests');
+
+      const countMap = {};
+      for (const r of requestCounts) {
+        countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
+      }
+
+      results.push({
+        project_id: project.id,
+        project_name: project.name,
+        members: (members || []).map(m => ({
+          id: m.users?.id,
+          name: m.users?.name,
+          email: m.users?.email,
+          role: m.role,
+          request_count: countMap[m.users?.id] || 0,
+          joined_at: m.joined_at,
+        })),
+      });
+    }
+
+    return results;
+  },
+
+  /**
    * Get status breakdown per project.
    */
   async getStatusBreakdown() {

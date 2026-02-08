@@ -159,4 +159,25 @@ export const userRepository = {
     if (error) handleError(error, 'count');
     return count;
   },
+
+  async updateAuthId(id, authId) {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ auth_id: authId })
+      .eq('id', id)
+      .select('id, email, name, role, profile_picture, theme_preference, must_change_password')
+      .single();
+    if (error) handleError(error, 'updateAuthId');
+    return data;
+  },
+
+  async findAdmins() {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, name, role, created_at')
+      .in('role', ['admin', 'super_admin'])
+      .order('created_at', { ascending: false });
+    if (error) handleError(error, 'findAdmins');
+    return data;
+  },
 };

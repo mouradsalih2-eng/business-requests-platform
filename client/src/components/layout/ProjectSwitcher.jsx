@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProject } from '../../context/ProjectContext';
 
 export function ProjectSwitcher() {
   const { projects, currentProject, switchProject, loading } = useProject();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -14,7 +16,7 @@ export function ProjectSwitcher() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (loading || projects.length <= 1) return null;
+  if (loading || !currentProject) return null;
 
   return (
     <div className="relative" ref={ref}>
@@ -54,6 +56,20 @@ export function ProjectSwitcher() {
               </div>
             </button>
           ))}
+          <div className="border-t border-neutral-100 dark:border-[#30363D] mt-1 pt-1">
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate('/onboarding');
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-neutral-500 dark:text-[#8B949E] hover:bg-neutral-100 dark:hover:bg-[#21262D] hover:text-neutral-700 dark:hover:text-[#E6EDF3] transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              New Project
+            </button>
+          </div>
         </div>
       )}
     </div>

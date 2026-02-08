@@ -22,16 +22,32 @@ const mockUserRepository = {
   updateProfilePicture: jest.fn(),
   delete: jest.fn(),
   count: jest.fn(),
+  updateAuthId: jest.fn(),
+  findAdmins: jest.fn(),
+};
+
+const mockProjectMemberRepository = {
+  addMember: jest.fn(),
+  removeMember: jest.fn(),
+  findByProjectAndUser: jest.fn(),
+  findByProject: jest.fn(),
+  updateRole: jest.fn(),
 };
 
 const mockSeedDatabase = jest.fn();
+const mockUnseedDatabase = jest.fn();
 
 jest.unstable_mockModule('../src/repositories/userRepository.js', () => ({
   userRepository: mockUserRepository,
 }));
 
+jest.unstable_mockModule('../src/repositories/projectMemberRepository.js', () => ({
+  projectMemberRepository: mockProjectMemberRepository,
+}));
+
 jest.unstable_mockModule('../src/services/seedService.js', () => ({
   seedDatabase: mockSeedDatabase,
+  unseedDatabase: mockUnseedDatabase,
 }));
 
 jest.unstable_mockModule('bcryptjs', () => ({
@@ -67,9 +83,18 @@ jest.unstable_mockModule('../src/middleware/auth.js', () => ({
     }
   },
   requireAdmin: (req, res, next) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+    if (req.user?.role !== 'admin' && req.user?.role !== 'super_admin') return res.status(403).json({ error: 'Admin access required' });
     next();
   },
+}));
+
+jest.unstable_mockModule('../src/middleware/project.js', () => ({
+  requireSuperAdmin: (req, res, next) => {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ error: 'Super admin access required' });
+    next();
+  },
+  requireProject: (req, res, next) => next(),
+  requireProjectAdmin: (req, res, next) => next(),
 }));
 
 // Mock storageService (files are now in Supabase Storage, no local fs)
@@ -100,6 +125,7 @@ const generateToken = (payload) => jwt.sign(payload, JWT_SECRET);
 
 const employeeToken = generateToken({ id: 1, email: 'employee@example.com', role: 'employee' });
 const adminToken = generateToken({ id: 2, email: 'admin@example.com', role: 'admin' });
+const superAdminToken = generateToken({ id: 3, email: 'super@example.com', role: 'super_admin' });
 
 // ── Tests ────────────────────────────────────────────────────
 
@@ -507,6 +533,154 @@ describe('Users API', () => {
       expect(res.status).toBe(200);
       expect(res.body.message).toContain('deleted');
       expect(mockUserRepository.delete).toHaveBeenCalledWith('5');
+    });
+  });
+
+  // ── POST /api/users/invite (invite user) ───────────────────
+
+  describe('POST /api/users/invite', () => {
+    it('returns 401 without authentication', async () => {
+      const res = await request(app)
+        .post('/api/users/invite')
+        .send({ email: 'new@test.com', name: 'New', auth_method: 'email', password: 'pass123' });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 for non-admin users', async () => {
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${employeeToken}`)
+        .send({ email: 'new@test.com', name: 'New', auth_method: 'email', password: 'pass123' });
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 400 if email is missing', async () => {
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'New', auth_method: 'email', password: 'pass123' });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for invalid auth_method', async () => {
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'new@test.com', name: 'New', auth_method: 'invalid' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('auth_method');
+    });
+
+    it('creates Google SSO user without Supabase Auth', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue({
+        id: 20, email: 'google@test.com', name: 'Google User', role: 'employee', created_at: '2024-01-01',
+      });
+
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'google@test.com', name: 'Google User', auth_method: 'google' });
+
+      expect(res.status).toBe(201);
+      expect(mockUserRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'google@test.com',
+          auth_provider: 'google',
+          must_change_password: false,
+        })
+      );
+    });
+
+    it('creates email user with Supabase Auth and must_change_password', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue({
+        id: 21, email: 'email@test.com', name: 'Email User', role: 'employee', created_at: '2024-01-01',
+      });
+
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'email@test.com', name: 'Email User', auth_method: 'email', password: 'pass123' });
+
+      expect(res.status).toBe(201);
+      expect(mockUserRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'email@test.com',
+          must_change_password: true,
+          auth_id: 'mock-uuid',
+        })
+      );
+    });
+
+    it('returns 400 when email auth_method without password', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'email@test.com', name: 'Email User', auth_method: 'email' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('Password');
+    });
+
+    it('adds user to project when project_id provided', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue({
+        id: 22, email: 'proj@test.com', name: 'Proj User', role: 'employee', created_at: '2024-01-01',
+      });
+      mockProjectMemberRepository.addMember.mockResolvedValue();
+
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'proj@test.com', name: 'Proj User', auth_method: 'google', project_id: 5 });
+
+      expect(res.status).toBe(201);
+      expect(mockProjectMemberRepository.addMember).toHaveBeenCalledWith(5, 22, 'member');
+    });
+
+    it('returns 409 if email already exists', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue({ id: 99 });
+
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'existing@test.com', name: 'Existing', auth_method: 'google' });
+
+      expect(res.status).toBe(409);
+    });
+  });
+
+  // ── GET /api/users/admins (super_admin only) ──────────────
+
+  describe('GET /api/users/admins', () => {
+    it('returns 401 without authentication', async () => {
+      const res = await request(app).get('/api/users/admins');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 for non-super-admin', async () => {
+      const res = await request(app)
+        .get('/api/users/admins')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(403);
+    });
+
+    it('returns admins list for super_admin', async () => {
+      mockUserRepository.findAdmins.mockResolvedValue([
+        { id: 2, email: 'admin@test.com', name: 'Admin', role: 'admin', created_at: '2024-01-01' },
+        { id: 3, email: 'super@test.com', name: 'Super', role: 'super_admin', created_at: '2024-01-01' },
+      ]);
+
+      const res = await request(app)
+        .get('/api/users/admins')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(2);
+      expect(mockUserRepository.findAdmins).toHaveBeenCalled();
     });
   });
 

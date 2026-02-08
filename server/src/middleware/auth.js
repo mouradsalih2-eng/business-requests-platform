@@ -49,24 +49,34 @@ export async function authenticateToken(req, res, next) {
           || supabaseUser.user_metadata?.name
           || email.split('@')[0];
 
-        user = await userRepository.create({
-          email,
-          name,
-          role: 'employee',
-          auth_id: authId,
-          auth_provider: authProvider,
-        });
+        // Check if admin pre-created this user (invited via Google SSO)
+        const existingByEmail = await userRepository.findByEmail(email, 'id, auth_id');
+        if (existingByEmail && !existingByEmail.auth_id) {
+          // Link the pre-created user to this OAuth account
+          await userRepository.updateAuthId(existingByEmail.id, authId);
+          user = await userRepository.findByAuthId(authId);
+          console.log(`Linked pre-created user to OAuth: ${email} (${authProvider})`);
+        } else if (!existingByEmail) {
+          // Auto-provision new OAuth user
+          user = await userRepository.create({
+            email,
+            name,
+            role: 'employee',
+            auth_id: authId,
+            auth_provider: authProvider,
+          });
 
-        // Add to default project
-        const defaultProject = await projectRepository.findBySlug('default');
-        if (defaultProject) {
-          await projectMemberRepository.addMember(defaultProject.id, user.id, 'member');
+          // Add to default project
+          const defaultProject = await projectRepository.findBySlug('default');
+          if (defaultProject) {
+            await projectMemberRepository.addMember(defaultProject.id, user.id, 'member');
+          }
+
+          console.log(`Auto-provisioned OAuth user: ${email} (${authProvider})`);
+
+          // Re-fetch with full columns
+          user = await userRepository.findByAuthId(authId);
         }
-
-        console.log(`Auto-provisioned OAuth user: ${email} (${authProvider})`);
-
-        // Re-fetch with full columns
-        user = await userRepository.findByAuthId(authId);
       }
 
       if (!user) {
