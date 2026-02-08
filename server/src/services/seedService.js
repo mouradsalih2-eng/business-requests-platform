@@ -186,3 +186,111 @@ export async function seedDatabase() {
 
   return { message: 'Database seeded successfully', users, requests, votes, comments };
 }
+
+/**
+ * Removes all seed-generated users (by known SEED_USERS emails) and their
+ * associated requests, votes, comments, tags, and activity log entries.
+ * Does NOT delete the admin user or any real users.
+ */
+export async function unseedDatabase() {
+  const seedEmails = SEED_USERS.map(u => u.email);
+
+  // Find seed user IDs
+  const seedUserRows = [];
+  for (const email of seedEmails) {
+    const user = await userRepository.findByEmail(email, 'id, auth_id');
+    if (user) seedUserRows.push(user);
+  }
+
+  if (seedUserRows.length === 0) {
+    return { message: 'No seed data found', deleted: { users: 0, requests: 0, votes: 0, comments: 0 } };
+  }
+
+  const seedUserIds = seedUserRows.map(u => u.id);
+
+  // Find all requests created by seed users
+  const { data: seedRequests } = await supabase
+    .from('requests')
+    .select('id')
+    .in('user_id', seedUserIds);
+  const seedRequestIds = (seedRequests || []).map(r => r.id);
+
+  // Delete in dependency order
+  let deletedVotes = 0;
+  let deletedComments = 0;
+
+  if (seedRequestIds.length > 0) {
+    // Delete votes on seed requests
+    const { count: vc } = await supabase
+      .from('votes')
+      .delete({ count: 'exact' })
+      .in('request_id', seedRequestIds);
+    deletedVotes = vc || 0;
+
+    // Delete comment_mentions for comments on seed requests
+    const { data: seedComments } = await supabase
+      .from('comments')
+      .select('id')
+      .in('request_id', seedRequestIds);
+    if (seedComments?.length) {
+      await supabase.from('comment_mentions').delete().in('comment_id', seedComments.map(c => c.id));
+    }
+
+    // Delete comments on seed requests
+    const { count: cc } = await supabase
+      .from('comments')
+      .delete({ count: 'exact' })
+      .in('request_id', seedRequestIds);
+    deletedComments = cc || 0;
+
+    // Delete tags on seed requests
+    await supabase.from('request_tags').delete().in('request_id', seedRequestIds);
+
+    // Delete activity log for seed requests
+    await supabase.from('activity_log').delete().in('request_id', seedRequestIds);
+
+    // Delete admin_read_status for seed requests
+    await supabase.from('admin_read_status').delete().in('request_id', seedRequestIds);
+
+    // Delete request_custom_field_values for seed requests
+    await supabase.from('request_custom_field_values').delete().in('request_id', seedRequestIds);
+
+    // Delete attachments for seed requests
+    await supabase.from('attachments').delete().in('request_id', seedRequestIds);
+
+    // Delete roadmap items synced to seed requests
+    await supabase.from('roadmap_items').delete().in('request_id', seedRequestIds);
+  }
+
+  // Delete the seed requests themselves
+  const { count: rc } = await supabase
+    .from('requests')
+    .delete({ count: 'exact' })
+    .in('user_id', seedUserIds);
+
+  // Also delete any votes/comments seed users made on non-seed requests
+  await supabase.from('votes').delete().in('user_id', seedUserIds);
+  await supabase.from('comments').delete().in('user_id', seedUserIds);
+
+  // Delete Supabase Auth accounts for seed users
+  for (const u of seedUserRows) {
+    if (u.auth_id) {
+      await supabase.auth.admin.deleteUser(u.auth_id).catch(() => {});
+    }
+  }
+
+  // Delete the seed users from app DB
+  for (const u of seedUserRows) {
+    await userRepository.delete(u.id);
+  }
+
+  return {
+    message: 'Seed data removed successfully',
+    deleted: {
+      users: seedUserRows.length,
+      requests: rc || 0,
+      votes: deletedVotes,
+      comments: deletedComments,
+    },
+  };
+}
