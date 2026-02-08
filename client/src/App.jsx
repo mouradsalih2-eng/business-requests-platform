@@ -65,17 +65,31 @@ function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false, a
 }
 
 function PublicRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isSuperAdmin } = useAuth();
 
   if (loading) {
     return <PageLoader />;
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace />;
   }
 
   return children;
+}
+
+function DefaultRedirect() {
+  const { user, loading, isSuperAdmin } = useAuth();
+
+  if (loading) {
+    return <PageLoader />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace />;
 }
 
 export default function App() {
@@ -202,8 +216,8 @@ export default function App() {
         />
 
         {/* Default Redirect */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<DefaultRedirect />} />
+        <Route path="*" element={<DefaultRedirect />} />
       </Routes>
     </Suspense>
   );

@@ -57,9 +57,9 @@ export function ProjectProvider({ children }) {
     await loadProjects();
   }, [loadProjects]);
 
-  // Admin/super_admin with no projects needs onboarding
+  // Admin with no projects needs onboarding (super_admin uses platform mode instead)
   const needsOnboarding = !loading && !!user &&
-    (user.role === 'admin' || user.role === 'super_admin') &&
+    user.role === 'admin' &&
     projects.length === 0;
 
   return (

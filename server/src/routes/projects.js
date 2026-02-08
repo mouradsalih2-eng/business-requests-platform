@@ -9,15 +9,10 @@ import { ValidationError, NotFoundError } from '../errors/AppError.js';
 
 const router = Router();
 
-// List projects the user belongs to (or all projects for super_admin)
+// List projects the user belongs to
 router.get('/', authenticateToken, asyncHandler(async (req, res) => {
-  if (req.user.role === 'super_admin') {
-    const projects = await projectRepository.findAll();
-    res.json(projects);
-  } else {
-    const projects = await projectRepository.findByUser(req.user.id);
-    res.json(projects);
-  }
+  const projects = await projectRepository.findByUser(req.user.id);
+  res.json(projects);
 }));
 
 // Get a single project

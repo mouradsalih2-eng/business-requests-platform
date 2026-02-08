@@ -16,12 +16,27 @@ export const superAdminService = {
 
     const overviews = await Promise.all(projects.map(async (project) => {
       const stats = await projectRepository.getStats(project.id);
+
+      // Get creator name
+      let created_by_name = null;
+      if (project.created_by) {
+        const { data: creator } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', project.created_by)
+          .single();
+        created_by_name = creator?.name || null;
+      }
+
       return {
         id: project.id,
         name: project.name,
         slug: project.slug,
         description: project.description,
+        icon: project.icon,
         created_at: project.created_at,
+        created_by: project.created_by,
+        created_by_name,
         ...stats,
       };
     }));
@@ -148,6 +163,92 @@ export const superAdminService = {
     }
 
     return results;
+  },
+
+  /**
+   * Get per-project trends for stacked chart.
+   */
+  async getTrendsByProject(days = 30) {
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const { data, error } = await supabase
+      .from('requests')
+      .select('id, created_at, project_id')
+      .gte('created_at', startDate.toISOString())
+      .order('created_at');
+    if (error) handleError(error, 'getTrendsByProject');
+
+    // Get all projects for legend
+    const projects = await projectRepository.findAll();
+    const projectMap = {};
+    for (const p of projects) {
+      projectMap[String(p.id)] = p.name;
+    }
+
+    // Group by day and project
+    const grouped = {};
+    for (const r of data) {
+      const day = r.created_at.split('T')[0];
+      if (!grouped[day]) grouped[day] = {};
+      const pid = String(r.project_id);
+      grouped[day][pid] = (grouped[day][pid] || 0) + 1;
+    }
+
+    // Fill in missing days
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().split('T')[0];
+      result.push({ date: key, projects: grouped[key] || {} });
+    }
+
+    return { trends: result, projectMap };
+  },
+
+  /**
+   * Get recent cross-project activity feed.
+   */
+  async getRecentActivity(limit = 20) {
+    const { data, error } = await supabase
+      .from('activity_log')
+      .select('id, action, old_value, new_value, created_at, user_id, project_id, request_id')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) handleError(error, 'getRecentActivity');
+
+    // Enrich with user and project names
+    const userIds = [...new Set(data.map(a => a.user_id).filter(Boolean))];
+    const projectIds = [...new Set(data.map(a => a.project_id).filter(Boolean))];
+
+    const userMap = {};
+    if (userIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, name')
+        .in('id', userIds);
+      for (const u of (users || [])) userMap[u.id] = u.name;
+    }
+
+    const projectNameMap = {};
+    if (projectIds.length > 0) {
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id, name')
+        .in('id', projectIds);
+      for (const p of (projects || [])) projectNameMap[p.id] = p.name;
+    }
+
+    return data.map(a => ({
+      id: a.id,
+      action: a.action,
+      old_value: a.old_value,
+      new_value: a.new_value,
+      user_name: userMap[a.user_id] || 'Unknown',
+      project_name: projectNameMap[a.project_id] || 'Unknown',
+      project_id: a.project_id,
+      request_id: a.request_id,
+      created_at: a.created_at,
+    }));
   },
 
   /**

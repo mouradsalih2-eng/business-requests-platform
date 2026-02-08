@@ -34,6 +34,20 @@ router.get('/status-breakdown', asyncHandler(async (_req, res) => {
   res.json(breakdown);
 }));
 
+// Get per-project trends for stacked chart
+router.get('/trends-by-project', asyncHandler(async (req, res) => {
+  const days = parseInt(req.query.days, 10) || 30;
+  const data = await superAdminService.getTrendsByProject(days);
+  res.json(data);
+}));
+
+// Get cross-project activity feed
+router.get('/activity', asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const data = await superAdminService.getRecentActivity(limit);
+  res.json(data);
+}));
+
 // Get members by project with request counts
 router.get('/members-by-project', asyncHandler(async (_req, res) => {
   const data = await superAdminService.getMembersByProject();

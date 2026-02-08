@@ -402,8 +402,10 @@ export const superAdmin = {
   getProjects: () => request('/super-admin/projects'),
   getStats: () => request('/super-admin/stats'),
   getTrends: (days = 30) => request(`/super-admin/trends?days=${days}`),
+  getTrendsByProject: (days = 30) => request(`/super-admin/trends-by-project?days=${days}`),
   getStatusBreakdown: () => request('/super-admin/status-breakdown'),
   getMembersByProject: () => request('/super-admin/members-by-project'),
+  getActivity: (limit = 20) => request(`/super-admin/activity?limit=${limit}`),
 };
 
 // Projects
