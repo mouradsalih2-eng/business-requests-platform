@@ -4,21 +4,52 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 const STORAGE_KEY = 'selectedProjectId';
 
-/**
- * Get the current Supabase access token.
- * Returns null if no active session.
- * Includes a 5-second timeout to prevent hanging on stale sessions.
- */
+// ── Token cache ─────────────────────────────────────────────
+// Caches the Supabase access token in memory. Initialized once,
+// then updated via onAuthStateChange in AuthContext.
+
+let cachedAccessToken = null;
+let tokenInitialized = false;
+let tokenInitPromise = null;
+
+function initTokenCache() {
+  if (tokenInitPromise) return tokenInitPromise;
+  tokenInitPromise = supabase.auth.getSession()
+    .then(({ data }) => {
+      cachedAccessToken = data?.session?.access_token || null;
+      tokenInitialized = true;
+    })
+    .catch(() => {
+      cachedAccessToken = null;
+      tokenInitialized = true;
+    });
+  return tokenInitPromise;
+}
+
+export function updateCachedToken(session) {
+  cachedAccessToken = session?.access_token || null;
+  tokenInitialized = true;
+}
+
+export function clearCachedToken() {
+  cachedAccessToken = null;
+}
+
+// For tests only
+export function __resetTokenCache() {
+  cachedAccessToken = null;
+  tokenInitialized = false;
+  tokenInitPromise = null;
+}
+
 async function getToken() {
-  try {
-    const result = await Promise.race([
-      supabase.auth.getSession(),
+  if (!tokenInitialized) {
+    await Promise.race([
+      initTokenCache(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('getToken timeout')), 5000)),
-    ]);
-    return result?.data?.session?.access_token || null;
-  } catch {
-    return null;
+    ]).catch(() => {});
   }
+  return cachedAccessToken;
 }
 
 function getProjectId() {
@@ -56,9 +87,10 @@ async function request(endpoint, options = {}) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
 
     // Auto-logout on 401 — user was deleted or token invalidated
+    // Let signOut fire SIGNED_OUT event → AuthContext clears user → ProtectedRoute redirects
     if (response.status === 401 && token && endpoint !== '/auth/me') {
-      await supabase.auth.signOut();
-      window.location.href = '/login';
+      clearCachedToken();
+      await supabase.auth.signOut().catch(() => {});
       throw new Error('Session expired');
     }
 

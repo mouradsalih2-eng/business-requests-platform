@@ -41,6 +41,15 @@ const upload = multer({
   fileFilter,
 });
 
+// ── Helpers ──────────────────────────────────────────────────
+
+function verifyProjectOwnership(request, req) {
+  if (req.user.role === 'super_admin') return;
+  if (request.project_id !== req.project.id) {
+    throw new ForbiddenError('Request does not belong to this project');
+  }
+}
+
 // ── Routes ───────────────────────────────────────────────────
 
 // Analytics (admin only) — before /:id
@@ -96,9 +105,10 @@ router.get('/', authenticateToken, requireProject, asyncHandler(async (req, res)
 }));
 
 // Get single request
-router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
+router.get('/:id', authenticateToken, requireProject, asyncHandler(async (req, res) => {
   const request = await requestRepository.findByIdWithCounts(req.params.id);
   if (!request) return res.status(404).json({ error: 'Request not found' });
+  verifyProjectOwnership(request, req);
 
   const [attachments, userVotes, customFieldValues, isWatching, watcherCount] = await Promise.all([
     attachmentRepository.findByRequest(req.params.id),
@@ -112,8 +122,10 @@ router.get('/:id', authenticateToken, asyncHandler(async (req, res) => {
 }));
 
 // Get interactions (upvoters, likers, commenters)
-router.get('/:id/interactions', authenticateToken, asyncHandler(async (req, res) => {
+router.get('/:id/interactions', authenticateToken, requireProject, asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const reqForInteractions = await requestRepository.findByIdOrFail(id);
+  verifyProjectOwnership(reqForInteractions, req);
   const [upvoters, likers, commenters] = await Promise.all([
     voteRepository.getUpvoters(id),
     voteRepository.getLikers(id),
@@ -197,6 +209,7 @@ router.post('/', authenticateToken, requireProject, upload.array('attachments', 
 // Update request
 router.patch('/:id', authenticateToken, requireProject, asyncHandler(async (req, res) => {
   const request = await requestRepository.findByIdOrFail(req.params.id);
+  verifyProjectOwnership(request, req);
   const isOwner = request.user_id === req.user.id;
   const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin' || req.projectRole === 'admin';
   if (!isOwner && !isAdmin) throw new ForbiddenError('Not authorized to update this request');
@@ -235,14 +248,17 @@ router.patch('/:id', authenticateToken, requireProject, asyncHandler(async (req,
 }));
 
 // Activity log
-router.get('/:id/activity', authenticateToken, asyncHandler(async (req, res) => {
+router.get('/:id/activity', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+  const reqForActivity = await requestRepository.findByIdOrFail(req.params.id);
+  verifyProjectOwnership(reqForActivity, req);
   const activities = await activityRepository.findByRequest(req.params.id);
   res.json(activities);
 }));
 
 // Delete request (admin)
 router.delete('/:id', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
-  await requestRepository.findByIdOrFail(req.params.id);
+  const reqToDelete = await requestRepository.findByIdOrFail(req.params.id);
+  verifyProjectOwnership(reqToDelete, req);
   await requestRepository.delete(req.params.id);
   res.json({ message: 'Request deleted successfully' });
 }));
@@ -252,6 +268,14 @@ router.post('/:id/merge', authenticateToken, requireProject, requireAdmin, async
   const sourceId = parseInt(req.params.id, 10);
   const { target_id, merge_votes = true, merge_comments = false } = req.body;
   if (!target_id) throw new ValidationError('Target request ID is required');
+
+  // Verify both source and target belong to this project
+  const [sourceReq, targetReq] = await Promise.all([
+    requestRepository.findByIdOrFail(sourceId),
+    requestRepository.findByIdOrFail(parseInt(target_id, 10)),
+  ]);
+  verifyProjectOwnership(sourceReq, req);
+  verifyProjectOwnership(targetReq, req);
 
   const result = await requestService.merge({
     sourceId, targetId: parseInt(target_id, 10),
@@ -263,7 +287,8 @@ router.post('/:id/merge', authenticateToken, requireProject, requireAdmin, async
 
 // Mark as read (admin)
 router.post('/:id/read', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
-  await requestRepository.findByIdOrFail(req.params.id);
+  const reqToRead = await requestRepository.findByIdOrFail(req.params.id);
+  verifyProjectOwnership(reqToRead, req);
   await adminReadRepository.markRead(req.params.id, req.user.id);
   res.json({ message: 'Request marked as read' });
 }));
@@ -271,15 +296,18 @@ router.post('/:id/read', authenticateToken, requireProject, requireAdmin, asyncH
 // ── Watch/Subscribe endpoints ────────────────────────────────
 
 // Watch a request
-router.post('/:id/watch', authenticateToken, asyncHandler(async (req, res) => {
-  await requestRepository.findByIdOrFail(req.params.id);
+router.post('/:id/watch', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+  const reqToWatch = await requestRepository.findByIdOrFail(req.params.id);
+  verifyProjectOwnership(reqToWatch, req);
   await watcherRepository.watch(req.params.id, req.user.id, false);
   const watcherCount = await watcherRepository.getWatcherCount(req.params.id);
   res.json({ isWatching: true, watcherCount });
 }));
 
 // Unwatch a request
-router.delete('/:id/watch', authenticateToken, asyncHandler(async (req, res) => {
+router.delete('/:id/watch', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+  const reqToUnwatch = await requestRepository.findByIdOrFail(req.params.id);
+  verifyProjectOwnership(reqToUnwatch, req);
   await watcherRepository.unwatch(req.params.id, req.user.id);
   const watcherCount = await watcherRepository.getWatcherCount(req.params.id);
   res.json({ isWatching: false, watcherCount });
@@ -287,6 +315,8 @@ router.delete('/:id/watch', authenticateToken, asyncHandler(async (req, res) => 
 
 // Get watchers for a request (admin only)
 router.get('/:id/watchers', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
+  const reqForWatchers = await requestRepository.findByIdOrFail(req.params.id);
+  verifyProjectOwnership(reqForWatchers, req);
   const watchers = await watcherRepository.getWatchers(req.params.id);
   res.json(watchers);
 }));

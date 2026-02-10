@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { supabase } from '../lib/supabase';
 
 describe('API utilities', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     global.fetch.mockReset();
     // Default: no active session
     supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
+    // Reset the token cache between tests
+    const { __resetTokenCache } = await import('../lib/api');
+    __resetTokenCache();
   });
 
   describe('request function behavior', () => {

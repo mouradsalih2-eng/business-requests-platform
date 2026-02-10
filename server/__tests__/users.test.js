@@ -576,11 +576,12 @@ describe('Users API', () => {
       mockUserRepository.create.mockResolvedValue({
         id: 20, email: 'google@test.com', name: 'Google User', role: 'employee', created_at: '2024-01-01',
       });
+      mockProjectMemberRepository.addMember.mockResolvedValue();
 
       const res = await request(app)
         .post('/api/users/invite')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ email: 'google@test.com', name: 'Google User', auth_method: 'google' });
+        .send({ email: 'google@test.com', name: 'Google User', auth_method: 'google', project_id: 1 });
 
       expect(res.status).toBe(201);
       expect(mockUserRepository.create).toHaveBeenCalledWith(
@@ -590,6 +591,7 @@ describe('Users API', () => {
           must_change_password: false,
         })
       );
+      expect(mockProjectMemberRepository.addMember).toHaveBeenCalledWith(1, 20, 'member');
     });
 
     it('creates email user with Supabase Auth and must_change_password', async () => {
@@ -597,11 +599,12 @@ describe('Users API', () => {
       mockUserRepository.create.mockResolvedValue({
         id: 21, email: 'email@test.com', name: 'Email User', role: 'employee', created_at: '2024-01-01',
       });
+      mockProjectMemberRepository.addMember.mockResolvedValue();
 
       const res = await request(app)
         .post('/api/users/invite')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ email: 'email@test.com', name: 'Email User', auth_method: 'email', password: 'pass123' });
+        .send({ email: 'email@test.com', name: 'Email User', auth_method: 'email', password: 'pass123', project_id: 1 });
 
       expect(res.status).toBe(201);
       expect(mockUserRepository.create).toHaveBeenCalledWith(
@@ -611,6 +614,7 @@ describe('Users API', () => {
           auth_id: 'mock-uuid',
         })
       );
+      expect(mockProjectMemberRepository.addMember).toHaveBeenCalledWith(1, 21, 'member');
     });
 
     it('returns 400 when email auth_method without password', async () => {
@@ -619,7 +623,7 @@ describe('Users API', () => {
       const res = await request(app)
         .post('/api/users/invite')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ email: 'email@test.com', name: 'Email User', auth_method: 'email' });
+        .send({ email: 'email@test.com', name: 'Email User', auth_method: 'email', project_id: 1 });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('Password');
@@ -647,7 +651,7 @@ describe('Users API', () => {
       const res = await request(app)
         .post('/api/users/invite')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ email: 'existing@test.com', name: 'Existing', auth_method: 'google' });
+        .send({ email: 'existing@test.com', name: 'Existing', auth_method: 'google', project_id: 1 });
 
       expect(res.status).toBe(409);
     });

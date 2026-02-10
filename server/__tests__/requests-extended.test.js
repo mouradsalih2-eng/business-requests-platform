@@ -353,6 +353,7 @@ describe('Requests Extended API', () => {
     });
 
     it('returns empty array when no activity exists', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, project_id: 1 });
       mockActivityRepository.findByRequest.mockResolvedValue([]);
 
       const res = await request(app)
@@ -365,6 +366,7 @@ describe('Requests Extended API', () => {
     });
 
     it('returns activity log with user names', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, project_id: 1 });
       const mockActivities = [
         {
           id: 1, request_id: 1, user_id: 2, action: 'status_change',
@@ -395,6 +397,7 @@ describe('Requests Extended API', () => {
     });
 
     it('returns merge activity entries', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 3, project_id: 1 });
       const mergeActivities = [
         {
           id: 5, request_id: 3, user_id: 2, action: 'merge',
@@ -415,6 +418,7 @@ describe('Requests Extended API', () => {
     });
 
     it('non-admin users can also view activity', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, project_id: 1 });
       mockActivityRepository.findByRequest.mockResolvedValue([
         { id: 1, request_id: 1, action: 'status_change', user_name: 'Admin' },
       ]);
@@ -460,6 +464,7 @@ describe('Requests Extended API', () => {
     });
 
     it('merges requests successfully with default options (votes=true, comments=false)', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, project_id: 1 });
       const mergeResult = {
         message: 'Request merged successfully',
         source: { id: 1, title: 'Source', status: 'duplicate', merged_into_id: 2 },
@@ -490,6 +495,7 @@ describe('Requests Extended API', () => {
     });
 
     it('merges with merge_votes=false', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 3, project_id: 1 });
       const mergeResult = {
         message: 'Request merged successfully',
         source: { id: 3, status: 'duplicate', merged_into_id: 4 },
@@ -513,6 +519,7 @@ describe('Requests Extended API', () => {
     });
 
     it('merges with merge_comments=true', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 5, project_id: 1 });
       const mergeResult = {
         message: 'Request merged successfully',
         source: { id: 5, status: 'duplicate', merged_into_id: 6 },
@@ -536,6 +543,7 @@ describe('Requests Extended API', () => {
     });
 
     it('returns 400 when service throws ValidationError (merge into itself)', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, project_id: 1 });
       const { ValidationError } = await import('../src/errors/AppError.js');
       mockRequestService.merge.mockRejectedValue(
         new ValidationError('Cannot merge request into itself'),
@@ -551,6 +559,7 @@ describe('Requests Extended API', () => {
     });
 
     it('returns 400 when source request is already merged', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, project_id: 1 });
       const { ValidationError } = await import('../src/errors/AppError.js');
       mockRequestService.merge.mockRejectedValue(
         new ValidationError('Source request is already merged'),
@@ -567,7 +576,7 @@ describe('Requests Extended API', () => {
 
     it('returns 404 when source request not found', async () => {
       const { NotFoundError } = await import('../src/errors/AppError.js');
-      mockRequestService.merge.mockRejectedValue(new NotFoundError('Request'));
+      mockRequestRepository.findByIdOrFail.mockRejectedValue(new NotFoundError('Request'));
 
       const res = await request(app)
         .post('/api/requests/999/merge')
@@ -580,7 +589,10 @@ describe('Requests Extended API', () => {
 
     it('returns 404 when target request not found', async () => {
       const { NotFoundError } = await import('../src/errors/AppError.js');
-      mockRequestService.merge.mockRejectedValue(new NotFoundError('Request'));
+      // Source found, target not found
+      mockRequestRepository.findByIdOrFail
+        .mockResolvedValueOnce({ id: 1, project_id: 1 })
+        .mockRejectedValueOnce(new NotFoundError('Request'));
 
       const res = await request(app)
         .post('/api/requests/1/merge')
@@ -592,6 +604,7 @@ describe('Requests Extended API', () => {
     });
 
     it('passes integer sourceId and targetId to the service', async () => {
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 10, project_id: 1 });
       mockRequestService.merge.mockResolvedValue({
         message: 'Request merged successfully',
         source: { id: 10 }, target_id: 20,

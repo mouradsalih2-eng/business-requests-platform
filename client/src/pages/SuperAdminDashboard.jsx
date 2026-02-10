@@ -913,13 +913,14 @@ function UsersView({ membersByProject, allProjects, onRefresh }) {
           />
 
           <Select
-            label="Assign to Project (optional)"
+            label="Assign to Project"
             value={inviteForm.project_id}
             onChange={(e) => setInviteForm(prev => ({ ...prev, project_id: e.target.value }))}
             options={[
-              { value: '', label: 'No project assignment' },
+              { value: '', label: 'Select a project...' },
               ...allProjects.map(p => ({ value: String(p.id), label: p.name })),
             ]}
+            required
           />
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">

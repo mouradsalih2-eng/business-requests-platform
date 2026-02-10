@@ -310,7 +310,7 @@ describe('Requests API', () => {
     it('returns request with attachments and user votes', async () => {
       const mockReq = {
         id: 1, title: 'Test Request', status: 'pending', category: 'bug',
-        priority: 'high', user_id: 1, author_name: 'Test User', upvotes: 5, likes: 3,
+        priority: 'high', user_id: 1, author_name: 'Test User', upvotes: 5, likes: 3, project_id: 1,
       };
       const mockAttachments = [
         { id: 10, request_id: 1, filename: 'screenshot.png', filepath: '1234-screenshot.png' },
@@ -335,7 +335,7 @@ describe('Requests API', () => {
 
     it('returns empty attachments and votes when none exist', async () => {
       mockRequestRepository.findByIdWithCounts.mockResolvedValue({
-        id: 2, title: 'Bare request', status: 'pending',
+        id: 2, title: 'Bare request', status: 'pending', project_id: 1,
       });
       mockAttachmentRepository.findByRequest.mockResolvedValue([]);
       mockVoteRepository.getUserVoteTypes.mockResolvedValue([]);
@@ -570,7 +570,7 @@ describe('Requests API', () => {
   describe('PATCH /api/requests/:id', () => {
     const existingRequest = {
       id: 1, user_id: 1, title: 'Original Title', status: 'pending',
-      category: 'bug', priority: 'medium',
+      category: 'bug', priority: 'medium', project_id: 1,
     };
 
     it('returns 404 when request does not exist (via NotFoundError)', async () => {
@@ -587,7 +587,7 @@ describe('Requests API', () => {
     });
 
     it('returns 403 if user is neither owner nor admin (via ForbiddenError)', async () => {
-      mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999 });
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999, project_id: 1 });
 
       const res = await request(app)
         .patch('/api/requests/1')
@@ -631,7 +631,7 @@ describe('Requests API', () => {
     });
 
     it('allows admin to change status and logs activity', async () => {
-      mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999 });
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999, project_id: 1 });
       mockRequestRepository.update.mockResolvedValue({});
       mockActivityRepository.create.mockResolvedValue(undefined);
       mockRequestRepository.findById.mockResolvedValue({ ...existingRequest, status: 'in_progress' });
@@ -653,7 +653,7 @@ describe('Requests API', () => {
     });
 
     it('does not log activity when admin sets same status', async () => {
-      mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999 });
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999, project_id: 1 });
       mockRequestRepository.findById.mockResolvedValue(existingRequest);
 
       const res = await request(app)
@@ -668,7 +668,7 @@ describe('Requests API', () => {
     it('allows admin to set status to each valid value', async () => {
       for (const status of ['backlog', 'in_progress', 'completed', 'rejected', 'duplicate', 'archived']) {
         jest.clearAllMocks();
-        mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999 });
+        mockRequestRepository.findByIdOrFail.mockResolvedValue({ ...existingRequest, user_id: 999, project_id: 1 });
         mockRequestRepository.update.mockResolvedValue({});
         mockActivityRepository.create.mockResolvedValue(undefined);
         mockRequestRepository.findById.mockResolvedValue({ ...existingRequest, status });
@@ -745,7 +745,7 @@ describe('Requests API', () => {
     });
 
     it('deletes request successfully for admin', async () => {
-      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, title: 'To Delete' });
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, title: 'To Delete', project_id: 1 });
       mockRequestRepository.delete.mockResolvedValue(undefined);
 
       const res = await request(app)
@@ -874,7 +874,7 @@ describe('Requests API', () => {
     });
 
     it('marks request as read for admin', async () => {
-      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, title: 'Request' });
+      mockRequestRepository.findByIdOrFail.mockResolvedValue({ id: 1, title: 'Request', project_id: 1 });
       mockAdminReadRepository.markRead.mockResolvedValue(undefined);
 
       const res = await request(app)

@@ -28,7 +28,22 @@ export async function authenticateToken(req, res, next) {
   }
 
   try {
-    const { data, error } = await supabase.auth.getUser(token);
+    // 10s timeout prevents hanging if Supabase is slow — returns 503 (not 401) so client doesn't auto-logout
+    const result = await Promise.race([
+      supabase.auth.getUser(token),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Auth verification timeout')), 10000)),
+    ]).catch((err) => {
+      if (err.message === 'Auth verification timeout') {
+        return { timeout: true };
+      }
+      throw err;
+    });
+
+    if (result.timeout) {
+      return res.status(503).json({ error: 'Authentication service temporarily unavailable' });
+    }
+
+    const { data, error } = result;
 
     if (error || !data?.user) {
       return res.status(401).json({ error: 'Invalid or expired token' });

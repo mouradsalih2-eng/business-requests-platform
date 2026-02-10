@@ -22,8 +22,8 @@ export function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const userData = await login(email, password);
+      navigate(userData.role === 'super_admin' ? '/super-admin' : '/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to login');
     } finally {
@@ -37,7 +37,7 @@ export function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/`,
         },
       });
       if (error) throw error;

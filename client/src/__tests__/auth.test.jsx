@@ -22,6 +22,8 @@ vi.mock('../lib/api', () => ({
     me: vi.fn(),
     logout: vi.fn(),
   },
+  updateCachedToken: vi.fn(),
+  clearCachedToken: vi.fn(),
 }));
 
 import { auth as authApi } from '../lib/api';

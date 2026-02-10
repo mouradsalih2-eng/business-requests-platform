@@ -139,6 +139,10 @@ router.post('/invite', authenticateToken, requireAdmin, asyncHandler(async (req,
     throw new ValidationError('auth_method must be "google" or "email"');
   }
 
+  if (!project_id) {
+    throw new ValidationError('project_id is required — users must be assigned to a project');
+  }
+
   const existing = await userRepository.findByEmail(email, 'id');
   if (existing) throw new ConflictError('A user with this email already exists');
 

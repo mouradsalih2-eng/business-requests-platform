@@ -59,7 +59,8 @@ function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false, a
   const exemptPaths = ['/onboarding', '/settings', '/change-password', '/super-admin'];
 
   // Wait for projects to finish loading before deciding (prevents flash of wrong content)
-  if (projectLoading && isAdmin && !exemptPaths.includes(location.pathname)) {
+  // Super admins operate at platform level — don't gate on project loading
+  if (projectLoading && isAdmin && !isSuperAdmin && !exemptPaths.includes(location.pathname)) {
     return <PageLoader />;
   }
 

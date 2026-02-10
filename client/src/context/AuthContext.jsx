@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { auth as authApi } from '../lib/api';
+import { auth as authApi, updateCachedToken, clearCachedToken } from '../lib/api';
 
 const AuthContext = createContext(null);
 
@@ -104,13 +104,10 @@ export function AuthProvider({ children }) {
 
     async function initAuth() {
       try {
-        // Race getSession against a timeout — stale sessions can hang on token refresh
-        const sessionResult = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 5000)),
-        ]);
-        const session = sessionResult?.data?.session;
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
         if (session && mounted) {
+          updateCachedToken(session);
           const userData = await authApi.me();
           setUser(userData);
           updateActivity();
@@ -119,7 +116,8 @@ export function AuthProvider({ children }) {
           }
         }
       } catch {
-        // Session invalid, timed out, or user not found in app — sign out
+        // Session invalid or user not found in app — sign out
+        clearCachedToken();
         await supabase.auth.signOut().catch(() => {});
       } finally {
         if (mounted) setLoading(false);
@@ -133,12 +131,14 @@ export function AuthProvider({ children }) {
       if (!mounted) return;
 
       if (event === 'SIGNED_OUT') {
+        clearCachedToken();
         setUser(null);
         setSessionWarning(false);
         warningShownRef.current = false;
         setLoading(false);
       } else if (event === 'SIGNED_IN' && session && !userRef.current) {
         // OAuth redirect or fresh sign-in — fetch app user data
+        updateCachedToken(session);
         try {
           const userData = await authApi.me();
           if (mounted) {
@@ -150,16 +150,19 @@ export function AuthProvider({ children }) {
         } finally {
           if (mounted) setLoading(false);
         }
-      } else if (event === 'TOKEN_REFRESHED' && session && !userRef.current) {
-        // Token was refreshed but we lost the user state — refetch
-        try {
-          const userData = await authApi.me();
-          setUser(userData);
-        } catch {
-          // Don't sign out on transient failures (rate limit, network)
-          // Only the 401 handler in api.js should trigger sign-out
-        } finally {
-          if (mounted) setLoading(false);
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        // Always update the cached token on refresh
+        updateCachedToken(session);
+        // Refetch user only if we lost user state
+        if (!userRef.current) {
+          try {
+            const userData = await authApi.me();
+            setUser(userData);
+          } catch {
+            // Don't sign out on transient failures (rate limit, network)
+          } finally {
+            if (mounted) setLoading(false);
+          }
         }
       }
     });
@@ -191,6 +194,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = useCallback(async () => {
+    clearCachedToken();
     await supabase.auth.signOut();
     setUser(null);
     setSessionWarning(false);
