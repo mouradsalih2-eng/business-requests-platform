@@ -139,8 +139,8 @@ router.post('/invite', authenticateToken, requireAdmin, asyncHandler(async (req,
     throw new ValidationError('auth_method must be "google" or "email"');
   }
 
-  if (!project_id) {
-    throw new ValidationError('project_id is required — users must be assigned to a project');
+  if (!project_id && userRole !== 'admin') {
+    throw new ValidationError('project_id is required — members must be assigned to a project');
   }
 
   const existing = await userRepository.findByEmail(email, 'id');

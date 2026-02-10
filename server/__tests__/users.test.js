@@ -645,6 +645,31 @@ describe('Users API', () => {
       expect(mockProjectMemberRepository.addMember).toHaveBeenCalledWith(5, 22, 'member');
     });
 
+    it('creates admin without project_id (will onboard)', async () => {
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue({
+        id: 23, email: 'newadmin@test.com', name: 'New Admin', role: 'admin', created_at: '2024-01-01',
+      });
+
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'newadmin@test.com', name: 'New Admin', role: 'admin', auth_method: 'google' });
+
+      expect(res.status).toBe(201);
+      expect(mockProjectMemberRepository.addMember).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for member without project_id', async () => {
+      const res = await request(app)
+        .post('/api/users/invite')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'member@test.com', name: 'Member', auth_method: 'google' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('project_id');
+    });
+
     it('returns 409 if email already exists', async () => {
       mockUserRepository.findByEmail.mockResolvedValue({ id: 99 });
 

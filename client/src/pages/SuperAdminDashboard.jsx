@@ -616,8 +616,8 @@ function UsersView({ membersByProject, allProjects, onRefresh }) {
   const handleInvite = async (e) => {
     e.preventDefault();
     setInviteError('');
-    if (!inviteForm.project_id) {
-      setInviteError('Please select a project — all users must be assigned to a project');
+    if (!inviteForm.project_id && inviteForm.role !== 'admin') {
+      setInviteError('Please select a project — members must be assigned to a project');
       return;
     }
     setInviting(true);
@@ -627,8 +627,8 @@ function UsersView({ membersByProject, allProjects, onRefresh }) {
         name: inviteForm.name,
         role: inviteForm.role,
         auth_method: authMethod,
-        project_id: parseInt(inviteForm.project_id),
       };
+      if (inviteForm.project_id) payload.project_id = parseInt(inviteForm.project_id);
       if (authMethod === 'email') payload.password = inviteForm.password;
 
       await usersApi.invite(payload);
@@ -921,11 +921,16 @@ function UsersView({ membersByProject, allProjects, onRefresh }) {
             value={inviteForm.project_id}
             onChange={(e) => setInviteForm(prev => ({ ...prev, project_id: e.target.value }))}
             options={[
-              { value: '', label: 'Select a project...' },
+              { value: '', label: inviteForm.role === 'admin' ? 'New project (creates on first login)' : 'Select a project...' },
               ...allProjects.map(p => ({ value: String(p.id), label: p.name })),
             ]}
-            required
+            required={inviteForm.role !== 'admin'}
           />
+          {inviteForm.role === 'admin' && !inviteForm.project_id && (
+            <p className="text-xs text-neutral-500 dark:text-[#8B949E] -mt-1">
+              Admin will be guided through onboarding to create their own project on first login.
+            </p>
+          )}
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <Button type="button" variant="secondary" className="w-full sm:w-auto"
