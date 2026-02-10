@@ -616,6 +616,10 @@ function UsersView({ membersByProject, allProjects, onRefresh }) {
   const handleInvite = async (e) => {
     e.preventDefault();
     setInviteError('');
+    if (!inviteForm.project_id) {
+      setInviteError('Please select a project — all users must be assigned to a project');
+      return;
+    }
     setInviting(true);
     try {
       const payload = {
@@ -623,9 +627,9 @@ function UsersView({ membersByProject, allProjects, onRefresh }) {
         name: inviteForm.name,
         role: inviteForm.role,
         auth_method: authMethod,
+        project_id: parseInt(inviteForm.project_id),
       };
       if (authMethod === 'email') payload.password = inviteForm.password;
-      if (inviteForm.project_id) payload.project_id = parseInt(inviteForm.project_id);
 
       await usersApi.invite(payload);
       await loadUsers();
