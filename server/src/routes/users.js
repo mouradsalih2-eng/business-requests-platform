@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { requireSuperAdmin } from '../middleware/project.js';
+import { requireProject, requireProjectAdmin, requireSuperAdmin } from '../middleware/project.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { supabase } from '../db/supabase.js';
 import { userRepository } from '../repositories/userRepository.js';
@@ -228,13 +228,13 @@ router.delete('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, 
 
 // ── Seed ─────────────────────────────────────────────────────
 
-router.post('/seed', authenticateToken, requireAdmin, asyncHandler(async (_req, res) => {
-  const result = await seedDatabase();
+router.post('/seed', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
+  const result = await seedDatabase(req.project.id);
   res.json(result);
 }));
 
-router.delete('/seed', authenticateToken, requireAdmin, asyncHandler(async (_req, res) => {
-  const result = await unseedDatabase();
+router.delete('/seed', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
+  const result = await unseedDatabase(req.project.id);
   res.json(result);
 }));
 

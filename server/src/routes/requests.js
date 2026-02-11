@@ -136,8 +136,10 @@ router.get('/:id/interactions', authenticateToken, requireProject, asyncHandler(
 
 // Create request
 router.post('/', authenticateToken, requireProject, upload.array('attachments', 5), asyncHandler(async (req, res) => {
-  const { title, category, priority, team, region, business_problem, problem_size, business_expectations, expected_impact, on_behalf_of_user_id, on_behalf_of_name } = req.body;
-  if (!title?.trim() || !category || !priority) throw new ValidationError('Title, category, and priority are required');
+  const { title, category: rawCategory, priority: rawPriority, team, region, business_problem, problem_size, business_expectations, expected_impact, on_behalf_of_user_id, on_behalf_of_name } = req.body;
+  if (!title?.trim()) throw new ValidationError('Title is required');
+  const category = rawCategory || 'new_feature';
+  const priority = rawPriority || 'medium';
 
   // On-behalf-of: admin-only feature
   const isOnBehalf = on_behalf_of_user_id || on_behalf_of_name;
@@ -198,8 +200,12 @@ router.post('/', authenticateToken, requireProject, upload.array('attachments', 
     }
   }
 
-  // Auto-watch: creator always watches their own request
-  await watcherRepository.watch(request.id, req.user.id, true);
+  // Auto-watch: creator always watches their own request (non-critical)
+  try {
+    await watcherRepository.watch(request.id, req.user.id, true);
+  } catch (err) {
+    console.error('Auto-watch failed (non-critical):', err.message);
+  }
 
   const attachments = await attachmentRepository.findByRequest(request.id);
   const customFieldValues = await customFieldValueRepository.findByRequest(request.id);

@@ -393,6 +393,8 @@ export const featureFlags = {
 export const formConfig = {
   get: () => request('/form-config'),
 
+  getImpact: () => request('/form-config/impact'),
+
   update: (data) =>
     request('/form-config', {
       method: 'PATCH',

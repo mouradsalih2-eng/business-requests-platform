@@ -26,10 +26,10 @@ export const requestSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
   category: z.enum(['bug', 'new_feature', 'optimization'], {
     errorMap: () => ({ message: 'Invalid category' }),
-  }),
+  }).optional(),
   priority: z.enum(['low', 'medium', 'high'], {
     errorMap: () => ({ message: 'Invalid priority' }),
-  }),
+  }).optional(),
   team: z.enum(['Manufacturing', 'Sales', 'Service', 'Energy']).optional(),
   region: z.enum(['EMEA', 'North America', 'APAC', 'Global']).optional(),
   business_problem: z.string().optional(),

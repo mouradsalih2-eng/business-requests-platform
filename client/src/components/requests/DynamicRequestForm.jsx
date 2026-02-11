@@ -19,18 +19,46 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
   const [expectedImpact, setExpectedImpact] = useState(initialValues.expected_impact || '');
   const [customValues, setCustomValues] = useState({});
   const [files, setFiles] = useState([]);
+  const [errors, setErrors] = useState({});
 
   const handleCustomFieldChange = (fieldId, value) => {
     setCustomValues(prev => ({ ...prev, [fieldId]: value }));
   };
 
+  const validate = () => {
+    const newErrors = {};
+    if (!title.trim()) {
+      newErrors.title = 'Title is required';
+    } else if (title.trim().length < 5) {
+      newErrors.title = 'Title must be at least 5 characters';
+    }
+    if (showField('category') && !category) newErrors.category = 'Category is required';
+    if (showField('priority') && !priority) newErrors.priority = 'Priority is required';
+
+    // Validate required custom fields
+    for (const field of customFields.filter(f => f.visibility === 'all' && f.is_enabled !== false && f.is_required)) {
+      const val = customValues[field.id];
+      if (val === undefined || val === '' || val === null) {
+        newErrors[`custom_${field.id}`] = `${field.label} is required`;
+      } else if (['text', 'textarea'].includes(field.field_type) && field.validation?.min_length) {
+        if (String(val).trim().length < Number(field.validation.min_length)) {
+          newErrors[`custom_${field.id}`] = `${field.label} must be at least ${field.validation.min_length} characters`;
+        }
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!validate()) return;
 
     const formData = new FormData();
     formData.append('title', title);
-    formData.append('category', category);
-    formData.append('priority', priority);
+    if (category) formData.append('category', category);
+    if (priority) formData.append('priority', priority);
     if (team) formData.append('team', team);
     if (region) formData.append('region', region);
     if (businessProblem) formData.append('business_problem', businessProblem);
@@ -77,34 +105,42 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
         <input
           type="text"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className={inputClass}
+          onChange={(e) => { setTitle(e.target.value); setErrors(prev => ({ ...prev, title: undefined })); }}
+          className={`${inputClass} ${errors.title ? 'border-red-400 dark:border-red-500' : ''}`}
           placeholder="Brief description of the request"
           required
+          minLength={5}
         />
+        {errors.title && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.title}</p>}
       </div>
 
       {/* Category + Priority row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className={labelClass}>Category *</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass} required>
-            <option value="">Select category</option>
-            {categories.map(c => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+      {(showField('category') || showField('priority')) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {showField('category') && (
+            <div>
+              <label className={labelClass}>Category *</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass} required>
+                <option value="">Select category</option>
+                {categories.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {showField('priority') && (
+            <div>
+              <label className={labelClass}>Priority *</label>
+              <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selectClass} required>
+                <option value="">Select priority</option>
+                {priorities.map(p => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
-        <div>
-          <label className={labelClass}>Priority *</label>
-          <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selectClass} required>
-            <option value="">Select priority</option>
-            {priorities.map(p => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      )}
 
       {/* Team + Region row */}
       {(showField('team') || showField('region')) && (
@@ -192,7 +228,8 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
           <label className={labelClass}>
             {field.label}{field.is_required && ' *'}
           </label>
-          {renderCustomField(field, customValues[field.id] || '', (val) => handleCustomFieldChange(field.id, val), { inputClass, selectClass, textareaClass })}
+          {renderCustomField(field, customValues[field.id] || '', (val) => { handleCustomFieldChange(field.id, val); setErrors(prev => ({ ...prev, [`custom_${field.id}`]: undefined })); }, { inputClass, selectClass, textareaClass })}
+          {errors[`custom_${field.id}`] && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors[`custom_${field.id}`]}</p>}
         </div>
       ))}
 
@@ -211,7 +248,7 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitLoading || !title.trim() || !category || !priority}
+        disabled={submitLoading || title.trim().length < 5 || (showField('category') && !category) || (showField('priority') && !priority)}
         className="w-full px-4 py-2.5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-sm font-medium rounded-lg hover:bg-[#4338CA] dark:hover:bg-[#4F46E5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {submitLoading ? 'Submitting...' : 'Submit Request'}

@@ -93,8 +93,11 @@ jest.unstable_mockModule('../src/middleware/project.js', () => ({
     if (req.user?.role !== 'super_admin') return res.status(403).json({ error: 'Super admin access required' });
     next();
   },
-  requireProject: (req, res, next) => next(),
-  requireProjectAdmin: (req, res, next) => next(),
+  requireProject: (req, res, next) => { req.project = { id: 1 }; req.projectRole = req.user?.role === 'admin' || req.user?.role === 'super_admin' ? 'admin' : 'member'; next(); },
+  requireProjectAdmin: (req, res, next) => {
+    if (req.user?.role === 'admin' || req.user?.role === 'super_admin' || req.projectRole === 'admin') return next();
+    return res.status(403).json({ error: 'Project admin access required' });
+  },
 }));
 
 // Mock storageService (files are now in Supabase Storage, no local fs)
@@ -748,7 +751,7 @@ describe('Users API', () => {
       expect(res.body.requests).toBe(115);
       expect(res.body.votes).toBe(340);
       expect(res.body.comments).toBe(120);
-      expect(mockSeedDatabase).toHaveBeenCalledTimes(1);
+      expect(mockSeedDatabase).toHaveBeenCalledWith(1);
     });
 
     it('propagates errors from seedDatabase', async () => {

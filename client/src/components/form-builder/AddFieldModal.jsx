@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../ui/Modal';
+import { CARD_ELIGIBLE_TYPES } from './FormBuilder';
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text', desc: 'Short answer', icon: (
@@ -67,6 +68,8 @@ export function AddFieldModal({ isOpen, onClose, onAdd, existingCount = 0, cardL
   const handleTypeSelect = (type) => {
     setSelectedType(type);
     setValidation({});
+    // Default analytics ON for select-like types
+    setIncludeInAnalytics(['select', 'multi_select'].includes(type));
   };
 
   const updateValidation = (key, value) => {
@@ -80,6 +83,9 @@ export function AddFieldModal({ isOpen, onClose, onAdd, existingCount = 0, cardL
       ? optionList.filter(Boolean).map((l) => ({ value: l.trim(), label: l.trim() }))
       : null;
 
+    // Only select-like types can be shown on card
+    const canShowOnCard = CARD_ELIGIBLE_TYPES.includes(selectedType);
+
     onAdd({
       name: name.trim(),
       label: label.trim(),
@@ -87,7 +93,7 @@ export function AddFieldModal({ isOpen, onClose, onAdd, existingCount = 0, cardL
       is_required: required,
       options: parsedOptions,
       sort_order: existingCount,
-      show_on_card: showOnCard,
+      show_on_card: canShowOnCard ? showOnCard : false,
       include_in_analytics: includeInAnalytics,
       color: color || null,
       validation: Object.keys(validation).length > 0 ? validation : null,
@@ -223,25 +229,34 @@ export function AddFieldModal({ isOpen, onClose, onAdd, existingCount = 0, cardL
             </button>
             <span className="text-xs text-neutral-900 dark:text-[#E6EDF3]">Required</span>
           </label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { if (!(cardLimitReached && !showOnCard)) setShowOnCard(!showOnCard); }}
-              disabled={cardLimitReached && !showOnCard}
-              className={`w-9 h-5 rounded-full relative flex-shrink-0 transition-colors ${
-                cardLimitReached && !showOnCard
-                  ? 'bg-neutral-200 dark:bg-[#21262D] cursor-not-allowed'
-                  : showOnCard ? 'bg-[#4F46E5] dark:bg-[#6366F1]' : 'bg-neutral-300 dark:bg-[#30363D]'
-              }`}
-            >
-              <div className={`w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${showOnCard ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
-            </button>
-            <div>
-              <span className="text-xs text-neutral-900 dark:text-[#E6EDF3]">Show on card</span>
-              {cardLimitReached && !showOnCard && (
-                <span className="block text-[10px] text-amber-500 dark:text-amber-400">Limit reached (max 5)</span>
-              )}
+          {CARD_ELIGIBLE_TYPES.includes(selectedType) ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { if (!(cardLimitReached && !showOnCard)) setShowOnCard(!showOnCard); }}
+                disabled={cardLimitReached && !showOnCard}
+                className={`w-9 h-5 rounded-full relative flex-shrink-0 transition-colors ${
+                  cardLimitReached && !showOnCard
+                    ? 'bg-neutral-200 dark:bg-[#21262D] cursor-not-allowed'
+                    : showOnCard ? 'bg-[#4F46E5] dark:bg-[#6366F1]' : 'bg-neutral-300 dark:bg-[#30363D]'
+                }`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${showOnCard ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+              </button>
+              <div>
+                <span className="text-xs text-neutral-900 dark:text-[#E6EDF3]">Show on card</span>
+                {cardLimitReached && !showOnCard && (
+                  <span className="block text-[10px] text-amber-500 dark:text-amber-400">Limit reached (max 5)</span>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2 opacity-50">
+              <div className="w-9 h-5 rounded-full relative flex-shrink-0 bg-neutral-200 dark:bg-[#21262D] cursor-not-allowed">
+                <div className="w-4 h-4 bg-white rounded-full absolute top-[2px] translate-x-[2px]" />
+              </div>
+              <span className="text-xs text-neutral-500 dark:text-[#8B949E]" title="Only select/dropdown fields can be card badges">Show on card</span>
+            </div>
+          )}
           {['select', 'multi_select'].includes(selectedType) && (
             <label className="flex items-center gap-2 cursor-pointer">
               <button

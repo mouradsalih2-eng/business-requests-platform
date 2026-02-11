@@ -1129,11 +1129,11 @@ export function AdminPanel() {
           <FormBuilder />
         )}
 
-        {/* Feature Flags Section */}
+        {/* Features Section */}
         {activeTab === 'flags' && (
           <div className="bg-white dark:bg-[#21262D] border border-neutral-100 dark:border-[#30363D] rounded-xl p-4 sm:p-6">
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3]">Feature Flags</h2>
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3]">Features</h2>
               <p className="text-sm text-neutral-500 dark:text-[#8B949E] mt-1">
                 Toggle features on/off to control the platform experience.
               </p>

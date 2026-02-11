@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isCardEligible, CARD_ELIGIBLE_TYPES } from './FormBuilder';
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
@@ -14,7 +15,7 @@ const FIELD_TYPES = [
 
 const BADGE_COLORS = ['#6366F1', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#06B6D4'];
 
-export function FieldEditor({ field, isOpen, onClose, onSave, onLiveChange, cardLimitReached }) {
+export function FieldEditor({ field, isOpen, onClose, onSave, onDelete, onLiveChange, cardLimitReached }) {
   const [label, setLabel] = useState('');
   const [fieldType, setFieldType] = useState('text');
   const [required, setRequired] = useState(false);
@@ -23,6 +24,7 @@ export function FieldEditor({ field, isOpen, onClose, onSave, onLiveChange, card
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
   const [validation, setValidation] = useState({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (field) {
@@ -310,34 +312,69 @@ export function FieldEditor({ field, isOpen, onClose, onSave, onLiveChange, card
                 <div className={`w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${required ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
               </button>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs text-neutral-900 dark:text-[#E6EDF3]">Show on card</span>
-                <span className={`block text-[10px] ${cardLimitReached && !showOnCard ? 'text-amber-500 dark:text-amber-400' : 'text-neutral-400 dark:text-[#6E7681]'}`}>
-                  {cardLimitReached && !showOnCard ? 'Card badge limit reached (max 5)' : 'Display as badge on request cards'}
-                </span>
+            {CARD_ELIGIBLE_TYPES.includes(fieldType) || (!field.isCustom && ['category', 'priority', 'team', 'region'].includes(field.key)) ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-neutral-900 dark:text-[#E6EDF3]">Show on card</span>
+                  <span className={`block text-[10px] ${cardLimitReached && !showOnCard ? 'text-amber-500 dark:text-amber-400' : 'text-neutral-400 dark:text-[#6E7681]'}`}>
+                    {cardLimitReached && !showOnCard ? 'Card badge limit reached (max 5)' : 'Display as badge on request cards'}
+                  </span>
+                </div>
+                <button
+                  onClick={toggleShowOnCard}
+                  disabled={cardLimitReached && !showOnCard}
+                  className={`w-9 h-5 rounded-full relative flex-shrink-0 transition-colors ${
+                    cardLimitReached && !showOnCard
+                      ? 'bg-neutral-200 dark:bg-[#21262D] cursor-not-allowed'
+                      : showOnCard ? 'bg-[#4F46E5] dark:bg-[#6366F1]' : 'bg-neutral-300 dark:bg-[#30363D]'
+                  }`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${showOnCard ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+                </button>
               </div>
-              <button
-                onClick={toggleShowOnCard}
-                disabled={cardLimitReached && !showOnCard}
-                className={`w-9 h-5 rounded-full relative flex-shrink-0 transition-colors ${
-                  cardLimitReached && !showOnCard
-                    ? 'bg-neutral-200 dark:bg-[#21262D] cursor-not-allowed'
-                    : showOnCard ? 'bg-[#4F46E5] dark:bg-[#6366F1]' : 'bg-neutral-300 dark:bg-[#30363D]'
-                }`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full absolute top-[2px] transition-transform duration-200 ${showOnCard ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
-              </button>
-            </div>
+            ) : (
+              <div className="flex items-center justify-between opacity-50">
+                <div>
+                  <span className="text-xs text-neutral-500 dark:text-[#8B949E]">Show on card</span>
+                  <span className="block text-[10px] text-neutral-400 dark:text-[#6E7681]">Only select/dropdown fields can be shown as card badges</span>
+                </div>
+                <div className="w-9 h-5 rounded-full relative flex-shrink-0 bg-neutral-200 dark:bg-[#21262D] cursor-not-allowed">
+                  <div className="w-4 h-4 bg-white rounded-full absolute top-[2px] translate-x-[2px]" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-neutral-200 dark:border-[#30363D]/60">
           {!isBuiltIn && (
-            <button className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors">
-              Delete field
-            </button>
+            <div className="relative">
+              {showDeleteConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-neutral-500 dark:text-[#8B949E]">Existing data will be preserved.</span>
+                  <button
+                    onClick={() => { onDelete?.(field); onClose(); setShowDeleteConfirm(false); }}
+                    className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 font-medium transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="text-xs text-neutral-400 dark:text-[#6E7681] hover:text-neutral-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
+                >
+                  Delete field
+                </button>
+              )}
+            </div>
           )}
           <div className={`flex gap-3 ${isBuiltIn ? 'ml-auto' : ''}`}>
             <button

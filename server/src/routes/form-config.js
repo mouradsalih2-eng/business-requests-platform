@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import { requireProject, requireProjectAdmin } from '../middleware/project.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { formConfigRepository } from '../repositories/formConfigRepository.js';
+import { requestRepository } from '../repositories/requestRepository.js';
 import { ValidationError, NotFoundError } from '../errors/AppError.js';
 
 const router = Router();
@@ -25,9 +26,16 @@ router.get('/', authenticateToken, requireProject, asyncHandler(async (req, res)
   res.json({ config, customFields });
 }));
 
+// Get impact count (how many requests in this project)
+router.get('/impact', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+  const count = await requestRepository.countByProject(req.project.id);
+  res.json({ requestCount: count });
+}));
+
 // Update form config (admin)
 router.patch('/', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
   const {
+    show_category, show_priority,
     show_team, show_region, show_business_problem, show_problem_size,
     show_business_expectations, show_expected_impact,
     custom_categories, custom_priorities, custom_teams, custom_regions, custom_statuses,
@@ -35,6 +43,8 @@ router.patch('/', authenticateToken, requireProject, requireProjectAdmin, asyncH
   } = req.body;
 
   const updates = {};
+  if (show_category !== undefined) updates.show_category = show_category;
+  if (show_priority !== undefined) updates.show_priority = show_priority;
   if (show_team !== undefined) updates.show_team = show_team;
   if (show_region !== undefined) updates.show_region = show_region;
   if (show_business_problem !== undefined) updates.show_business_problem = show_business_problem;
@@ -125,15 +135,16 @@ router.patch('/fields/:fieldId', authenticateToken, requireProject, requireProje
   res.json(field);
 }));
 
-// Delete custom field
+// Delete custom field (soft-delete: sets is_enabled = false to preserve existing data)
 router.delete('/fields/:fieldId', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
   const fieldId = parseInt(req.params.fieldId, 10);
   const existing = await formConfigRepository.getCustomField(fieldId);
   if (!existing) throw new NotFoundError('Custom field');
   if (existing.project_id !== req.project.id) throw new NotFoundError('Custom field');
 
-  await formConfigRepository.deleteCustomField(fieldId);
-  res.json({ message: 'Custom field deleted' });
+  // Soft-delete: disable the field but preserve existing request data
+  await formConfigRepository.updateCustomField(fieldId, { is_enabled: false });
+  res.json({ message: 'Custom field disabled' });
 }));
 
 export default router;

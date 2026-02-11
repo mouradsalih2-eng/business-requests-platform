@@ -680,22 +680,40 @@ describe('Edge Cases - Input Validation', () => {
       expect(res.status).toBe(201);
     });
 
-    it('rejects request missing category', async () => {
+    it('defaults category to new_feature when missing', async () => {
+      mockRequestRepository.create.mockResolvedValue({
+        id: 99, title: 'Test', category: 'new_feature', priority: 'low',
+        status: 'pending', user_id: 1, team: 'Manufacturing', region: 'Global',
+      });
+      mockAttachmentRepository.findByRequest.mockResolvedValue([]);
+
       const res = await request(app)
         .post('/api/requests')
         .set('Authorization', `Bearer ${userToken}`)
         .send({ title: 'Test', priority: 'low' });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(201);
+      expect(mockRequestRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'new_feature' }),
+      );
     });
 
-    it('rejects request missing priority', async () => {
+    it('defaults priority to medium when missing', async () => {
+      mockRequestRepository.create.mockResolvedValue({
+        id: 100, title: 'Test', category: 'bug', priority: 'medium',
+        status: 'pending', user_id: 1, team: 'Manufacturing', region: 'Global',
+      });
+      mockAttachmentRepository.findByRequest.mockResolvedValue([]);
+
       const res = await request(app)
         .post('/api/requests')
         .set('Authorization', `Bearer ${userToken}`)
         .send({ title: 'Test', category: 'bug' });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(201);
+      expect(mockRequestRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ priority: 'medium' }),
+      );
     });
   });
 

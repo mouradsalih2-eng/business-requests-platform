@@ -10,7 +10,7 @@ const STEPS = [
   { label: 'Name', title: 'Name Your Project' },
   { label: 'Members', title: 'Invite Members' },
   { label: 'Form', title: 'Build Your Form' },
-  { label: 'Flags', title: 'Configure Features' },
+  { label: 'Features', title: 'Configure Features' },
   { label: 'Launch', title: 'Review & Launch' },
 ];
 
@@ -46,6 +46,7 @@ export function Onboarding() {
   const [memberAuth, setMemberAuth] = useState('google');
   const [memberPassword, setMemberPassword] = useState('');
   const [addingMember, setAddingMember] = useState(false);
+  const [memberError, setMemberError] = useState('');
 
   // Step 3: Form config (managed by FormBuilder)
   const [formBuilderConfig, setFormBuilderConfig] = useState({ config: {}, customFields: [] });
@@ -64,10 +65,26 @@ export function Onboarding() {
 
   const handleAddMember = async () => {
     if (!memberEmail) return;
+    setMemberError('');
+
+    const email = memberEmail.trim().toLowerCase();
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setMemberError('Please enter a valid email address');
+      return;
+    }
+
+    // Check for duplicates in current list
+    if (members.some((m) => m.email.toLowerCase() === email)) {
+      setMemberError('This email has already been added');
+      return;
+    }
+
     setAddingMember(true);
     try {
       const member = {
-        email: memberEmail,
+        email,
         role: memberRole,
         authMethod: memberAuth,
         password: memberAuth === 'email' ? memberPassword : null,
@@ -285,7 +302,7 @@ export function Onboarding() {
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 <div className="sm:col-span-4">
                   <label className="block text-xs font-medium text-neutral-500 dark:text-[#8B949E] mb-1">Email</label>
-                  <input type="email" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} className={inputClass} placeholder="user@company.com" />
+                  <input type="email" value={memberEmail} onChange={(e) => { setMemberEmail(e.target.value); setMemberError(''); }} className={inputClass} placeholder="user@company.com" />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-neutral-500 dark:text-[#8B949E] mb-1">Role</label>
@@ -313,6 +330,9 @@ export function Onboarding() {
                   </button>
                 </div>
               </div>
+              {memberError && (
+                <p className="mt-2 text-xs text-red-500 dark:text-red-400">{memberError}</p>
+              )}
             </div>
 
             <div className="space-y-2">

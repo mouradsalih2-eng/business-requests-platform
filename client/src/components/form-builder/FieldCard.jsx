@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { isCardEligible } from './FormBuilder';
 
 const BADGE_COLORS = ['#6366F1', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#06B6D4'];
 
@@ -18,31 +18,7 @@ function isAnalyticsEligible(field) {
  * FieldCard - Single draggable field row in the form builder.
  * Standard fields show toggle + eye. Custom fields also show color dot, option count, and settings gear.
  */
-export function FieldCard({ field, index, isCustom, onToggle, onToggleCardVisibility, onEdit, onDragStart, onDragOver, onDrop, cardLimitReached, analyticsFields, onToggleAnalytics }) {
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  const handleDragStart = (e) => {
-    e.dataTransfer.setData('text/plain', index.toString());
-    e.dataTransfer.effectAllowed = 'move';
-    onDragStart?.(index);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setIsDragOver(true);
-    onDragOver?.(index);
-  };
-
-  const handleDragLeave = () => setIsDragOver(false);
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-    onDrop?.(fromIndex, index);
-  };
-
+export function FieldCard({ field, index, isCustom, onToggle, onToggleCardVisibility, onEdit, cardLimitReached, analyticsFields, onToggleAnalytics, dragHandleProps, isDragging, onCardLimitReachedClick, onCardIneligibleClick }) {
   const isLocked = field.locked;
   const isEnabled = field.enabled !== false;
 
@@ -60,14 +36,9 @@ export function FieldCard({ field, index, isCustom, onToggle, onToggleCardVisibi
 
   return (
     <div
-      draggable={!isLocked}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
       className={`
         group field-row flex items-center gap-3 py-3 px-3 rounded-lg transition-all duration-200
-        ${isDragOver ? 'border-t-2 border-[#4F46E5] dark:border-[#6366F1]' : ''}
+        ${isDragging ? 'ring-2 ring-[#4F46E5] dark:ring-[#6366F1] shadow-lg bg-white dark:bg-[#161B22]' : ''}
         ${isLocked
           ? 'bg-neutral-50 dark:bg-[#161B22]/50 border border-neutral-200 dark:border-[#30363D]/30'
           : 'hover:bg-neutral-50 dark:hover:bg-[#161B22]/40'
@@ -78,7 +49,10 @@ export function FieldCard({ field, index, isCustom, onToggle, onToggleCardVisibi
     >
       {/* Drag handle — always visible on mobile, hover on desktop */}
       {!isLocked && (
-        <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-grab text-neutral-400 dark:text-[#484F58]">
+        <div
+          {...(dragHandleProps || {})}
+          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-neutral-400 dark:text-[#484F58]"
+        >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 6h2v2H8V6zm6 0h2v2h-2V6zM8 11h2v2H8v-2zm6 0h2v2h-2v-2zm-6 5h2v2H8v-2zm6 0h2v2h-2v-2z" />
           </svg>
@@ -139,29 +113,46 @@ export function FieldCard({ field, index, isCustom, onToggle, onToggleCardVisibi
             </button>
           )}
 
-          {/* Card visibility eye icon */}
-          <button
-            onClick={() => onToggleCardVisibility?.(field)}
-            disabled={cardLimitReached && !field.showOnCard}
-            className={`p-1.5 rounded-md transition-colors ${
-              cardLimitReached && !field.showOnCard
-                ? 'text-neutral-200 dark:text-[#30363D] cursor-not-allowed'
-                : field.showOnCard
-                  ? 'text-[#4F46E5] dark:text-[#818CF8] hover:bg-[#4F46E5]/10 dark:hover:bg-[#818CF8]/10'
-                  : 'text-neutral-300 dark:text-[#484F58] hover:text-neutral-500 dark:hover:text-[#8B949E] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
-            }`}
-            title={cardLimitReached && !field.showOnCard ? 'Card badge limit reached (max 5)' : field.showOnCard ? 'Visible on card' : 'Hidden from card'}
-          >
-            {field.showOnCard ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
-              </svg>
-            ) : (
+          {/* Card visibility eye icon — only for card-eligible types (select-like fields) */}
+          {isCardEligible(field) ? (
+            <button
+              onClick={() => {
+                if (cardLimitReached && !field.showOnCard) {
+                  onCardLimitReachedClick?.();
+                } else {
+                  onToggleCardVisibility?.(field);
+                }
+              }}
+              className={`p-1.5 rounded-md transition-colors ${
+                cardLimitReached && !field.showOnCard
+                  ? 'text-neutral-200 dark:text-[#30363D] cursor-not-allowed'
+                  : field.showOnCard
+                    ? 'text-[#4F46E5] dark:text-[#818CF8] hover:bg-[#4F46E5]/10 dark:hover:bg-[#818CF8]/10'
+                    : 'text-neutral-300 dark:text-[#484F58] hover:text-neutral-500 dark:hover:text-[#8B949E] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
+              }`}
+              title={cardLimitReached && !field.showOnCard ? 'Card badge limit reached (max 5)' : field.showOnCard ? 'Visible on card' : 'Hidden from card'}
+            >
+              {field.showOnCard ? (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={() => onCardIneligibleClick?.()}
+              className="p-1.5 rounded-md text-neutral-200 dark:text-[#30363D] hover:text-neutral-300 dark:hover:text-[#484F58] transition-colors"
+              title="Only select/dropdown fields can be shown as card badges"
+            >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
               </svg>
-            )}
-          </button>
+            </button>
+          )}
 
           {/* Settings gear — always visible on mobile, hover on desktop */}
           {isCustom && (

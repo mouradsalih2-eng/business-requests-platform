@@ -365,24 +365,40 @@ describe('Requests API', () => {
       expect(res.body.error).toMatch(/required/i);
     });
 
-    it('returns 400 if category is missing', async () => {
+    it('defaults category to new_feature when missing', async () => {
+      mockRequestRepository.create.mockResolvedValue({
+        id: 99, title: 'Test Request', category: 'new_feature', priority: 'high',
+        status: 'pending', user_id: 1, team: 'Manufacturing', region: 'Global',
+      });
+      mockAttachmentRepository.findByRequest.mockResolvedValue([]);
+
       const res = await request(app)
         .post('/api/requests')
         .set('Authorization', `Bearer ${userToken}`)
-        .send({ title: 'Test', priority: 'high' });
+        .send({ title: 'Test Request', priority: 'high' });
 
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/required/i);
+      expect(res.status).toBe(201);
+      expect(mockRequestRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'new_feature' }),
+      );
     });
 
-    it('returns 400 if priority is missing', async () => {
+    it('defaults priority to medium when missing', async () => {
+      mockRequestRepository.create.mockResolvedValue({
+        id: 100, title: 'Test Request', category: 'bug', priority: 'medium',
+        status: 'pending', user_id: 1, team: 'Manufacturing', region: 'Global',
+      });
+      mockAttachmentRepository.findByRequest.mockResolvedValue([]);
+
       const res = await request(app)
         .post('/api/requests')
         .set('Authorization', `Bearer ${userToken}`)
-        .send({ title: 'Test', category: 'bug' });
+        .send({ title: 'Test Request', category: 'bug' });
 
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/required/i);
+      expect(res.status).toBe(201);
+      expect(mockRequestRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ priority: 'medium' }),
+      );
     });
 
     it('returns 400 if title is blank whitespace', async () => {

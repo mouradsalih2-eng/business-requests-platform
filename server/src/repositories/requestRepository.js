@@ -150,6 +150,15 @@ export const requestRepository = {
     if (error) handleError(error, 'count');
     return count;
   },
+
+  async countByProject(projectId) {
+    const { count, error } = await supabase
+      .from('requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId);
+    if (error) handleError(error, 'countByProject');
+    return count;
+  },
 };
 
 // ── helpers ──────────────────────────────────────────────────

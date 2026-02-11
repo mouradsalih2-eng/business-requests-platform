@@ -3,6 +3,7 @@ import { userRepository } from '../repositories/userRepository.js';
 import { requestRepository } from '../repositories/requestRepository.js';
 import { voteRepository } from '../repositories/voteRepository.js';
 import { commentRepository } from '../repositories/commentRepository.js';
+import { projectMemberRepository } from '../repositories/projectMemberRepository.js';
 
 const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -100,13 +101,19 @@ async function ensureSeedUser(email, name, role = 'employee') {
   return userRepository.create({ email, name, role, auth_id: authData.user.id });
 }
 
-export async function seedDatabase() {
+export async function seedDatabase(projectId) {
+  if (!projectId) throw new Error('projectId is required for seeding');
+
   const userIds = [];
 
-  // Create test users with Supabase Auth accounts
+  // Create test users with Supabase Auth accounts and add as project members
   for (const u of SEED_USERS) {
     const user = await ensureSeedUser(u.email, u.name);
     userIds.push(user.id);
+    // Add as project member (ignore if already a member)
+    try {
+      await projectMemberRepository.addMember(projectId, user.id, 'member');
+    } catch { /* already a member */ }
   }
 
   const admin = await userRepository.findByEmail('admin@company.com', 'id');
@@ -124,6 +131,7 @@ export async function seedDatabase() {
         user_id: userIds[i % userIds.length], title: r.title, category: r.category,
         priority: r.priority, status: r.status, business_problem: r.business_problem,
         team: r.team, region: r.region, created_at: createdAt,
+        project_id: projectId,
       });
     }
     allRequestIds.push(existing.id);
@@ -153,6 +161,7 @@ export async function seedDatabase() {
           team: randomChoice(TEAMS), region: randomChoice(REGIONS),
           business_problem: `Request for ${randomChoice(TEAMS)} team in ${randomChoice(REGIONS)}.`,
           created_at: createdAt,
+          project_id: projectId,
         });
         allRequestIds.push(existing.id);
       }
@@ -181,7 +190,7 @@ export async function seedDatabase() {
   }
 
   const [users, requests, votes, comments] = await Promise.all([
-    userRepository.count(), requestRepository.count(), voteRepository.count(), commentRepository.count(),
+    userRepository.count(), requestRepository.countByProject(projectId), voteRepository.count(), commentRepository.count(),
   ]);
 
   return { message: 'Database seeded successfully', users, requests, votes, comments };
@@ -192,7 +201,7 @@ export async function seedDatabase() {
  * associated requests, votes, comments, tags, and activity log entries.
  * Does NOT delete the admin user or any real users.
  */
-export async function unseedDatabase() {
+export async function unseedDatabase(projectId) {
   const seedEmails = SEED_USERS.map(u => u.email);
 
   // Find seed user IDs
@@ -208,11 +217,13 @@ export async function unseedDatabase() {
 
   const seedUserIds = seedUserRows.map(u => u.id);
 
-  // Find all requests created by seed users
-  const { data: seedRequests } = await supabase
+  // Find all requests created by seed users (scoped to project if provided)
+  let seedRequestQuery = supabase
     .from('requests')
     .select('id')
     .in('user_id', seedUserIds);
+  if (projectId) seedRequestQuery = seedRequestQuery.eq('project_id', projectId);
+  const { data: seedRequests } = await seedRequestQuery;
   const seedRequestIds = (seedRequests || []).map(r => r.id);
 
   // Delete in dependency order
@@ -262,11 +273,20 @@ export async function unseedDatabase() {
     await supabase.from('roadmap_items').delete().in('request_id', seedRequestIds);
   }
 
-  // Delete the seed requests themselves
-  const { count: rc } = await supabase
+  // Delete the seed requests themselves (scoped to project if provided)
+  let deleteRequestsQuery = supabase
     .from('requests')
     .delete({ count: 'exact' })
     .in('user_id', seedUserIds);
+  if (projectId) deleteRequestsQuery = deleteRequestsQuery.eq('project_id', projectId);
+  const { count: rc } = await deleteRequestsQuery;
+
+  // Remove seed users from this project's membership
+  if (projectId) {
+    for (const userId of seedUserIds) {
+      await supabase.from('project_members').delete().eq('project_id', projectId).eq('user_id', userId);
+    }
+  }
 
   // Also delete any votes/comments seed users made on non-seed requests
   await supabase.from('votes').delete().in('user_id', seedUserIds);

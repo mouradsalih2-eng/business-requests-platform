@@ -1,4 +1,5 @@
 import { StatusBadge, CategoryBadge, PriorityBadge, TeamBadge, RegionBadge } from '../ui/Badge';
+import { isCardEligible } from './FormBuilder';
 
 const STATUS_DOT_COLORS = {
   pending: 'bg-amber-400',
@@ -15,7 +16,8 @@ const STATUS_DOT_COLORS = {
  * Mirrors the actual RequestCard design exactly, including mobile dot behavior.
  */
 export function CardPreview({ fields, maxCardFields = 5 }) {
-  const cardFields = fields.filter((f) => f.showOnCard && f.enabled !== false);
+  // Only card-eligible fields (select-like) count toward the badge limit and render
+  const cardFields = fields.filter((f) => f.showOnCard && f.enabled !== false && isCardEligible(f));
   const MAX_CARD_FIELDS = maxCardFields;
 
   // Separate built-in badge fields from custom fields

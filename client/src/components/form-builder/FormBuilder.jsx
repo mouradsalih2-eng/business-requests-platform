@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useProject } from '../../context/ProjectContext';
 import { formConfig as formConfigApi } from '../../lib/api';
 import { FieldList } from './FieldList';
@@ -6,13 +6,30 @@ import { FieldEditor } from './FieldEditor';
 import { FormPreview } from './FormPreview';
 import { CardPreview } from './CardPreview';
 import { AddFieldModal } from './AddFieldModal';
+import { useToast } from '../ui/Toast';
 
 const MAX_CARD_FIELDS = 5;
 
+// Only select-like fields make visual sense as card badges
+export const CARD_ELIGIBLE_TYPES = ['select', 'multi_select'];
+// Built-in select fields that are always eligible
+export const CARD_ELIGIBLE_BUILTIN_KEYS = ['category', 'priority', 'team', 'region'];
+
+export function isCardEligible(field) {
+  // Built-in select fields
+  if (!field.isCustom && CARD_ELIGIBLE_BUILTIN_KEYS.includes(field.key)) return true;
+  // Title is always on card (locked)
+  if (field.key === 'title' && field.locked) return true;
+  // Custom select fields
+  const type = field.type || field.field_type;
+  if (field.isCustom && CARD_ELIGIBLE_TYPES.includes(type)) return true;
+  return false;
+}
+
 const BUILTIN_FIELDS = [
   { key: 'title', label: 'Title', type: 'text', required: true, locked: true, showOnCard: true },
-  { key: 'category', label: 'Category', type: 'select', required: true, configKey: null, showOnCard: true },
-  { key: 'priority', label: 'Priority', type: 'select', required: true, configKey: null, showOnCard: true },
+  { key: 'category', label: 'Category', type: 'select', required: true, configKey: 'show_category', showOnCard: true },
+  { key: 'priority', label: 'Priority', type: 'select', required: true, configKey: 'show_priority', showOnCard: true },
   { key: 'team', label: 'Team', type: 'select', configKey: 'show_team', showOnCard: false },
   { key: 'region', label: 'Region', type: 'select', configKey: 'show_region', showOnCard: false },
   { key: 'business_problem', label: 'Business Problem', type: 'textarea', configKey: 'show_business_problem', showOnCard: false },
@@ -23,6 +40,7 @@ const BUILTIN_FIELDS = [
 
 export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange }) {
   const { currentProject } = useProject();
+  const toast = useToast();
   const [config, setConfig] = useState(null);
   const [customFields, setCustomFields] = useState([]);
   const [loading, setLoading] = useState(!initialConfig);
@@ -32,9 +50,23 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
   const [saving, setSaving] = useState(false);
   const [previewTab, setPreviewTab] = useState('form');
 
+  // Draft mode: track original state for dirty detection
+  const originalConfig = useRef(null);
+  const originalCustomFields = useRef([]);
+  // Track new/modified/deleted custom fields for batch save
+  const pendingNewFields = useRef([]);
+  const pendingDeletedFieldIds = useRef(new Set());
+  const pendingModifiedFieldIds = useRef(new Set());
+
+  // Confirmation modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [impactCount, setImpactCount] = useState(null);
+
+  const isOnboarding = initialConfig !== undefined;
+
   // Load config from API or use initial props
   useEffect(() => {
-    if (initialConfig !== undefined) {
+    if (isOnboarding) {
       setConfig(initialConfig || {});
       setCustomFields(initialCustomFields || []);
       setLoading(false);
@@ -46,15 +78,32 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
   const loadConfig = async () => {
     try {
       const data = await formConfigApi.get();
-      setConfig(data.config || {});
-      setCustomFields(data.customFields || []);
+      const cfg = data.config || {};
+      const cfs = data.customFields || [];
+      setConfig(cfg);
+      setCustomFields(cfs);
+      originalConfig.current = JSON.parse(JSON.stringify(cfg));
+      originalCustomFields.current = JSON.parse(JSON.stringify(cfs));
+      pendingNewFields.current = [];
+      pendingDeletedFieldIds.current = new Set();
+      pendingModifiedFieldIds.current = new Set();
     } catch (err) {
       console.error('Failed to load form config:', err);
       setConfig({});
+      originalConfig.current = {};
+      originalCustomFields.current = [];
     } finally {
       setLoading(false);
     }
   };
+
+  // Dirty detection
+  const isDirty = useMemo(() => {
+    if (!config || !originalConfig.current) return false;
+    if (isOnboarding) return false; // onboarding uses its own save flow
+    return JSON.stringify(config) !== JSON.stringify(originalConfig.current)
+      || JSON.stringify(customFields) !== JSON.stringify(originalCustomFields.current);
+  }, [config, customFields, isOnboarding]);
 
   // Build unified field list (built-in + custom), overlaying live draft when editing
   const getFields = useCallback(() => {
@@ -113,33 +162,25 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
   }, [config, customFields, editingFieldDraft]);
 
   const fields = getFields();
-  const cardFieldCount = fields.filter((f) => f.showOnCard && f.enabled !== false).length;
+  const cardFieldCount = fields.filter((f) => f.showOnCard && f.enabled !== false && isCardEligible(f)).length;
   const cardLimitReached = cardFieldCount >= MAX_CARD_FIELDS;
 
   const notifyChange = (newConfig, newCustomFields) => {
     onConfigChange?.({ config: newConfig, customFields: newCustomFields });
   };
 
-  // Toggle field visibility (built-in or custom)
-  const handleToggle = async (field) => {
+  // Toggle field visibility (built-in or custom) — LOCAL ONLY
+  const handleToggle = (field) => {
     if (field.locked) return;
 
     if (field.isCustom) {
-      // Toggle is_enabled for custom field
       const newEnabled = !(field.is_enabled !== false);
       const updated = customFields.map((f) =>
         f.id === field.id ? { ...f, is_enabled: newEnabled } : f
       );
       setCustomFields(updated);
       notifyChange(config, updated);
-
-      if (!initialConfig) {
-        try {
-          await formConfigApi.updateField(field.id, { is_enabled: newEnabled });
-        } catch (err) {
-          console.error('Failed to toggle custom field:', err);
-        }
-      }
+      if (!isOnboarding) pendingModifiedFieldIds.current.add(field.id);
       return;
     }
 
@@ -147,56 +188,41 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
     if (!key) return;
 
     const newValue = !(config[key] !== false);
+
+    // Warn when hiding category or priority
+    if (!newValue && (key === 'show_category' || key === 'show_priority')) {
+      toast.warning('Hiding this field will default new requests to "New Feature" (category) or "Medium" (priority). Existing requests are not affected.');
+    }
     let newConfig = { ...config, [key]: newValue };
 
     // When re-enabling a field that has showOnCard, check if it would exceed the limit
     if (newValue && field.showOnCard && cardLimitReached) {
-      // Auto-remove from card to stay within limit
       const currentCardFields = newConfig.card_fields || [];
       newConfig = { ...newConfig, card_fields: currentCardFields.filter((k) => k !== field.key) };
     }
 
     setConfig(newConfig);
     notifyChange(newConfig, customFields);
-
-    if (!initialConfig) {
-      try {
-        const updates = { [key]: newValue };
-        if (newValue && field.showOnCard && cardLimitReached) {
-          updates.card_fields = newConfig.card_fields;
-        }
-        await formConfigApi.update(updates);
-      } catch (err) {
-        console.error('Failed to toggle field:', err);
-      }
-    }
   };
 
-  // Toggle card visibility
-  const handleToggleCardVisibility = async (field) => {
-    // Block adding more fields if limit reached (always allow removing)
+  // Toggle card visibility — LOCAL ONLY
+  const handleToggleCardVisibility = (field) => {
     const isCurrentlyOnCard = field.isCustom
       ? (field.show_on_card || field.showOnCard)
       : field.showOnCard;
-    if (!isCurrentlyOnCard && cardLimitReached) return;
+    if (!isCurrentlyOnCard && cardLimitReached) {
+      toast.error('Card badge limit reached (5/5). Remove a badge to add another.');
+      return;
+    }
 
     if (field.isCustom) {
-      // Toggle show_on_card for custom field
       const updated = customFields.map((f) =>
         f.id === field.id ? { ...f, show_on_card: !f.show_on_card } : f
       );
       setCustomFields(updated);
       notifyChange(config, updated);
-
-      if (!initialConfig) {
-        try {
-          await formConfigApi.updateField(field.id, { show_on_card: !field.show_on_card });
-        } catch (err) {
-          console.error('Failed to toggle card visibility:', err);
-        }
-      }
+      if (!isOnboarding) pendingModifiedFieldIds.current.add(field.id);
     } else {
-      // Toggle card visibility for built-in field
       const currentCardFields = config.card_fields || [];
       const newCardFields = currentCardFields.includes(field.key)
         ? currentCardFields.filter((k) => k !== field.key)
@@ -204,14 +230,6 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
       const newConfig = { ...config, card_fields: newCardFields };
       setConfig(newConfig);
       notifyChange(newConfig, customFields);
-
-      if (!initialConfig) {
-        try {
-          await formConfigApi.update({ card_fields: newCardFields });
-        } catch (err) {
-          console.error('Failed to toggle card field:', err);
-        }
-      }
     }
   };
 
@@ -226,7 +244,7 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
     setEditingFieldDraft(draft);
   };
 
-  const handleSaveField = async (updatedField) => {
+  const handleSaveField = (updatedField) => {
     if (updatedField.isCustom) {
       const { isCustom, key, type, enabled, showOnCard, ...fieldData } = updatedField;
       const updated = customFields.map((f) =>
@@ -234,57 +252,57 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
       );
       setCustomFields(updated);
       notifyChange(config, updated);
-
-      if (!initialConfig) {
-        try {
-          await formConfigApi.updateField(updatedField.id, fieldData);
-        } catch (err) {
-          console.error('Failed to save field:', err);
-        }
-      }
+      if (!isOnboarding) pendingModifiedFieldIds.current.add(updatedField.id);
     }
     setEditingField(null);
     setEditingFieldDraft(null);
   };
 
-  // Add custom field
-  const handleAddField = async (fieldData) => {
+  // Add custom field — LOCAL ONLY (creates temp ID for new fields)
+  const handleAddField = (fieldData) => {
     const { include_in_analytics, ...fieldPayload } = fieldData;
+    const tempId = `temp_${Date.now()}`;
+    const newField = { ...fieldPayload, id: tempId, isNew: true };
+    setCustomFields((prev) => [...prev, newField]);
+    notifyChange(config, [...customFields, newField]);
 
-    if (initialConfig) {
-      // In onboarding mode, just add locally
-      const tempId = `temp_${Date.now()}`;
-      setCustomFields((prev) => [...prev, { ...fieldPayload, id: tempId, isNew: true }]);
-      notifyChange(config, [...customFields, { ...fieldPayload, id: tempId, isNew: true }]);
-    } else {
-      setSaving(true);
-      try {
-        const created = await formConfigApi.createField(fieldPayload);
-        setCustomFields((prev) => [...prev, created]);
-        notifyChange(config, [...customFields, created]);
+    if (!isOnboarding) {
+      pendingNewFields.current.push({ ...fieldPayload, tempId, include_in_analytics });
+    }
 
-        // Auto-add to analytics_fields if requested
-        if (include_in_analytics && created.id) {
-          const fieldKey = `custom_${created.id}`;
-          const current = config.analytics_fields || [];
-          if (!current.includes(fieldKey)) {
-            const newAnalyticsFields = [...current, fieldKey];
-            const newConfig = { ...config, analytics_fields: newAnalyticsFields };
-            setConfig(newConfig);
-            notifyChange(newConfig, [...customFields, created]);
-            await formConfigApi.update({ analytics_fields: newAnalyticsFields });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to create field:', err);
-      } finally {
-        setSaving(false);
+    // Auto-add to analytics_fields if requested (using temp key)
+    if (include_in_analytics) {
+      const fieldKey = `custom_${tempId}`;
+      const current = config.analytics_fields || [];
+      if (!current.includes(fieldKey)) {
+        const newConfig = { ...config, analytics_fields: [...current, fieldKey] };
+        setConfig(newConfig);
+        notifyChange(newConfig, [...customFields, newField]);
       }
     }
   };
 
-  // Toggle analytics inclusion for a field
-  const handleToggleAnalytics = async (field) => {
+  // Delete (soft-delete) a custom field — LOCAL ONLY
+  const handleDeleteField = (field) => {
+    if (!field.isCustom) return;
+    const updated = customFields.map((f) =>
+      f.id === field.id ? { ...f, is_enabled: false } : f
+    );
+    setCustomFields(updated);
+    notifyChange(config, updated);
+
+    if (!isOnboarding) {
+      // If it's a new field (temp), just remove from pending
+      if (String(field.id).startsWith('temp_')) {
+        pendingNewFields.current = pendingNewFields.current.filter((f) => f.tempId !== field.id);
+      } else {
+        pendingDeletedFieldIds.current.add(field.id);
+      }
+    }
+  };
+
+  // Toggle analytics inclusion — LOCAL ONLY
+  const handleToggleAnalytics = (field) => {
     const fieldKey = field.key || `custom_${field.id}`;
     const current = config.analytics_fields || [];
     const newAnalyticsFields = current.includes(fieldKey)
@@ -293,20 +311,19 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
     const newConfig = { ...config, analytics_fields: newAnalyticsFields };
     setConfig(newConfig);
     notifyChange(newConfig, customFields);
-
-    if (!initialConfig) {
-      try {
-        await formConfigApi.update({ analytics_fields: newAnalyticsFields });
-      } catch (err) {
-        console.error('Failed to toggle analytics field:', err);
-      }
-    }
   };
 
-  // Reorder fields
-  const handleReorder = async (reordered) => {
-    // Split back into built-in and custom
-    const newBuiltIn = reordered.filter((f) => !f.isCustom);
+  // Toast callbacks for FieldCard error states
+  const handleCardLimitReached = useCallback(() => {
+    toast.error('Card badge limit reached (5/5). Remove a badge to add another.');
+  }, [toast]);
+
+  const handleCardIneligible = useCallback(() => {
+    toast.error('Only select/dropdown fields can be shown as card badges.');
+  }, [toast]);
+
+  // Reorder fields — LOCAL ONLY
+  const handleReorder = (reordered) => {
     const newCustom = reordered.filter((f) => f.isCustom);
 
     // Update field_order in config
@@ -322,18 +339,121 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
     });
     setCustomFields(resolvedCustom);
     notifyChange(newConfig, resolvedCustom);
+  };
 
-    if (!initialConfig) {
-      try {
-        await formConfigApi.update({ field_order: fieldOrder });
-        const customIds = newCustom.map((f) => f.id).filter(Boolean);
+  // ── Draft Mode: Save / Discard ───────────────────────────
+
+  const handleSaveClick = async () => {
+    try {
+      const { requestCount } = await formConfigApi.getImpact();
+      setImpactCount(requestCount);
+    } catch {
+      setImpactCount(0);
+    }
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSave = async () => {
+    setSaving(true);
+    setShowConfirmModal(false);
+
+    try {
+      // 1. Save config changes (diff)
+      const configDiff = {};
+      const orig = originalConfig.current || {};
+      for (const key of Object.keys(config)) {
+        if (JSON.stringify(config[key]) !== JSON.stringify(orig[key])) {
+          configDiff[key] = config[key];
+        }
+      }
+
+      if (Object.keys(configDiff).length > 0) {
+        await formConfigApi.update(configDiff);
+      }
+
+      // 2. Create new custom fields
+      const tempIdToRealId = {};
+      for (const pending of pendingNewFields.current) {
+        const { tempId, include_in_analytics, ...fieldPayload } = pending;
+        try {
+          const created = await formConfigApi.createField(fieldPayload);
+          tempIdToRealId[tempId] = created.id;
+
+          // Handle analytics_fields with real IDs
+          if (include_in_analytics && created.id) {
+            const tempKey = `custom_${tempId}`;
+            const realKey = `custom_${created.id}`;
+            const current = config.analytics_fields || [];
+            const updated = current.map((k) => k === tempKey ? realKey : k);
+            if (!updated.includes(realKey)) updated.push(realKey);
+            await formConfigApi.update({ analytics_fields: updated });
+          }
+        } catch (err) {
+          console.error('Failed to create field:', err);
+        }
+      }
+
+      // 3. Delete removed custom fields
+      for (const fieldId of pendingDeletedFieldIds.current) {
+        try {
+          await formConfigApi.deleteField(fieldId);
+        } catch (err) {
+          console.error('Failed to delete field:', err);
+        }
+      }
+
+      // 4. Update modified custom fields
+      for (const fieldId of pendingModifiedFieldIds.current) {
+        if (pendingDeletedFieldIds.current.has(fieldId)) continue;
+        if (String(fieldId).startsWith('temp_')) continue;
+        const field = customFields.find((f) => f.id === fieldId);
+        if (!field) continue;
+        const { id, project_id, created_at, updated_at, isNew, ...updateData } = field;
+        try {
+          await formConfigApi.updateField(fieldId, updateData);
+        } catch (err) {
+          console.error('Failed to update field:', err);
+        }
+      }
+
+      // 5. Reorder custom fields if order changed
+      const fieldOrder = config.field_order;
+      if (Array.isArray(fieldOrder) && fieldOrder.length > 0) {
+        const customIds = customFields
+          .filter((f) => f.is_enabled !== false && !String(f.id).startsWith('temp_'))
+          .sort((a, b) => {
+            const aKey = `custom_${a.id}`;
+            const bKey = `custom_${b.id}`;
+            const aIdx = fieldOrder.indexOf(aKey);
+            const bIdx = fieldOrder.indexOf(bKey);
+            return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx);
+          })
+          .map((f) => f.id);
         if (customIds.length > 0) {
           await formConfigApi.reorderFields(customIds);
         }
-      } catch (err) {
-        console.error('Failed to reorder fields:', err);
       }
+
+      toast.success('Form configuration saved successfully.');
+
+      // Reload fresh state from server
+      await loadConfig();
+    } catch (err) {
+      console.error('Failed to save form config:', err);
+      toast.error('Failed to save changes. Please try again.');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleDiscard = () => {
+    setConfig(JSON.parse(JSON.stringify(originalConfig.current)));
+    setCustomFields(JSON.parse(JSON.stringify(originalCustomFields.current)));
+    pendingNewFields.current = [];
+    pendingDeletedFieldIds.current = new Set();
+    pendingModifiedFieldIds.current = new Set();
+    notifyChange(originalConfig.current, originalCustomFields.current);
+    toast.info('Changes discarded.');
   };
 
   if (loading) {
@@ -350,7 +470,7 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
       {/* Left: Field configuration (3 cols) */}
       <div className="lg:col-span-3 space-y-4">
-        <div className="bg-white dark:bg-[#0D1117] border border-neutral-200 dark:border-[#30363D]/60 rounded-xl p-4 sm:p-5">
+        <div className="bg-white dark:bg-[#0D1117] border border-neutral-200 dark:border-[#30363D]/60 rounded-xl p-4 sm:p-5 relative">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-[#E6EDF3]">Form Fields</h3>
           </div>
@@ -388,6 +508,8 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
             cardLimitReached={cardLimitReached}
             analyticsFields={config?.analytics_fields || []}
             onToggleAnalytics={handleToggleAnalytics}
+            onCardLimitReachedClick={handleCardLimitReached}
+            onCardIneligibleClick={handleCardIneligible}
           />
 
           {/* Add custom field button */}
@@ -402,6 +524,42 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
               Add custom field
             </button>
           </div>
+
+          {/* Draft mode: Save / Discard bar */}
+          {isDirty && (
+            <div className="sticky bottom-0 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 mt-4 px-4 sm:px-5 py-3 bg-white dark:bg-[#0D1117] border-t border-neutral-200 dark:border-[#30363D] rounded-b-xl flex items-center justify-between gap-3">
+              <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                Unsaved changes
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDiscard}
+                  disabled={saving}
+                  className="px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D] rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={handleSaveClick}
+                  disabled={saving}
+                  className="px-4 py-1.5 text-xs font-medium text-white bg-[#4F46E5] dark:bg-[#6366F1] hover:bg-[#4338CA] dark:hover:bg-[#4F46E5] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {saving ? (
+                    <>
+                      <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -447,6 +605,7 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
         isOpen={!!editingField}
         onClose={() => { setEditingField(null); setEditingFieldDraft(null); }}
         onSave={handleSaveField}
+        onDelete={handleDeleteField}
         onLiveChange={handleLiveChange}
         cardLimitReached={cardLimitReached}
       />
@@ -459,6 +618,37 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
         existingCount={customFields.length}
         cardLimitReached={cardLimitReached}
       />
+
+      {/* Confirmation modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" onClick={() => setShowConfirmModal(false)} />
+          <div className="relative bg-white dark:bg-[#161B22] rounded-xl border border-neutral-200 dark:border-[#30363D] shadow-xl max-w-sm w-full p-5">
+            <h3 className="text-sm font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">
+              Save Form Configuration?
+            </h3>
+            <p className="text-xs text-neutral-600 dark:text-[#8B949E] mb-4">
+              {impactCount !== null && impactCount > 0
+                ? `This will affect how new requests are created. There are currently ${impactCount} request${impactCount !== 1 ? 's' : ''} in this project.`
+                : 'This will update the form configuration for this project.'}
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-[#8B949E] hover:bg-neutral-100 dark:hover:bg-[#21262D] rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                className="px-4 py-1.5 text-xs font-medium text-white bg-[#4F46E5] dark:bg-[#6366F1] hover:bg-[#4338CA] dark:hover:bg-[#4F46E5] rounded-lg transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
