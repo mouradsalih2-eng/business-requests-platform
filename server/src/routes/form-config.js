@@ -39,7 +39,7 @@ router.patch('/', authenticateToken, requireProject, requireProjectAdmin, asyncH
     show_team, show_region, show_business_problem, show_problem_size,
     show_business_expectations, show_expected_impact,
     custom_categories, custom_priorities, custom_teams, custom_regions, custom_statuses,
-    field_order, card_fields, analytics_fields,
+    field_order, card_fields, analytics_fields, field_overrides,
   } = req.body;
 
   const updates = {};
@@ -59,6 +59,7 @@ router.patch('/', authenticateToken, requireProject, requireProjectAdmin, asyncH
   if (field_order !== undefined) updates.field_order = field_order;
   if (card_fields !== undefined) updates.card_fields = card_fields;
   if (analytics_fields !== undefined) updates.analytics_fields = analytics_fields;
+  if (field_overrides !== undefined) updates.field_overrides = field_overrides;
 
   const config = await formConfigRepository.upsertConfig(req.project.id, updates);
   res.json(config);

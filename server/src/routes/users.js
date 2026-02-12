@@ -198,6 +198,18 @@ router.get('/admins', authenticateToken, requireSuperAdmin, asyncHandler(async (
   res.json(admins);
 }));
 
+// ── Seed (before :id to avoid route conflict) ─────────────────
+
+router.post('/seed', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
+  const result = await seedDatabase(req.project.id);
+  res.json(result);
+}));
+
+router.delete('/seed', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
+  const result = await unseedDatabase(req.project.id);
+  res.json(result);
+}));
+
 router.patch('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
@@ -224,18 +236,6 @@ router.delete('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, 
 
   await userRepository.delete(id);
   res.json({ message: 'User deleted successfully' });
-}));
-
-// ── Seed ─────────────────────────────────────────────────────
-
-router.post('/seed', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
-  const result = await seedDatabase(req.project.id);
-  res.json(result);
-}));
-
-router.delete('/seed', authenticateToken, requireProject, requireProjectAdmin, asyncHandler(async (req, res) => {
-  const result = await unseedDatabase(req.project.id);
-  res.json(result);
 }));
 
 export default router;

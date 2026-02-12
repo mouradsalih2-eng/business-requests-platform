@@ -46,7 +46,7 @@ export function FieldEditor({ field, isOpen, onClose, onSave, onDelete, onLiveCh
 
   // Emit live changes for real-time preview
   const emitLiveChange = useCallback((overrides = {}) => {
-    if (!field || !field.isCustom) return;
+    if (!field) return;
     const currentLabel = overrides.label !== undefined ? overrides.label : label;
     const currentFieldType = overrides.fieldType !== undefined ? overrides.fieldType : fieldType;
     const currentRequired = overrides.required !== undefined ? overrides.required : required;
@@ -253,7 +253,7 @@ export function FieldEditor({ field, isOpen, onClose, onSave, onDelete, onLiveCh
           />
 
           {/* Options */}
-          {['select', 'multi_select'].includes(fieldType) && !isBuiltIn && (
+          {['select', 'multi_select'].includes(fieldType) && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-medium text-neutral-900 dark:text-[#E6EDF3]">Options</label>

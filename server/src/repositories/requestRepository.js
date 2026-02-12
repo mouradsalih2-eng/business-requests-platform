@@ -43,6 +43,17 @@ export const requestRepository = {
     return data;
   },
 
+  async findByTitleInProject(title, projectId) {
+    const { data, error } = await supabase
+      .from('requests')
+      .select('id')
+      .eq('title', title)
+      .eq('project_id', projectId)
+      .maybeSingle();
+    if (error) handleError(error, 'findByTitleInProject');
+    return data;
+  },
+
   /**
    * Builds and runs a filtered, sorted query against the requests_with_counts view.
    */

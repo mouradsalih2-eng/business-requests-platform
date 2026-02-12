@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useProject } from '../context/ProjectContext';
 import { formConfig as formConfigApi } from '../lib/api';
+import { queryKeys } from '../lib/queryClient';
 
 // Default categories/priorities/teams/regions
 const DEFAULTS = {
@@ -30,33 +32,17 @@ const DEFAULTS = {
 
 export function useFormConfig() {
   const { currentProject } = useProject();
-  const [config, setConfig] = useState(null);
-  const [customFields, setCustomFields] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const projectId = currentProject?.id;
 
-  const loadConfig = useCallback(async () => {
-    if (!currentProject) {
-      setLoading(false);
-      return;
-    }
+  const { data, isLoading: loading } = useQuery({
+    queryKey: queryKeys.formConfig.byProject(projectId),
+    queryFn: () => formConfigApi.get(),
+    enabled: !!projectId,
+  });
 
-    try {
-      const data = await formConfigApi.get();
-      setConfig(data.config);
-      setCustomFields(data.customFields || []);
-    } catch (err) {
-      console.error('Failed to load form config:', err);
-      setConfig(null);
-      setCustomFields([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentProject?.id]);
-
-  useEffect(() => {
-    setLoading(true);
-    loadConfig();
-  }, [loadConfig]);
+  const config = data?.config ?? null;
+  const customFields = data?.customFields ?? [];
 
   // Resolve option lists — use custom if defined, otherwise defaults
   const categories = config?.custom_categories?.length ? config.custom_categories : DEFAULTS.categories;
@@ -65,14 +51,33 @@ export function useFormConfig() {
   const regions = config?.custom_regions?.length ? config.custom_regions : DEFAULTS.regions;
 
   // Field visibility
-  const showField = (fieldName) => {
+  const showField = useCallback((fieldName) => {
     if (!config) return true; // default: show all
     return config[`show_${fieldName}`] !== false;
-  };
+  }, [config]);
+
+  // Built-in field overrides (label, required) from config
+  const fieldOverrides = config?.field_overrides || {};
+
+  // Get the display label for a built-in field (uses override if set)
+  const getFieldLabel = useCallback((fieldName, defaultLabel) => {
+    return fieldOverrides[fieldName]?.label || defaultLabel;
+  }, [fieldOverrides]);
+
+  // Check if a built-in field is required (uses override if set)
+  const isFieldRequired = useCallback((fieldName, defaultRequired) => {
+    const override = fieldOverrides[fieldName];
+    if (override?.required !== undefined) return override.required;
+    return defaultRequired;
+  }, [fieldOverrides]);
 
   // Card fields — which built-in fields show on request cards
   const cardFields = config?.card_fields || [];
   const fieldOrder = config?.field_order || [];
+
+  const refresh = useCallback(() => {
+    return queryClient.invalidateQueries({ queryKey: queryKeys.formConfig.byProject(projectId) });
+  }, [queryClient, projectId]);
 
   return {
     config,
@@ -83,8 +88,11 @@ export function useFormConfig() {
     teams,
     regions,
     showField,
+    getFieldLabel,
+    isFieldRequired,
+    fieldOverrides,
     cardFields,
     fieldOrder,
-    refresh: loadConfig,
+    refresh,
   };
 }

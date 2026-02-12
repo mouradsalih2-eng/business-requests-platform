@@ -8,7 +8,10 @@ const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 export function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'; } catch { return false; }
+    try {
+      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      return stored === null ? true : stored === 'true'; // default collapsed
+    } catch { return true; }
   });
   const location = useLocation();
 

@@ -154,8 +154,8 @@ export function FieldCard({ field, index, isCustom, onToggle, onToggleCardVisibi
             </button>
           )}
 
-          {/* Settings gear — always visible on mobile, hover on desktop */}
-          {isCustom && (
+          {/* Settings gear — for both custom and built-in (non-locked) fields */}
+          {(isCustom || field.configKey) && (
             <button
               onClick={() => onEdit?.(field)}
               className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-md text-neutral-400 dark:text-[#6E7681] hover:text-neutral-700 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D] transition-all"

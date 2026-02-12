@@ -40,80 +40,6 @@ export function Dashboard() {
   const { isAdmin, isSuperAdmin } = useAuth();
   const { currentProject, loading: projectLoading } = useProject();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // No project state
-  if (!projectLoading && !currentProject) {
-    // Super admin without a selected project: point to platform mode
-    if (isSuperAdmin) {
-      return (
-        <Layout>
-          <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
-            <div className="text-center px-6 py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
-                <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">You're in Platform Mode</h2>
-              <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto mb-6">
-                As a super admin, manage all projects and users from the platform dashboard.
-              </p>
-              <Link to="/super-admin" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl text-sm font-medium transition-colors">
-                Go to Platform Dashboard
-              </Link>
-            </div>
-          </div>
-        </Layout>
-      );
-    }
-
-    // Admin with no project: CTA to create first project (bootstrapping admin)
-    if (isAdmin) {
-      return (
-        <Layout>
-          <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
-            <div className="text-center px-6 py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 flex items-center justify-center">
-                <svg className="w-8 h-8 text-[#4F46E5] dark:text-[#818CF8]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">Set Up Your First Project</h2>
-              <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto mb-6">
-                Create a project to start collecting and managing requests from your team.
-              </p>
-              <Link to="/onboarding" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl text-sm font-medium transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                Create Project
-              </Link>
-            </div>
-          </div>
-        </Layout>
-      );
-    }
-
-    // Member with no project: safety fallback (should not normally happen since members are always invited to a project)
-    return (
-      <Layout>
-        <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
-          <div className="text-center px-6 py-12">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-[#21262D] flex items-center justify-center">
-              <svg className="w-8 h-8 text-neutral-400 dark:text-[#484F58]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-              </svg>
-            </div>
-            <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">No Project Assigned</h2>
-            <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto">
-              You haven't been added to any project yet. Contact your administrator to get access.
-            </p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
   const [showFilters, setShowFilters] = useState(false);
 
   // Initialize filters from URL params
@@ -292,6 +218,75 @@ export function Dashboard() {
     setRequestsList((prev) => prev.filter((r) => r.id !== requestId));
     setSelectedRequest(null);
   };
+
+  // No project state — early returns placed after all hooks
+  if (!projectLoading && !currentProject) {
+    if (isSuperAdmin) {
+      return (
+        <Layout>
+          <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
+            <div className="text-center px-6 py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">You're in Platform Mode</h2>
+              <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto mb-6">
+                As a super admin, manage all projects and users from the platform dashboard.
+              </p>
+              <Link to="/super-admin" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl text-sm font-medium transition-colors">
+                Go to Platform Dashboard
+              </Link>
+            </div>
+          </div>
+        </Layout>
+      );
+    }
+    if (isAdmin) {
+      return (
+        <Layout>
+          <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
+            <div className="text-center px-6 py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 flex items-center justify-center">
+                <svg className="w-8 h-8 text-[#4F46E5] dark:text-[#818CF8]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">Set Up Your First Project</h2>
+              <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto mb-6">
+                Create a project to start collecting and managing requests from your team.
+              </p>
+              <Link to="/onboarding" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-xl text-sm font-medium transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Create Project
+              </Link>
+            </div>
+          </div>
+        </Layout>
+      );
+    }
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]">
+          <div className="text-center px-6 py-12">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-[#21262D] flex items-center justify-center">
+              <svg className="w-8 h-8 text-neutral-400 dark:text-[#484F58]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-[#E6EDF3] mb-2">No Project Assigned</h2>
+            <p className="text-sm text-neutral-500 dark:text-[#8B949E] max-w-sm mx-auto">
+              You haven't been added to any project yet. Contact your administrator to get access.
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

@@ -6,7 +6,7 @@ import { useFormConfig } from '../../hooks/useFormConfig';
  * Supports Level 1 (field visibility), Level 2 (custom options), Level 3 (custom fields).
  */
 export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialValues = {} }) {
-  const { categories, priorities, teams, regions, showField, customFields, loading: configLoading } = useFormConfig();
+  const { categories, priorities, teams, regions, showField, getFieldLabel, isFieldRequired, customFields, loading: configLoading } = useFormConfig();
 
   const [title, setTitle] = useState(initialValues.title || '');
   const [category, setCategory] = useState(initialValues.category || '');
@@ -32,8 +32,8 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
     } else if (title.trim().length < 5) {
       newErrors.title = 'Title must be at least 5 characters';
     }
-    if (showField('category') && !category) newErrors.category = 'Category is required';
-    if (showField('priority') && !priority) newErrors.priority = 'Priority is required';
+    if (showField('category') && isFieldRequired('category', true) && !category) newErrors.category = `${getFieldLabel('category', 'Category')} is required`;
+    if (showField('priority') && isFieldRequired('priority', true) && !priority) newErrors.priority = `${getFieldLabel('priority', 'Priority')} is required`;
 
     // Validate required custom fields
     for (const field of customFields.filter(f => f.visibility === 'all' && f.is_enabled !== false && f.is_required)) {
@@ -101,7 +101,7 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Title (always shown) */}
       <div>
-        <label className={labelClass}>Title *</label>
+        <label className={labelClass}>{getFieldLabel('title', 'Title')} *</label>
         <input
           type="text"
           value={title}
@@ -119,24 +119,26 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {showField('category') && (
             <div>
-              <label className={labelClass}>Category *</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass} required>
-                <option value="">Select category</option>
+              <label className={labelClass}>{getFieldLabel('category', 'Category')}{isFieldRequired('category', true) ? ' *' : ''}</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass} required={isFieldRequired('category', true)}>
+                <option value="">Select {getFieldLabel('category', 'category').toLowerCase()}</option>
                 {categories.map(c => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
+              {errors.category && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.category}</p>}
             </div>
           )}
           {showField('priority') && (
             <div>
-              <label className={labelClass}>Priority *</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selectClass} required>
-                <option value="">Select priority</option>
+              <label className={labelClass}>{getFieldLabel('priority', 'Priority')}{isFieldRequired('priority', true) ? ' *' : ''}</label>
+              <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selectClass} required={isFieldRequired('priority', true)}>
+                <option value="">Select {getFieldLabel('priority', 'priority').toLowerCase()}</option>
                 {priorities.map(p => (
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
               </select>
+              {errors.priority && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.priority}</p>}
             </div>
           )}
         </div>
@@ -147,9 +149,9 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {showField('team') && (
             <div>
-              <label className={labelClass}>Team</label>
-              <select value={team} onChange={(e) => setTeam(e.target.value)} className={selectClass}>
-                <option value="">Select team</option>
+              <label className={labelClass}>{getFieldLabel('team', 'Team')}{isFieldRequired('team', false) ? ' *' : ''}</label>
+              <select value={team} onChange={(e) => setTeam(e.target.value)} className={selectClass} required={isFieldRequired('team', false)}>
+                <option value="">Select {getFieldLabel('team', 'team').toLowerCase()}</option>
                 {teams.map(t => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
@@ -158,9 +160,9 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
           )}
           {showField('region') && (
             <div>
-              <label className={labelClass}>Region</label>
-              <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectClass}>
-                <option value="">Select region</option>
+              <label className={labelClass}>{getFieldLabel('region', 'Region')}{isFieldRequired('region', false) ? ' *' : ''}</label>
+              <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectClass} required={isFieldRequired('region', false)}>
+                <option value="">Select {getFieldLabel('region', 'region').toLowerCase()}</option>
                 {regions.map(r => (
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
@@ -173,12 +175,13 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
       {/* Business Problem */}
       {showField('business_problem') && (
         <div>
-          <label className={labelClass}>Business Problem</label>
+          <label className={labelClass}>{getFieldLabel('business_problem', 'Business Problem')}{isFieldRequired('business_problem', false) ? ' *' : ''}</label>
           <textarea
             value={businessProblem}
             onChange={(e) => setBusinessProblem(e.target.value)}
             className={textareaClass}
             placeholder="Describe the business problem this request addresses"
+            required={isFieldRequired('business_problem', false)}
           />
         </div>
       )}
@@ -186,12 +189,13 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
       {/* Problem Size */}
       {showField('problem_size') && (
         <div>
-          <label className={labelClass}>Problem Size</label>
+          <label className={labelClass}>{getFieldLabel('problem_size', 'Problem Size')}{isFieldRequired('problem_size', false) ? ' *' : ''}</label>
           <textarea
             value={problemSize}
             onChange={(e) => setProblemSize(e.target.value)}
             className={textareaClass}
             placeholder="How big is this problem? Who is affected?"
+            required={isFieldRequired('problem_size', false)}
           />
         </div>
       )}
@@ -199,12 +203,13 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
       {/* Business Expectations */}
       {showField('business_expectations') && (
         <div>
-          <label className={labelClass}>Business Expectations</label>
+          <label className={labelClass}>{getFieldLabel('business_expectations', 'Business Expectations')}{isFieldRequired('business_expectations', false) ? ' *' : ''}</label>
           <textarea
             value={businessExpectations}
             onChange={(e) => setBusinessExpectations(e.target.value)}
             className={textareaClass}
             placeholder="What are the expected business outcomes?"
+            required={isFieldRequired('business_expectations', false)}
           />
         </div>
       )}
@@ -212,12 +217,13 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
       {/* Expected Impact */}
       {showField('expected_impact') && (
         <div>
-          <label className={labelClass}>Expected Impact</label>
+          <label className={labelClass}>{getFieldLabel('expected_impact', 'Expected Impact')}{isFieldRequired('expected_impact', false) ? ' *' : ''}</label>
           <textarea
             value={expectedImpact}
             onChange={(e) => setExpectedImpact(e.target.value)}
             className={textareaClass}
             placeholder="What impact do you expect this to have?"
+            required={isFieldRequired('expected_impact', false)}
           />
         </div>
       )}
@@ -248,7 +254,7 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitLoading || title.trim().length < 5 || (showField('category') && !category) || (showField('priority') && !priority)}
+        disabled={submitLoading || title.trim().length < 5 || (showField('category') && isFieldRequired('category', true) && !category) || (showField('priority') && isFieldRequired('priority', true) && !priority) || customFields.filter(f => f.visibility === 'all' && f.is_enabled !== false && f.is_required).some(f => { const v = customValues[f.id]; return v === undefined || v === '' || v === null; })}
         className="w-full px-4 py-2.5 bg-[#4F46E5] dark:bg-[#6366F1] text-white text-sm font-medium rounded-lg hover:bg-[#4338CA] dark:hover:bg-[#4F46E5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {submitLoading ? 'Submitting...' : 'Submit Request'}

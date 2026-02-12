@@ -8,7 +8,7 @@ function handleError(error, context) {
 
 export const voteRepository = {
   async findByRequestAndUser(requestId, userId, type) {
-    const query = supabase
+    let query = supabase
       .from('votes')
       .select('id')
       .eq('request_id', requestId)

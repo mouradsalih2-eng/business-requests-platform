@@ -119,11 +119,11 @@ export async function seedDatabase(projectId) {
   const admin = await userRepository.findByEmail('admin@company.com', 'id');
   if (admin) userIds.push(admin.id);
 
-  // Create 15 detailed requests
+  // Create 15 detailed requests — scoped to THIS project
   const allRequestIds = [];
   for (let i = 0; i < DETAILED_REQUESTS.length; i++) {
     const r = DETAILED_REQUESTS[i];
-    let existing = await requestRepository.findByTitle(r.title);
+    let existing = await requestRepository.findByTitleInProject(r.title, projectId);
     if (!existing) {
       const daysAgo = randomInt(0, 30);
       const createdAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
@@ -153,7 +153,7 @@ export async function seedDatabase(projectId) {
       const daysAgo = dist.minDays === dist.maxDays ? dist.minDays : randomInt(dist.minDays, dist.maxDays);
       const createdAt = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000 - randomInt(0, 23) * 3600000).toISOString();
       const title = `${randomChoice(REQUEST_TITLES)} - ${randomChoice(TEAMS)} ${randomChoice(REGIONS)} #${num}`;
-      let existing = await requestRepository.findByTitle(title);
+      let existing = await requestRepository.findByTitleInProject(title, projectId);
       if (!existing) {
         existing = await requestRepository.create({
           user_id: randomChoice(userIds), title, category: randomChoice(CATEGORIES),
@@ -189,19 +189,19 @@ export async function seedDatabase(projectId) {
     }
   }
 
-  const [users, requests, votes, comments] = await Promise.all([
-    userRepository.count(), requestRepository.countByProject(projectId), voteRepository.count(), commentRepository.count(),
-  ]);
+  const requests = await requestRepository.countByProject(projectId);
 
-  return { message: 'Database seeded successfully', users, requests, votes, comments };
+  return { message: 'Database seeded successfully', users: userIds.length, requests, votes: allRequestIds.length * 4, comments: allRequestIds.length * 2 };
 }
 
 /**
- * Removes all seed-generated users (by known SEED_USERS emails) and their
- * associated requests, votes, comments, tags, and activity log entries.
- * Does NOT delete the admin user or any real users.
+ * Removes all seed-generated data for a specific project.
+ * Only deletes requests owned by seed users in THIS project.
+ * Only removes seed users if they have no memberships in other projects.
  */
 export async function unseedDatabase(projectId) {
+  if (!projectId) throw new Error('projectId is required for unseeding');
+
   const seedEmails = SEED_USERS.map(u => u.email);
 
   // Find seed user IDs
@@ -217,13 +217,12 @@ export async function unseedDatabase(projectId) {
 
   const seedUserIds = seedUserRows.map(u => u.id);
 
-  // Find all requests created by seed users (scoped to project if provided)
-  let seedRequestQuery = supabase
+  // Find all requests created by seed users IN THIS PROJECT ONLY
+  const { data: seedRequests } = await supabase
     .from('requests')
     .select('id')
-    .in('user_id', seedUserIds);
-  if (projectId) seedRequestQuery = seedRequestQuery.eq('project_id', projectId);
-  const { data: seedRequests } = await seedRequestQuery;
+    .in('user_id', seedUserIds)
+    .eq('project_id', projectId);
   const seedRequestIds = (seedRequests || []).map(r => r.id);
 
   // Delete in dependency order
@@ -271,43 +270,57 @@ export async function unseedDatabase(projectId) {
 
     // Delete roadmap items synced to seed requests
     await supabase.from('roadmap_items').delete().in('request_id', seedRequestIds);
+
+    // Delete request watchers for seed requests
+    await supabase.from('request_watchers').delete().in('request_id', seedRequestIds);
   }
 
-  // Delete the seed requests themselves (scoped to project if provided)
-  let deleteRequestsQuery = supabase
+  // Delete the seed requests themselves (scoped to this project)
+  const { count: rc } = await supabase
     .from('requests')
     .delete({ count: 'exact' })
-    .in('user_id', seedUserIds);
-  if (projectId) deleteRequestsQuery = deleteRequestsQuery.eq('project_id', projectId);
-  const { count: rc } = await deleteRequestsQuery;
+    .in('user_id', seedUserIds)
+    .eq('project_id', projectId);
 
   // Remove seed users from this project's membership
-  if (projectId) {
-    for (const userId of seedUserIds) {
-      await supabase.from('project_members').delete().eq('project_id', projectId).eq('user_id', userId);
-    }
+  for (const userId of seedUserIds) {
+    await supabase.from('project_members').delete().eq('project_id', projectId).eq('user_id', userId);
   }
 
-  // Also delete any votes/comments seed users made on non-seed requests
-  await supabase.from('votes').delete().in('user_id', seedUserIds);
-  await supabase.from('comments').delete().in('user_id', seedUserIds);
-
-  // Delete Supabase Auth accounts for seed users
+  // Only delete seed users who have NO remaining project memberships
+  let deletedUsers = 0;
   for (const u of seedUserRows) {
-    if (u.auth_id) {
-      await supabase.auth.admin.deleteUser(u.auth_id).catch(() => {});
+    const { count: membershipCount } = await supabase
+      .from('project_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', u.id);
+
+    if ((membershipCount || 0) === 0) {
+      // No other memberships — safe to delete the user entirely
+      // Also clean up any votes/comments they made on non-seed requests
+      await supabase.from('votes').delete().eq('user_id', u.id);
+      // Delete comment mentions first
+      const { data: userComments } = await supabase.from('comments').select('id').eq('user_id', u.id);
+      if (userComments?.length) {
+        await supabase.from('comment_mentions').delete().in('comment_id', userComments.map(c => c.id));
+      }
+      await supabase.from('comments').delete().eq('user_id', u.id);
+
+      // Delete Supabase Auth account
+      if (u.auth_id) {
+        await supabase.auth.admin.deleteUser(u.auth_id).catch(() => {});
+      }
+
+      // Delete the app user
+      await userRepository.delete(u.id);
+      deletedUsers++;
     }
-  }
-
-  // Delete the seed users from app DB
-  for (const u of seedUserRows) {
-    await userRepository.delete(u.id);
   }
 
   return {
     message: 'Seed data removed successfully',
     deleted: {
-      users: seedUserRows.length,
+      users: deletedUsers,
       requests: rc || 0,
       votes: deletedVotes,
       comments: deletedComments,

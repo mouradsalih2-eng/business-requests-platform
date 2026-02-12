@@ -40,6 +40,9 @@ export const queryKeys = {
   votes: {
     get: (requestId) => ['votes', requestId],
   },
+  formConfig: {
+    byProject: (projectId) => ['formConfig', projectId],
+  },
 };
 
 export default queryClient;

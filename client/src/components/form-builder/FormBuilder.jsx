@@ -109,14 +109,36 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
   const getFields = useCallback(() => {
     if (!config) return [];
 
-    const cardFieldKeys = config.card_fields || [];
+    // If card_fields was never configured, derive defaults from BUILTIN_FIELDS
+    const hasExplicitCardFields = Array.isArray(config.card_fields);
+    const cardFieldKeys = hasExplicitCardFields
+      ? config.card_fields
+      : BUILTIN_FIELDS.filter((f) => f.showOnCard).map((f) => f.key);
 
-    const builtIn = BUILTIN_FIELDS.map((f) => ({
-      ...f,
-      enabled: f.configKey ? config[f.configKey] !== false : true,
-      showOnCard: f.locked ? true : cardFieldKeys.includes(f.key) || f.showOnCard,
-      isCustom: false,
-    }));
+    // Built-in field overrides (label, required) from config
+    const overrides = config.field_overrides || {};
+    // Map built-in select fields to their custom options config key
+    const optionsMap = {
+      category: config.custom_categories,
+      priority: config.custom_priorities,
+      team: config.custom_teams,
+      region: config.custom_regions,
+    };
+
+    const builtIn = BUILTIN_FIELDS.map((f) => {
+      const ov = overrides[f.key] || {};
+      // Overlay live draft for the built-in field being edited
+      const draft = editingFieldDraft && editingFieldDraft.key === f.key && !editingFieldDraft.isCustom ? editingFieldDraft : null;
+      return {
+        ...f,
+        label: draft ? draft.label : (ov.label || f.label),
+        required: draft ? draft.is_required : (ov.required !== undefined ? ov.required : f.required),
+        options: draft ? draft.options : (optionsMap[f.key] || f.options || null),
+        enabled: f.configKey ? config[f.configKey] !== false : true,
+        showOnCard: f.locked ? true : cardFieldKeys.includes(f.key),
+        isCustom: false,
+      };
+    });
 
     const sortedCustom = [...customFields].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const custom = sortedCustom.map((f) => {
@@ -223,7 +245,10 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
       notifyChange(config, updated);
       if (!isOnboarding) pendingModifiedFieldIds.current.add(field.id);
     } else {
-      const currentCardFields = config.card_fields || [];
+      // When card_fields hasn't been set yet, initialize from BUILTIN defaults
+      const currentCardFields = Array.isArray(config.card_fields)
+        ? config.card_fields
+        : BUILTIN_FIELDS.filter((f) => f.showOnCard).map((f) => f.key);
       const newCardFields = currentCardFields.includes(field.key)
         ? currentCardFields.filter((k) => k !== field.key)
         : [...currentCardFields, field.key];
@@ -253,6 +278,33 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
       setCustomFields(updated);
       notifyChange(config, updated);
       if (!isOnboarding) pendingModifiedFieldIds.current.add(updatedField.id);
+    } else {
+      // Built-in field: store label/required overrides in field_overrides,
+      // and options in the corresponding custom_XXX config key
+      const currentOverrides = config.field_overrides || {};
+      const builtinDef = BUILTIN_FIELDS.find((f) => f.key === updatedField.key);
+      const override = {};
+      if (updatedField.label !== builtinDef?.label) override.label = updatedField.label;
+      if (updatedField.is_required !== builtinDef?.required) override.required = updatedField.is_required;
+
+      const newOverrides = { ...currentOverrides };
+      if (Object.keys(override).length > 0) {
+        newOverrides[updatedField.key] = { ...(currentOverrides[updatedField.key] || {}), ...override };
+      } else {
+        delete newOverrides[updatedField.key];
+      }
+
+      let newConfig = { ...config, field_overrides: newOverrides };
+
+      // Store options for built-in select fields in custom_XXX keys
+      const optionsKeyMap = { category: 'custom_categories', priority: 'custom_priorities', team: 'custom_teams', region: 'custom_regions' };
+      const optionsKey = optionsKeyMap[updatedField.key];
+      if (optionsKey && updatedField.options) {
+        newConfig[optionsKey] = updatedField.options;
+      }
+
+      setConfig(newConfig);
+      notifyChange(newConfig, customFields);
     }
     setEditingField(null);
     setEditingFieldDraft(null);
