@@ -306,10 +306,10 @@ export function Onboarding() {
                       <p className="text-sm text-neutral-900 dark:text-[#E6EDF3] font-medium truncate">{logoFile?.name}</p>
                       <p className="text-xs text-neutral-500 dark:text-[#8B949E] mt-0.5">{logoFile ? `${(logoFile.size / 1024).toFixed(1)} KB` : ''}</p>
                       <div className="flex items-center gap-3 mt-2">
-                        {/* Native label→input for Replace — no JS .click() needed */}
+                        {/* Native label→input for Replace — hidden without clip (clip breaks Chrome label forwarding) */}
                         <label htmlFor="logo-replace" className="text-xs font-medium text-[#4F46E5] dark:text-[#818CF8] hover:text-[#4338CA] dark:hover:text-[#A5B4FC] transition-colors cursor-pointer">
                           Replace
-                          <input id="logo-replace" type="file" accept="image/*" onChange={handleLogoSelect} className="sr-only" />
+                          <input id="logo-replace" type="file" accept="image/*" onChange={handleLogoSelect} style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', overflow: 'hidden' }} />
                         </label>
                         <button type="button" onClick={() => { setLogoPreview(null); setLogoFile(null); }} className="text-xs font-medium text-neutral-400 dark:text-[#6E7681] hover:text-red-500 dark:hover:text-red-400 transition-colors">Remove</button>
                       </div>
@@ -325,7 +325,7 @@ export function Onboarding() {
                     </span>
                     <span className="text-sm font-medium text-neutral-600 dark:text-[#8B949E]">Upload your logo</span>
                     <span className="text-xs text-neutral-400 dark:text-[#484F58]">PNG, JPG or SVG, up to 5 MB</span>
-                    <input id="logo-upload" type="file" accept="image/*" onChange={handleLogoSelect} className="sr-only" />
+                    <input id="logo-upload" type="file" accept="image/*" onChange={handleLogoSelect} style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', overflow: 'hidden' }} />
                   </label>
                 )}
               </div>
