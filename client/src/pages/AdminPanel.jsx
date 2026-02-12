@@ -501,21 +501,21 @@ export function AdminPanel() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleRequestClick = async (request) => {
-    try {
-      const fullRequest = await requestsApi.getOne(request.id);
+  const handleRequestClick = (request) => {
+    // Open immediately with card data, then load full details in background
+    setSelectedRequest(request);
+    requestsApi.getOne(request.id).then((fullRequest) => {
       setSelectedRequest(fullRequest);
+    }).catch((err) => {
+      console.error('Failed to load request details:', err);
+    });
 
-      // Mark as read if unread
-      if (!request.isRead) {
-        await requestsApi.markAsRead(request.id);
-        // Update local state to reflect read status
-        setRequestsList((prev) =>
-          prev.map((r) => (r.id === request.id ? { ...r, isRead: true } : r))
-        );
-      }
-    } catch (err) {
-      console.error('Failed to load request:', err);
+    // Mark as read in background if unread
+    if (!request.isRead) {
+      requestsApi.markAsRead(request.id).catch(() => {});
+      setRequestsList((prev) =>
+        prev.map((r) => (r.id === request.id ? { ...r, isRead: true } : r))
+      );
     }
   };
 

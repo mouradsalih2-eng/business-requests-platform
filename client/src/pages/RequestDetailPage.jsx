@@ -53,14 +53,13 @@ export function RequestDetailPage() {
       const data = await requestsApi.getOne(id);
       setRequest(data);
       setStatus(data.status);
+      setLoading(false);
 
-      // Load activity log
-      const activity = await requestsApi.getActivity(id);
-      setActivityLog(activity);
+      // Load activity log in background (don't block page render)
+      requestsApi.getActivity(id).then(setActivityLog).catch(() => {});
     } catch (err) {
       console.error('Failed to load request:', err);
       setError(err.message || 'Request not found');
-    } finally {
       setLoading(false);
     }
   };
