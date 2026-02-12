@@ -36,7 +36,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      connectSrc: ["'self'", config.supabase.url, "https://accounts.google.com", "https://login.microsoftonline.com"],
+      connectSrc: ["'self'", config.supabase.url, "https://accounts.google.com", "https://login.microsoftonline.com", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
       scriptSrc: ["'self'", "https://accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],

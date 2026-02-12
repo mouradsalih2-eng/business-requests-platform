@@ -519,7 +519,21 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+    <div className="space-y-4">
+      {/* Header with project context */}
+      {!isOnboarding && currentProject && (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-[#21262D] flex items-center justify-center text-base flex-shrink-0">
+            {currentProject.icon || currentProject.name?.charAt(0) || 'P'}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-[#E6EDF3] truncate">{currentProject.name}</h2>
+            <p className="text-xs text-neutral-500 dark:text-[#6E7681]">Form Builder</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
       {/* Left: Field configuration (3 cols) */}
       <div className="lg:col-span-3 space-y-4">
         <div className="bg-white dark:bg-[#0D1117] border border-neutral-200 dark:border-[#30363D]/60 rounded-xl p-4 sm:p-5 relative">
@@ -617,12 +631,12 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
 
       {/* Right: Preview panel (2 cols) */}
       <div className="lg:col-span-2">
-        <div className="lg:sticky lg:top-20 space-y-4">
+        <div className="lg:sticky lg:top-20 max-h-[calc(100vh-6rem)] overflow-y-auto space-y-4">
           {/* Preview tab switcher */}
           <div className="flex gap-1 p-1 bg-white dark:bg-[#0D1117] rounded-xl border border-neutral-200 dark:border-[#30363D]/40">
             <button
               onClick={() => setPreviewTab('form')}
-              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${
+              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors duration-100 ${
                 previewTab === 'form'
                   ? 'bg-neutral-100 dark:bg-[#21262D] text-neutral-900 dark:text-[#E6EDF3]'
                   : 'text-neutral-500 dark:text-[#6E7681] hover:text-neutral-700 dark:hover:text-[#8B949E]'
@@ -632,7 +646,7 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
             </button>
             <button
               onClick={() => setPreviewTab('card')}
-              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${
+              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors duration-100 ${
                 previewTab === 'card'
                   ? 'bg-neutral-100 dark:bg-[#21262D] text-neutral-900 dark:text-[#E6EDF3]'
                   : 'text-neutral-500 dark:text-[#6E7681] hover:text-neutral-700 dark:hover:text-[#8B949E]'
@@ -644,7 +658,7 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
 
           {/* Preview content */}
           {previewTab === 'form' ? (
-            <FormPreview fields={fields} />
+            <FormPreview fields={fields} projectName={currentProject?.name} projectIcon={currentProject?.icon} />
           ) : (
             <CardPreview fields={fields} maxCardFields={MAX_CARD_FIELDS} />
           )}
@@ -701,6 +715,7 @@ export function FormBuilder({ initialConfig, initialCustomFields, onConfigChange
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

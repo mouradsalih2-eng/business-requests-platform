@@ -135,7 +135,7 @@ function SidebarNav({ items, onClose, label, isPlatform = false, collapsed = fal
             title={collapsed ? item.label : undefined}
             className={({ isActive: routeActive }) => {
               const active = isPlatform ? isActive : routeActive;
-              return `flex items-center ${collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'} text-sm rounded-lg transition-all duration-200 ${
+              return `flex items-center ${collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'} text-sm rounded-lg transition-colors duration-100 ${
                 active
                   ? `bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8] font-medium ${collapsed ? '' : 'border-l-2 border-[#4F46E5] dark:border-[#6366F1] -ml-[2px]'}`
                   : 'text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
@@ -179,7 +179,7 @@ export function Sidebar({ isOpen, onClose, collapsed = false, onToggleCollapse }
           onClick={onItemClose}
           title={isCollapsed ? 'Settings' : undefined}
           className={({ isActive }) =>
-            `flex items-center ${isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'} text-sm rounded-lg transition-all duration-200 ${
+            `flex items-center ${isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'} text-sm rounded-lg transition-colors duration-100 ${
               isActive
                 ? `bg-[#4F46E5]/10 dark:bg-[#6366F1]/15 text-[#4F46E5] dark:text-[#818CF8] font-medium ${isCollapsed ? '' : 'border-l-2 border-[#4F46E5] dark:border-[#6366F1] -ml-[2px]'}`
                 : 'text-neutral-600 dark:text-[#8B949E] hover:text-neutral-900 dark:hover:text-[#E6EDF3] hover:bg-neutral-100 dark:hover:bg-[#21262D]'
@@ -237,7 +237,7 @@ export function Sidebar({ isOpen, onClose, collapsed = false, onToggleCollapse }
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className={`hidden lg:flex lg:flex-col ${collapsed ? 'w-14' : 'w-56'} bg-white dark:bg-[#0D1117] border-r border-neutral-100 dark:border-[#30363D] min-h-[calc(100vh-3.5rem)] flex-shrink-0 transition-all duration-200`}>
+      <aside className={`hidden lg:flex lg:flex-col ${collapsed ? 'w-14' : 'w-56'} bg-white dark:bg-[#0D1117] border-r border-neutral-100 dark:border-[#30363D] min-h-[calc(100vh-3.5rem)] flex-shrink-0 transition-[width] duration-150`}>
         {isPlatformMode ? (
           renderPlatformNav(undefined, collapsed)
         ) : (
@@ -253,7 +253,7 @@ export function Sidebar({ isOpen, onClose, collapsed = false, onToggleCollapse }
       <aside
         className={`
           fixed top-14 left-0 bottom-0 w-64 bg-white dark:bg-[#0D1117] border-r border-neutral-100 dark:border-[#30363D]
-          z-50 lg:hidden transform transition-transform duration-300 ease-in-out
+          z-50 lg:hidden transform transition-transform duration-200 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >

@@ -1,4 +1,4 @@
-export function FormPreview({ fields }) {
+export function FormPreview({ fields, projectName, projectIcon }) {
   const enabledFields = fields.filter((f) => f.enabled !== false);
 
   return (
@@ -10,7 +10,7 @@ export function FormPreview({ fields }) {
         <h3 className="text-sm font-semibold text-neutral-900 dark:text-[#E6EDF3]">New Request Form</h3>
       </div>
       <p className="text-[11px] text-neutral-500 dark:text-[#6E7681] mb-4">
-        This is what users see when submitting a new request
+        {projectName ? `Preview of the "${projectName}" request form` : 'This is what users see when submitting a new request'}
       </p>
 
       <div className="space-y-3.5 p-4 bg-neutral-50 dark:bg-[#161B22] rounded-lg border border-neutral-100 dark:border-[#30363D]/30">

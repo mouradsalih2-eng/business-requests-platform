@@ -3,6 +3,7 @@ import { AppError } from '../errors/AppError.js';
 
 const AVATAR_BUCKET = 'avatars';
 const ATTACHMENT_BUCKET = 'attachments';
+const LOGO_BUCKET = 'avatars'; // Reuse avatars bucket with project-logos/ prefix
 
 /**
  * Extract the storage path from a Supabase public URL.
@@ -58,6 +59,33 @@ export const storageService = {
       console.error('storageService.deleteAvatar:', error.message);
       // Non-fatal — the DB record will still be cleared
     }
+  },
+
+  /**
+   * Upload a project logo. Returns the public URL.
+   * Files are stored under: avatars/project-logos/<projectId>/<timestamp>.<ext>
+   */
+  async uploadLogo(projectId, buffer, originalName, mimeType) {
+    const ext = originalName.split('.').pop().toLowerCase();
+    const storagePath = `project-logos/${projectId}/${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from(LOGO_BUCKET)
+      .upload(storagePath, buffer, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('storageService.uploadLogo:', error.message);
+      throw new AppError('Failed to upload logo', 500);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(LOGO_BUCKET)
+      .getPublicUrl(storagePath);
+
+    return urlData.publicUrl;
   },
 
   /**

@@ -1,16 +1,34 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { authenticateToken } from '../middleware/auth.js';
 import { requireProject, requireProjectAdmin, requireSuperAdmin } from '../middleware/project.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { supabase } from '../db/supabase.js';
 import { projectRepository } from '../repositories/projectRepository.js';
 import { projectMemberRepository } from '../repositories/projectMemberRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
+import { storageService } from '../services/storageService.js';
 import { ValidationError, NotFoundError } from '../errors/AppError.js';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
 
 const router = Router();
 
-// List projects the user belongs to
+// List projects the user belongs to (super_admin sees all)
 router.get('/', authenticateToken, asyncHandler(async (req, res) => {
+  if (req.user.role === 'super_admin') {
+    // Super admins see all projects with admin role
+    const allProjects = await projectRepository.findAll();
+    const projects = allProjects.map(p => ({ ...p, memberRole: 'admin' }));
+    return res.json(projects);
+  }
   const projects = await projectRepository.findByUser(req.user.id);
   res.json(projects);
 }));
@@ -48,6 +66,24 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
   // Add creator as project admin
   await projectMemberRepository.addMember(project.id, req.user.id, 'admin');
 
+  // Auto-add all super_admins as project admins
+  try {
+    const { data: superAdmins } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', 'super_admin')
+      .neq('id', req.user.id);
+    if (superAdmins?.length) {
+      for (const sa of superAdmins) {
+        try {
+          await projectMemberRepository.addMember(project.id, sa.id, 'admin');
+        } catch { /* already a member */ }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to auto-add super admins:', err);
+  }
+
   res.status(201).json(project);
 }));
 
@@ -76,6 +112,15 @@ router.delete('/:id', authenticateToken, requireSuperAdmin, asyncHandler(async (
   }
   await projectRepository.delete(project.id);
   res.json({ message: 'Project deleted' });
+}));
+
+// Upload project logo
+router.post('/:id/logo', authenticateToken, requireProject, requireProjectAdmin, upload.single('logo'), asyncHandler(async (req, res) => {
+  if (!req.file) throw new ValidationError('No logo file provided');
+
+  const logoUrl = await storageService.uploadLogo(req.project.id, req.file.buffer, req.file.originalname, req.file.mimetype);
+  const project = await projectRepository.update(req.project.id, { logo_url: logoUrl });
+  res.json({ logo_url: logoUrl, project });
 }));
 
 // ── Project Members ─────────────────────────────────────────

@@ -465,6 +465,12 @@ export const projects = {
       method: 'DELETE',
     }),
 
+  uploadLogo: (id, formData) =>
+    request(`/projects/${id}/logo`, {
+      method: 'POST',
+      body: formData,
+    }),
+
   // Members
   getMembers: (id) => request(`/projects/${id}/members`),
 

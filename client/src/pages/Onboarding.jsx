@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../context/ProjectContext';
@@ -39,6 +39,10 @@ export function Onboarding() {
   const [brandingMode, setBrandingMode] = useState('emoji'); // emoji | upload | url
   const [logoUrl, setLogoUrl] = useState('');
 
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const logoInputRef = useRef(null);
+
   // Step 2: Members
   const [members, setMembers] = useState([]);
   const [memberEmail, setMemberEmail] = useState('');
@@ -61,6 +65,18 @@ export function Onboarding() {
     if (!projectSlug || projectSlug === slugify(projectName)) {
       setProjectSlug(slugify(val));
     }
+  };
+
+  const handleLogoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo must be under 5MB');
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+    setBrandingMode('upload');
   };
 
   const handleAddMember = async () => {
@@ -127,6 +143,17 @@ export function Onboarding() {
       // 2. Set project context
       localStorage.setItem('selectedProjectId', project.id.toString());
 
+      // 2b. Upload logo if file was selected
+      if (logoFile) {
+        try {
+          const formData = new FormData();
+          formData.append('logo', logoFile);
+          await projectsApi.uploadLogo(project.id, formData);
+        } catch (err) {
+          console.error('Failed to upload logo:', err);
+        }
+      }
+
       // 3. Add members
       for (const member of members) {
         try {
@@ -179,6 +206,12 @@ export function Onboarding() {
     }
   };
 
+  const isStepComplete = (step) => {
+    if (step === 0) return !!(projectName.trim() && projectSlug.trim());
+    // Steps 1-3 are optional, but we track if user visited them
+    return true;
+  };
+
   const canGoNext = () => {
     if (currentStep === 0) return projectName.trim() && projectSlug.trim();
     return true;
@@ -211,36 +244,42 @@ export function Onboarding() {
 
         {/* Stepper — pill-style tabs */}
         <div className="flex items-center gap-1 sm:gap-2 mb-10 p-1 bg-white dark:bg-[#161B22] rounded-xl border border-neutral-200 dark:border-[#30363D]/40 overflow-x-auto">
-          {STEPS.map((step, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentStep(i)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                i === currentStep
-                  ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
-                  : i < currentStep
-                    ? 'text-green-600 dark:text-green-400 hover:bg-neutral-50 dark:hover:bg-[#21262D]'
-                    : 'text-neutral-400 dark:text-[#6E7681] hover:text-neutral-600 dark:hover:text-[#8B949E]'
-              }`}
-            >
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                i === currentStep
-                  ? 'bg-white/20'
-                  : i < currentStep
-                    ? 'bg-green-100 dark:bg-green-500/20'
-                    : 'bg-neutral-100 dark:bg-[#21262D]'
-              }`}>
-                {i < currentStep ? (
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                  </svg>
-                ) : (
-                  i + 1
-                )}
-              </span>
-              <span className="hidden sm:inline">{step.label}</span>
-            </button>
-          ))}
+          {STEPS.map((step, i) => {
+            const visited = i < currentStep;
+            const complete = visited && isStepComplete(i);
+            return (
+              <button
+                key={i}
+                onClick={() => setCurrentStep(i)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-medium whitespace-nowrap transition-colors duration-100 ${
+                  i === currentStep
+                    ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
+                    : complete
+                      ? 'text-green-600 dark:text-green-400 hover:bg-neutral-50 dark:hover:bg-[#21262D]'
+                      : visited
+                        ? 'text-[#4F46E5] dark:text-[#818CF8] hover:bg-neutral-50 dark:hover:bg-[#21262D]'
+                        : 'text-neutral-400 dark:text-[#6E7681] hover:text-neutral-600 dark:hover:text-[#8B949E]'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                  i === currentStep
+                    ? 'bg-white/20'
+                    : complete
+                      ? 'bg-green-100 dark:bg-green-500/20'
+                      : 'bg-neutral-100 dark:bg-[#21262D]'
+                }`}>
+                  {complete ? (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  ) : (
+                    i + 1
+                  )}
+                </span>
+                <span className="hidden sm:inline">{step.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Step 1: Name */}
@@ -262,20 +301,45 @@ export function Onboarding() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-900 dark:text-[#E6EDF3] mb-3">Branding</label>
-                <div className="flex gap-3 mb-4">
-                  {['emoji', 'url'].map((mode) => (
-                    <button key={mode} onClick={() => setBrandingMode(mode)} className={`px-4 py-2 text-sm rounded-lg transition-colors ${brandingMode === mode ? 'bg-[#4F46E5] text-white' : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E]'}`}>
-                      {mode === 'emoji' ? 'Emoji' : 'Logo URL'}
+                <div className="flex gap-2 mb-4">
+                  {['emoji', 'upload', 'url'].map((mode) => (
+                    <button key={mode} onClick={() => { setBrandingMode(mode); if (mode === 'upload') logoInputRef.current?.click(); }} className={`px-3 py-2 text-sm rounded-lg transition-colors duration-100 ${brandingMode === mode ? 'bg-[#4F46E5] text-white' : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E]'}`}>
+                      {mode === 'emoji' ? 'Emoji' : mode === 'upload' ? 'Upload' : 'URL'}
                     </button>
                   ))}
+                  <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoSelect} hidden />
                 </div>
                 {brandingMode === 'emoji' ? (
                   <div className="grid grid-cols-8 gap-2 p-4 bg-neutral-50 dark:bg-[#0D1117] rounded-lg border border-neutral-200 dark:border-[#30363D]">
                     {EMOJIS.map((emoji) => (
-                      <button key={emoji} onClick={() => setProjectIcon(emoji)} className={`p-2 text-xl rounded transition-all text-center hover:bg-neutral-200 dark:hover:bg-[#21262D] ${projectIcon === emoji ? 'bg-[#4F46E5] rounded-lg' : ''}`}>
+                      <button key={emoji} onClick={() => setProjectIcon(emoji)} className={`p-2 text-xl rounded transition-colors text-center hover:bg-neutral-200 dark:hover:bg-[#21262D] ${projectIcon === emoji ? 'bg-[#4F46E5] rounded-lg' : ''}`}>
                         {emoji}
                       </button>
                     ))}
+                  </div>
+                ) : brandingMode === 'upload' ? (
+                  <div>
+                    {logoPreview ? (
+                      <div className="flex items-center gap-4 p-4 bg-neutral-50 dark:bg-[#0D1117] rounded-lg border border-neutral-200 dark:border-[#30363D]">
+                        <img src={logoPreview} alt="Logo preview" className="w-16 h-16 rounded-lg object-cover" />
+                        <div className="flex-1">
+                          <p className="text-sm text-neutral-900 dark:text-[#E6EDF3] font-medium">{logoFile?.name}</p>
+                          <p className="text-xs text-neutral-500 dark:text-[#8B949E]">{logoFile ? `${(logoFile.size / 1024).toFixed(1)} KB` : ''}</p>
+                          <button onClick={() => { setLogoPreview(null); setLogoFile(null); logoInputRef.current.value = ''; }} className="text-xs text-red-500 hover:text-red-700 mt-1">Remove</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => logoInputRef.current?.click()}
+                        className="w-full p-6 border-2 border-dashed border-neutral-200 dark:border-[#30363D] rounded-lg text-center hover:border-[#6366F1]/40 transition-colors"
+                      >
+                        <svg className="w-8 h-8 text-neutral-300 dark:text-[#484F58] mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        </svg>
+                        <p className="text-sm text-neutral-500 dark:text-[#8B949E]">Click to upload your logo</p>
+                        <p className="text-xs text-neutral-400 dark:text-[#484F58] mt-1">PNG, JPG, SVG up to 5MB</p>
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className={inputClass} placeholder="https://example.com/logo.png" />
@@ -310,6 +374,9 @@ export function Onboarding() {
                     <option value="member">Member</option>
                     <option value="admin">Admin</option>
                   </select>
+                  <p className="text-[10px] text-neutral-400 dark:text-[#484F58] mt-1">
+                    {memberRole === 'admin' ? 'Can manage settings, members & requests' : 'Can submit & vote on requests'}
+                  </p>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-neutral-500 dark:text-[#8B949E] mb-1">Auth</label>
@@ -345,8 +412,10 @@ export function Onboarding() {
                     <div>
                       <p className="text-sm text-neutral-900 dark:text-[#E6EDF3] font-medium">{member.email}</p>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-neutral-500 dark:text-[#8B949E]">{member.role}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${member.authMethod === 'google' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${member.role === 'admin' ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400' : 'bg-neutral-100 dark:bg-[#21262D] text-neutral-600 dark:text-[#8B949E]'}`}>
+                          {member.role === 'admin' ? 'Admin' : 'Member'}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${member.authMethod === 'google' ? 'bg-blue-500/15 text-blue-500 dark:text-blue-400' : 'bg-amber-500/15 text-amber-500 dark:text-amber-400'}`}>
                           {member.authMethod === 'google' ? 'Google SSO' : 'Temp password'}
                         </span>
                       </div>

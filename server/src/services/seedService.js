@@ -275,12 +275,20 @@ export async function unseedDatabase(projectId) {
     await supabase.from('request_watchers').delete().in('request_id', seedRequestIds);
   }
 
-  // Delete the seed requests themselves (scoped to this project)
-  const { count: rc } = await supabase
-    .from('requests')
-    .delete({ count: 'exact' })
-    .in('user_id', seedUserIds)
-    .eq('project_id', projectId);
+  // Delete the seed requests themselves (use pre-identified IDs for accurate count)
+  let rc = 0;
+  if (seedRequestIds.length > 0) {
+    // Delete in batches to avoid query size limits
+    const batchSize = 100;
+    for (let i = 0; i < seedRequestIds.length; i += batchSize) {
+      const batch = seedRequestIds.slice(i, i + batchSize);
+      const { count } = await supabase
+        .from('requests')
+        .delete({ count: 'exact' })
+        .in('id', batch);
+      rc += count || 0;
+    }
+  }
 
   // Remove seed users from this project's membership
   for (const userId of seedUserIds) {

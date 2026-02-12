@@ -37,7 +37,7 @@ export function FieldCard({ field, index, isCustom, onToggle, onToggleCardVisibi
   return (
     <div
       className={`
-        group field-row flex items-center gap-3 py-3 px-3 rounded-lg transition-all duration-200
+        group field-row flex items-center gap-3 py-3 px-3 rounded-lg transition-colors duration-150 animate-in fade-in slide-in-from-left-2 duration-200
         ${isDragging ? 'ring-2 ring-[#4F46E5] dark:ring-[#6366F1] shadow-lg bg-white dark:bg-[#161B22]' : ''}
         ${isLocked
           ? 'bg-neutral-50 dark:bg-[#161B22]/50 border border-neutral-200 dark:border-[#30363D]/30'
