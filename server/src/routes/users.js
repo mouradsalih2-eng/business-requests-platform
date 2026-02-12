@@ -225,16 +225,48 @@ router.patch('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, r
 // Admin deletes a user — also removes Supabase Auth account
 router.delete('/:id', authenticateToken, requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
-  if (parseInt(id) === req.user.id) throw new ForbiddenError('Cannot delete your own account');
+  const userId = parseInt(id);
+  if (userId === req.user.id) throw new ForbiddenError('Cannot delete your own account');
 
   const user = await userRepository.findByIdOrFail(id, 'id, auth_id');
 
-  // Delete Supabase Auth user if linked
+  // Clean up all FK-referenced data before deleting the user
+  // 1. Get user's request IDs to clean up request-level dependencies
+  const { data: userRequests } = await supabase.from('requests').select('id').eq('user_id', userId);
+  const requestIds = userRequests?.map(r => r.id) || [];
+
+  if (requestIds.length) {
+    // Delete custom field values, votes, comment mentions, comments, activity log for user's requests
+    await supabase.from('request_custom_field_values').delete().in('request_id', requestIds);
+    await supabase.from('votes').delete().in('request_id', requestIds);
+    const { data: reqComments } = await supabase.from('comments').select('id').in('request_id', requestIds);
+    if (reqComments?.length) {
+      await supabase.from('comment_mentions').delete().in('comment_id', reqComments.map(c => c.id));
+    }
+    await supabase.from('comments').delete().in('request_id', requestIds);
+    await supabase.from('activity_log').delete().in('request_id', requestIds);
+    await supabase.from('requests').delete().in('id', requestIds);
+  }
+
+  // 2. Clean up user's votes/comments/mentions on OTHER requests
+  await supabase.from('votes').delete().eq('user_id', userId);
+  await supabase.from('comment_mentions').delete().eq('user_id', userId);
+  await supabase.from('comments').delete().eq('user_id', userId);
+  await supabase.from('activity_log').delete().eq('user_id', userId);
+
+  // 3. Nullify nullable references, reassign NOT NULL ones to the deleting admin
+  await supabase.from('requests').update({ posted_by_admin_id: null }).eq('posted_by_admin_id', userId);
+  await supabase.from('requests').update({ on_behalf_of_user_id: null }).eq('on_behalf_of_user_id', userId);
+  await supabase.from('roadmap_items').update({ created_by: req.user.id }).eq('created_by', userId);
+  await supabase.from('projects').update({ created_by: req.user.id }).eq('created_by', userId);
+
+  // 4. Delete Supabase Auth user if linked
   if (user.auth_id) {
     await supabase.auth.admin.deleteUser(user.auth_id).catch(() => {});
   }
 
-  await userRepository.delete(id);
+  // 5. Delete the user (project_members, admin_read_requests, password_reset_tokens cascade automatically)
+  await userRepository.delete(userId);
   res.json({ message: 'User deleted successfully' });
 }));
 

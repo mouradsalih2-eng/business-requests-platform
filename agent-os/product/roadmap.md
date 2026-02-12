@@ -158,6 +158,17 @@ Core functionality for first usable version.
 - Push notifications (ties into F8)
 - Spec: `agent-os/specs/pwa/shape.md`
 
+### F11 — SAML SSO (Enterprise) — Future
+- **Size**: L | **Dependencies**: Supabase Pro plan
+- Requires Supabase Pro plan for SAML SSO support
+- Domain-based login: email input → detect domain → route to IdP or password
+- SSO connection management per project via Supabase Admin API
+- Self-service setup UI: customer pastes IdP metadata (SSO URL, Entity ID, X.509 cert)
+- Auto-provisioning: create user record on first SAML sign-in (no invite needed)
+- Support for Okta, Microsoft Entra, OneLogin, Google Workspace SAML
+- Optional: SCIM endpoint for automated user provisioning/deprovisioning
+- `supabase.auth.signInWithSSO({ domain })` client integration
+
 ---
 
 ## Completed Features Log

@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useFormConfig } from '../../hooks/useFormConfig';
 
 /**
  * Dynamic request form that adapts to project form configuration.
  * Supports Level 1 (field visibility), Level 2 (custom options), Level 3 (custom fields).
+ * Respects field_order from config — custom fields can be interleaved with built-in fields.
  */
 export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialValues = {} }) {
-  const { categories, priorities, teams, regions, showField, getFieldLabel, isFieldRequired, customFields, loading: configLoading } = useFormConfig();
+  const { categories, priorities, teams, regions, showField, getFieldLabel, isFieldRequired, customFields, fieldOrder, loading: configLoading } = useFormConfig();
 
   const [title, setTitle] = useState(initialValues.title || '');
   const [category, setCategory] = useState(initialValues.category || '');
@@ -82,6 +83,41 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
     onSubmit(formData);
   };
 
+  // Build the ordered field list: built-in + custom, sorted by field_order
+  const orderedFields = useMemo(() => {
+    const defaultBuiltinOrder = ['title', 'category', 'priority', 'team', 'region', 'business_problem', 'problem_size', 'business_expectations', 'expected_impact'];
+    const visibleCustom = customFields.filter(f => f.visibility === 'all' && f.is_enabled !== false);
+
+    // All field keys (built-in that are visible + custom)
+    const builtinKeys = defaultBuiltinOrder.filter(key => key === 'title' || showField(key));
+    const customKeys = visibleCustom.map(f => `custom_${f.id}`);
+
+    if (fieldOrder.length > 0) {
+      // Use config field_order — supports interleaving
+      const allKeys = new Set([...builtinKeys, ...customKeys]);
+      const ordered = [];
+
+      // First add keys from field_order that exist
+      for (const key of fieldOrder) {
+        if (allKeys.has(key)) {
+          ordered.push(key);
+          allKeys.delete(key);
+        }
+      }
+      // Append any remaining fields not in field_order
+      for (const key of [...builtinKeys, ...customKeys]) {
+        if (allKeys.has(key)) {
+          ordered.push(key);
+          allKeys.delete(key);
+        }
+      }
+      return ordered;
+    }
+
+    // Default: built-in first, then custom
+    return [...builtinKeys, ...customKeys];
+  }, [fieldOrder, customFields, showField]);
+
   if (configLoading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -97,10 +133,10 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
   const textareaClass = inputClass + " min-h-[80px] resize-y";
   const labelClass = "block text-sm font-medium text-neutral-700 dark:text-[#E6EDF3] mb-1.5";
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Title (always shown) */}
-      <div>
+  // Renderers for built-in fields
+  const builtinRenderers = {
+    title: () => (
+      <div key="title">
         <label className={labelClass}>{getFieldLabel('title', 'Title')} *</label>
         <input
           type="text"
@@ -113,133 +149,128 @@ export function DynamicRequestForm({ onSubmit, loading: submitLoading, initialVa
         />
         {errors.title && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.title}</p>}
       </div>
+    ),
+    category: () => (
+      <div key="category">
+        <label className={labelClass}>{getFieldLabel('category', 'Category')}{isFieldRequired('category', true) ? ' *' : ''}</label>
+        <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass} required={isFieldRequired('category', true)}>
+          <option value="">Select {getFieldLabel('category', 'category').toLowerCase()}</option>
+          {categories.map(c => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+        {errors.category && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.category}</p>}
+      </div>
+    ),
+    priority: () => (
+      <div key="priority">
+        <label className={labelClass}>{getFieldLabel('priority', 'Priority')}{isFieldRequired('priority', true) ? ' *' : ''}</label>
+        <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selectClass} required={isFieldRequired('priority', true)}>
+          <option value="">Select {getFieldLabel('priority', 'priority').toLowerCase()}</option>
+          {priorities.map(p => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
+        {errors.priority && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.priority}</p>}
+      </div>
+    ),
+    team: () => (
+      <div key="team">
+        <label className={labelClass}>{getFieldLabel('team', 'Team')}{isFieldRequired('team', false) ? ' *' : ''}</label>
+        <select value={team} onChange={(e) => setTeam(e.target.value)} className={selectClass} required={isFieldRequired('team', false)}>
+          <option value="">Select {getFieldLabel('team', 'team').toLowerCase()}</option>
+          {teams.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+    ),
+    region: () => (
+      <div key="region">
+        <label className={labelClass}>{getFieldLabel('region', 'Region')}{isFieldRequired('region', false) ? ' *' : ''}</label>
+        <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectClass} required={isFieldRequired('region', false)}>
+          <option value="">Select {getFieldLabel('region', 'region').toLowerCase()}</option>
+          {regions.map(r => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </select>
+      </div>
+    ),
+    business_problem: () => (
+      <div key="business_problem">
+        <label className={labelClass}>{getFieldLabel('business_problem', 'Business Problem')}{isFieldRequired('business_problem', false) ? ' *' : ''}</label>
+        <textarea
+          value={businessProblem}
+          onChange={(e) => setBusinessProblem(e.target.value)}
+          className={textareaClass}
+          placeholder="Describe the business problem this request addresses"
+          required={isFieldRequired('business_problem', false)}
+        />
+      </div>
+    ),
+    problem_size: () => (
+      <div key="problem_size">
+        <label className={labelClass}>{getFieldLabel('problem_size', 'Problem Size')}{isFieldRequired('problem_size', false) ? ' *' : ''}</label>
+        <textarea
+          value={problemSize}
+          onChange={(e) => setProblemSize(e.target.value)}
+          className={textareaClass}
+          placeholder="How big is this problem? Who is affected?"
+          required={isFieldRequired('problem_size', false)}
+        />
+      </div>
+    ),
+    business_expectations: () => (
+      <div key="business_expectations">
+        <label className={labelClass}>{getFieldLabel('business_expectations', 'Business Expectations')}{isFieldRequired('business_expectations', false) ? ' *' : ''}</label>
+        <textarea
+          value={businessExpectations}
+          onChange={(e) => setBusinessExpectations(e.target.value)}
+          className={textareaClass}
+          placeholder="What are the expected business outcomes?"
+          required={isFieldRequired('business_expectations', false)}
+        />
+      </div>
+    ),
+    expected_impact: () => (
+      <div key="expected_impact">
+        <label className={labelClass}>{getFieldLabel('expected_impact', 'Expected Impact')}{isFieldRequired('expected_impact', false) ? ' *' : ''}</label>
+        <textarea
+          value={expectedImpact}
+          onChange={(e) => setExpectedImpact(e.target.value)}
+          className={textareaClass}
+          placeholder="What impact do you expect this to have?"
+          required={isFieldRequired('expected_impact', false)}
+        />
+      </div>
+    ),
+  };
 
-      {/* Category + Priority row */}
-      {(showField('category') || showField('priority')) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {showField('category') && (
-            <div>
-              <label className={labelClass}>{getFieldLabel('category', 'Category')}{isFieldRequired('category', true) ? ' *' : ''}</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass} required={isFieldRequired('category', true)}>
-                <option value="">Select {getFieldLabel('category', 'category').toLowerCase()}</option>
-                {categories.map(c => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-              {errors.category && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.category}</p>}
-            </div>
-          )}
-          {showField('priority') && (
-            <div>
-              <label className={labelClass}>{getFieldLabel('priority', 'Priority')}{isFieldRequired('priority', true) ? ' *' : ''}</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selectClass} required={isFieldRequired('priority', true)}>
-                <option value="">Select {getFieldLabel('priority', 'priority').toLowerCase()}</option>
-                {priorities.map(p => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-              </select>
-              {errors.priority && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.priority}</p>}
-            </div>
-          )}
-        </div>
-      )}
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {orderedFields.map(key => {
+        // Built-in field
+        if (builtinRenderers[key]) {
+          return builtinRenderers[key]();
+        }
 
-      {/* Team + Region row */}
-      {(showField('team') || showField('region')) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {showField('team') && (
-            <div>
-              <label className={labelClass}>{getFieldLabel('team', 'Team')}{isFieldRequired('team', false) ? ' *' : ''}</label>
-              <select value={team} onChange={(e) => setTeam(e.target.value)} className={selectClass} required={isFieldRequired('team', false)}>
-                <option value="">Select {getFieldLabel('team', 'team').toLowerCase()}</option>
-                {teams.map(t => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          {showField('region') && (
-            <div>
-              <label className={labelClass}>{getFieldLabel('region', 'Region')}{isFieldRequired('region', false) ? ' *' : ''}</label>
-              <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectClass} required={isFieldRequired('region', false)}>
-                <option value="">Select {getFieldLabel('region', 'region').toLowerCase()}</option>
-                {regions.map(r => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      )}
+        // Custom field (key format: "custom_<id>")
+        const fieldId = parseInt(key.replace('custom_', ''), 10);
+        const field = customFields.find(f => f.id === fieldId);
+        if (!field) return null;
 
-      {/* Business Problem */}
-      {showField('business_problem') && (
-        <div>
-          <label className={labelClass}>{getFieldLabel('business_problem', 'Business Problem')}{isFieldRequired('business_problem', false) ? ' *' : ''}</label>
-          <textarea
-            value={businessProblem}
-            onChange={(e) => setBusinessProblem(e.target.value)}
-            className={textareaClass}
-            placeholder="Describe the business problem this request addresses"
-            required={isFieldRequired('business_problem', false)}
-          />
-        </div>
-      )}
+        return (
+          <div key={key}>
+            <label className={labelClass}>
+              {field.label}{field.is_required && ' *'}
+            </label>
+            {renderCustomField(field, customValues[field.id] || '', (val) => { handleCustomFieldChange(field.id, val); setErrors(prev => ({ ...prev, [`custom_${field.id}`]: undefined })); }, { inputClass, selectClass, textareaClass })}
+            {errors[`custom_${field.id}`] && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors[`custom_${field.id}`]}</p>}
+          </div>
+        );
+      })}
 
-      {/* Problem Size */}
-      {showField('problem_size') && (
-        <div>
-          <label className={labelClass}>{getFieldLabel('problem_size', 'Problem Size')}{isFieldRequired('problem_size', false) ? ' *' : ''}</label>
-          <textarea
-            value={problemSize}
-            onChange={(e) => setProblemSize(e.target.value)}
-            className={textareaClass}
-            placeholder="How big is this problem? Who is affected?"
-            required={isFieldRequired('problem_size', false)}
-          />
-        </div>
-      )}
-
-      {/* Business Expectations */}
-      {showField('business_expectations') && (
-        <div>
-          <label className={labelClass}>{getFieldLabel('business_expectations', 'Business Expectations')}{isFieldRequired('business_expectations', false) ? ' *' : ''}</label>
-          <textarea
-            value={businessExpectations}
-            onChange={(e) => setBusinessExpectations(e.target.value)}
-            className={textareaClass}
-            placeholder="What are the expected business outcomes?"
-            required={isFieldRequired('business_expectations', false)}
-          />
-        </div>
-      )}
-
-      {/* Expected Impact */}
-      {showField('expected_impact') && (
-        <div>
-          <label className={labelClass}>{getFieldLabel('expected_impact', 'Expected Impact')}{isFieldRequired('expected_impact', false) ? ' *' : ''}</label>
-          <textarea
-            value={expectedImpact}
-            onChange={(e) => setExpectedImpact(e.target.value)}
-            className={textareaClass}
-            placeholder="What impact do you expect this to have?"
-            required={isFieldRequired('expected_impact', false)}
-          />
-        </div>
-      )}
-
-      {/* Custom Fields (Level 3) */}
-      {customFields.filter(f => f.visibility === 'all' && f.is_enabled !== false).map(field => (
-        <div key={field.id}>
-          <label className={labelClass}>
-            {field.label}{field.is_required && ' *'}
-          </label>
-          {renderCustomField(field, customValues[field.id] || '', (val) => { handleCustomFieldChange(field.id, val); setErrors(prev => ({ ...prev, [`custom_${field.id}`]: undefined })); }, { inputClass, selectClass, textareaClass })}
-          {errors[`custom_${field.id}`] && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors[`custom_${field.id}`]}</p>}
-        </div>
-      ))}
-
-      {/* Attachments */}
+      {/* Attachments (always last) */}
       <div>
         <label className={labelClass}>Attachments</label>
         <input

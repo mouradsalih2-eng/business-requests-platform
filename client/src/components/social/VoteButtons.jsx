@@ -21,7 +21,7 @@ export function VoteButtons({
   const hasUpvoted = userVotes.includes('upvote');
   const hasLiked = userVotes.includes('like');
 
-  // Handle vote with animation
+  // Handle vote with optimistic update
   const handleVote = async (type) => {
     if (loading) return;
     setLoading(true);
@@ -30,23 +30,42 @@ export function VoteButtons({
     setAnimating((prev) => ({ ...prev, [type]: true }));
     setTimeout(() => setAnimating((prev) => ({ ...prev, [type]: false })), 300);
 
-    try {
-      const hasVoted = type === 'upvote' ? hasUpvoted : hasLiked;
+    const hasVoted = type === 'upvote' ? hasUpvoted : hasLiked;
 
-      if (hasVoted) {
-        const result = await votesApi.remove(requestId, type);
-        setUpvotes(result.upvotes);
-        setLikes(result.likes);
-        setUserVotes(result.userVotes || []);
-        onVoteChange?.({ upvotes: result.upvotes, likes: result.likes, userVotes: result.userVotes || [] });
-      } else {
-        const result = await votesApi.add(requestId, type);
-        setUpvotes(result.upvotes);
-        setLikes(result.likes);
-        setUserVotes(result.userVotes || []);
-        onVoteChange?.({ upvotes: result.upvotes, likes: result.likes, userVotes: result.userVotes || [] });
-      }
+    // Save previous state for rollback
+    const prevUpvotes = upvotes;
+    const prevLikes = likes;
+    const prevUserVotes = userVotes;
+
+    // Optimistic update — apply immediately
+    const delta = hasVoted ? -1 : 1;
+    const newUpvotes = type === 'upvote' ? upvotes + delta : upvotes;
+    const newLikes = type === 'like' ? likes + delta : likes;
+    const newUserVotes = hasVoted
+      ? userVotes.filter(v => v !== type)
+      : [...userVotes, type];
+
+    setUpvotes(newUpvotes);
+    setLikes(newLikes);
+    setUserVotes(newUserVotes);
+    onVoteChange?.({ upvotes: newUpvotes, likes: newLikes, userVotes: newUserVotes });
+
+    try {
+      const result = hasVoted
+        ? await votesApi.remove(requestId, type)
+        : await votesApi.add(requestId, type);
+
+      // Reconcile with server truth
+      setUpvotes(result.upvotes);
+      setLikes(result.likes);
+      setUserVotes(result.userVotes || []);
+      onVoteChange?.({ upvotes: result.upvotes, likes: result.likes, userVotes: result.userVotes || [] });
     } catch (err) {
+      // Rollback on error
+      setUpvotes(prevUpvotes);
+      setLikes(prevLikes);
+      setUserVotes(prevUserVotes);
+      onVoteChange?.({ upvotes: prevUpvotes, likes: prevLikes, userVotes: prevUserVotes });
       console.error('Vote error:', err);
     } finally {
       setLoading(false);

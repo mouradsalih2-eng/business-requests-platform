@@ -95,7 +95,7 @@ export const RequestCard = memo(function RequestCard({ request, onClick, onVoteC
     setShowTooltip(null);
   };
 
-  // Handle vote click with animation
+  // Handle vote click with optimistic update
   const handleVote = async (type, e) => {
     e.stopPropagation();
     if (voting) return;
@@ -105,25 +105,43 @@ export const RequestCard = memo(function RequestCard({ request, onClick, onVoteC
     setAnimating((prev) => ({ ...prev, [type]: true }));
     setTimeout(() => setAnimating((prev) => ({ ...prev, [type]: false })), 300);
 
-    try {
-      const hasVoted = type === 'upvote' ? hasUpvoted : hasLiked;
+    const hasVoted = type === 'upvote' ? hasUpvoted : hasLiked;
 
-      if (hasVoted) {
-        const result = await votesApi.remove(id, type);
-        setUpvotes(result.upvotes);
-        setLikes(result.likes);
-        setUserVotes(result.userVotes || []);
-        setInteractions(null);
-        onVoteChange?.(id, { upvotes: result.upvotes, likes: result.likes, userVotes: result.userVotes || [] });
-      } else {
-        const result = await votesApi.add(id, type);
-        setUpvotes(result.upvotes);
-        setLikes(result.likes);
-        setUserVotes(result.userVotes || []);
-        setInteractions(null);
-        onVoteChange?.(id, { upvotes: result.upvotes, likes: result.likes, userVotes: result.userVotes || [] });
-      }
+    // Save previous state for rollback
+    const prevUpvotes = upvotes;
+    const prevLikes = likes;
+    const prevUserVotes = userVotes;
+
+    // Optimistic update — apply immediately
+    const delta = hasVoted ? -1 : 1;
+    const newUpvotes = type === 'upvote' ? upvotes + delta : upvotes;
+    const newLikes = type === 'like' ? likes + delta : likes;
+    const newUserVotes = hasVoted
+      ? userVotes.filter(v => v !== type)
+      : [...userVotes, type];
+
+    setUpvotes(newUpvotes);
+    setLikes(newLikes);
+    setUserVotes(newUserVotes);
+    setInteractions(null);
+    onVoteChange?.(id, { upvotes: newUpvotes, likes: newLikes, userVotes: newUserVotes });
+
+    try {
+      const result = hasVoted
+        ? await votesApi.remove(id, type)
+        : await votesApi.add(id, type);
+
+      // Reconcile with server truth
+      setUpvotes(result.upvotes);
+      setLikes(result.likes);
+      setUserVotes(result.userVotes || []);
+      onVoteChange?.(id, { upvotes: result.upvotes, likes: result.likes, userVotes: result.userVotes || [] });
     } catch (err) {
+      // Rollback on error
+      setUpvotes(prevUpvotes);
+      setLikes(prevLikes);
+      setUserVotes(prevUserVotes);
+      onVoteChange?.(id, { upvotes: prevUpvotes, likes: prevLikes, userVotes: prevUserVotes });
       console.error('Vote error:', err);
     } finally {
       setVoting(false);

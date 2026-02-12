@@ -190,13 +190,14 @@ export function MyRequests() {
     );
   }, []);
 
-  const handleRequestClick = async (request) => {
-    try {
-      const fullRequest = await requestsApi.getOne(request.id);
+  const handleRequestClick = (request) => {
+    // Open immediately with card data, then load full details in background
+    setSelectedRequest(request);
+    requestsApi.getOne(request.id).then((fullRequest) => {
       setSelectedRequest(fullRequest);
-    } catch (err) {
-      console.error('Failed to load request:', err);
-    }
+    }).catch((err) => {
+      console.error('Failed to load request details:', err);
+    });
   };
 
   const handleStatusUpdate = (requestId, newStatus) => {

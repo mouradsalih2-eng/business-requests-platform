@@ -58,8 +58,24 @@ jest.unstable_mockModule('bcryptjs', () => ({
   },
 }));
 
+// Chainable query builder mock for supabase.from()
+const mockChain = () => {
+  const result = Promise.resolve({ data: [], error: null });
+  const chain = new Proxy(result, {
+    get(target, prop) {
+      if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+        return target[prop].bind(target);
+      }
+      // All other methods (select, delete, update, eq, in, etc.) return chain
+      return jest.fn().mockReturnValue(chain);
+    },
+  });
+  return chain;
+};
+
 jest.unstable_mockModule('../src/db/supabase.js', () => ({
   supabase: {
+    from: jest.fn(() => mockChain()),
     auth: {
       admin: {
         createUser: jest.fn().mockResolvedValue({ data: { user: { id: 'mock-uuid' } }, error: null }),
@@ -535,7 +551,7 @@ describe('Users API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.message).toContain('deleted');
-      expect(mockUserRepository.delete).toHaveBeenCalledWith('5');
+      expect(mockUserRepository.delete).toHaveBeenCalledWith(5);
     });
   });
 
