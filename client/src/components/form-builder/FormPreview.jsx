@@ -15,11 +15,13 @@ export function FormPreview({ fields, projectName, projectIcon }) {
 
       <div className="space-y-3.5 p-4 bg-neutral-50 dark:bg-[#161B22] rounded-lg border border-neutral-100 dark:border-[#30363D]/30">
         {enabledFields.map((field) => (
-          <FormField key={field.key || field.id || field.name} field={field} showColorDot={field.isCustom} />
+          <div key={field.key || field.id || field.name} className="animate-in field-appear duration-200">
+            <FormField field={field} showColorDot={field.isCustom} />
+          </div>
         ))}
 
         {enabledFields.length === 0 && (
-          <p className="text-sm text-neutral-400 dark:text-[#484F58] text-center py-4">No fields enabled</p>
+          <p className="text-sm text-neutral-400 dark:text-[#484F58] text-center py-4 animate-in fade-in duration-200">No fields enabled</p>
         )}
       </div>
 

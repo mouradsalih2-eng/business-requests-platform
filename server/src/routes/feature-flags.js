@@ -14,7 +14,7 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json(flags);
 }));
 
-// Toggle flag (admin)
+// Toggle flag (admin) — upserts if flag doesn't exist for this project
 router.patch('/:name', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
   const { name } = req.params;
   const { enabled } = req.body;
@@ -22,7 +22,11 @@ router.patch('/:name', authenticateToken, requireProject, requireAdmin, asyncHan
   if (typeof enabled !== 'boolean') throw new ValidationError('enabled must be a boolean');
 
   const existing = await featureFlagRepository.findByName(name, req.project.id);
-  if (!existing) return res.status(404).json({ error: 'Feature flag not found' });
+  if (!existing) {
+    // Create the flag for this project
+    const created = await featureFlagRepository.create(name, enabled, req.project.id);
+    return res.status(201).json(created);
+  }
 
   const updated = await featureFlagRepository.update(name, enabled, req.project.id);
   res.json(updated);

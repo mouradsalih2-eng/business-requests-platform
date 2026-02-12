@@ -336,7 +336,7 @@ export function FieldEditor({ field, isOpen, onClose, onSave, onDelete, onLiveCh
               <div className="flex items-center justify-between opacity-50">
                 <div>
                   <span className="text-xs text-neutral-500 dark:text-[#8B949E]">Show on card</span>
-                  <span className="block text-[10px] text-neutral-400 dark:text-[#6E7681]">Only select/dropdown fields can be shown as card badges</span>
+                  <span className="block text-[10px] text-neutral-400 dark:text-[#6E7681]">Text fields cannot be shown as card badges</span>
                 </div>
                 <div className="w-9 h-5 rounded-full relative flex-shrink-0 bg-neutral-200 dark:bg-[#21262D] cursor-not-allowed">
                   <div className="w-4 h-4 bg-white rounded-full absolute top-[2px] translate-x-[2px]" />

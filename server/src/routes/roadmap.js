@@ -11,27 +11,27 @@ import { ForbiddenError } from '../errors/AppError.js';
 
 const router = Router();
 
-// Feature-flag gate
-router.use(asyncHandler(async (_req, _res, next) => {
-  const enabled = await featureFlagRepository.isEnabled('roadmap_kanban');
+// Feature-flag gate (runs after requireProject so we have project context)
+const roadmapGate = asyncHandler(async (req, _res, next) => {
+  const enabled = await featureFlagRepository.isEnabled('roadmap_kanban', req.project?.id);
   if (!enabled) throw new ForbiddenError('Roadmap feature is currently disabled');
   next();
-}));
+});
 
 // Get grouped roadmap
-router.get('/', authenticateToken, requireProject, asyncHandler(async (req, res) => {
+router.get('/', authenticateToken, requireProject, roadmapGate, asyncHandler(async (req, res) => {
   const grouped = await roadmapService.getGrouped(req.project.id);
   res.json(grouped);
 }));
 
 // Create roadmap item (admin)
-router.post('/', authenticateToken, requireProject, requireAdmin, validateBody(roadmapItemSchema), asyncHandler(async (req, res) => {
+router.post('/', authenticateToken, requireProject, roadmapGate, requireAdmin, validateBody(roadmapItemSchema), asyncHandler(async (req, res) => {
   const item = await roadmapService.create(req.body, req.user.id, req.project.id);
   res.status(201).json(item);
 }));
 
 // Update roadmap item (admin)
-router.patch('/:id', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
+router.patch('/:id', authenticateToken, requireProject, roadmapGate, requireAdmin, asyncHandler(async (req, res) => {
   const { title, description, category, priority, team, region } = req.body;
   await roadmapRepository.findByIdOrFail(req.params.id);
 
@@ -50,21 +50,21 @@ router.patch('/:id', authenticateToken, requireProject, requireAdmin, asyncHandl
 }));
 
 // Move roadmap item (admin)
-router.patch('/:id/move', authenticateToken, requireProject, requireAdmin, validateBody(roadmapMoveSchema), asyncHandler(async (req, res) => {
+router.patch('/:id/move', authenticateToken, requireProject, roadmapGate, requireAdmin, validateBody(roadmapMoveSchema), asyncHandler(async (req, res) => {
   const { column_status, position } = req.body;
   const item = await roadmapService.move(req.params.id, column_status, position, req.user.id);
   res.json(item);
 }));
 
 // Promote request to roadmap item (admin)
-router.post('/promote', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
+router.post('/promote', authenticateToken, requireProject, roadmapGate, requireAdmin, asyncHandler(async (req, res) => {
   const { request_id, column_status, position } = req.body;
   const item = await roadmapService.promote(request_id, column_status, position, req.user.id, req.project.id);
   res.status(201).json(item);
 }));
 
 // Delete roadmap item (admin)
-router.delete('/:id', authenticateToken, requireProject, requireAdmin, asyncHandler(async (req, res) => {
+router.delete('/:id', authenticateToken, requireProject, roadmapGate, requireAdmin, asyncHandler(async (req, res) => {
   const existing = await roadmapRepository.findByIdOrFail(req.params.id);
   await roadmapRepository.updatePositionsInColumn(existing.column_status, existing.position, -1);
   await roadmapRepository.delete(req.params.id);

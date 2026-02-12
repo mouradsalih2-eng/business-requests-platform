@@ -219,6 +219,73 @@ body {
   animation-name: scale-in;
 }
 
+@keyframes slide-in-from-left-2 {
+  from {
+    transform: translateX(-0.5rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-from-left-2 {
+  animation-name: slide-in-from-left-2;
+}
+
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.slide-in-from-right {
+  animation-name: slide-in-from-right;
+}
+
+@keyframes field-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 8rem;
+  }
+}
+
+.field-appear {
+  animation-name: field-appear;
+}
+
+@keyframes badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.badge-pop {
+  animation-name: badge-pop;
+}
+
+.duration-150 {
+  animation-duration: 0.15s;
+}
+
 .duration-200 {
   animation-duration: 0.2s;
 }
@@ -231,6 +298,29 @@ body {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Show scrollbar only on hover */
+.scrollbar-on-hover {
+  scrollbar-width: none;
+}
+.scrollbar-on-hover::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+.scrollbar-on-hover::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+.scrollbar-on-hover:hover {
+  scrollbar-width: thin;
+}
+.scrollbar-on-hover:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+.dark .scrollbar-on-hover:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .scrollbar-hide::-webkit-scrollbar {

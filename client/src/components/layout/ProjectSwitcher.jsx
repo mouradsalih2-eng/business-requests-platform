@@ -44,9 +44,15 @@ export function ProjectSwitcher() {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-neutral-200 dark:border-[#30363D] bg-white dark:bg-[#161B22] text-neutral-700 dark:text-[#E6EDF3] hover:bg-neutral-50 dark:hover:bg-[#21262D] transition-colors max-w-[200px]"
       >
-        <svg className="w-4 h-4 flex-shrink-0 text-neutral-500 dark:text-[#8B949E]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-        </svg>
+        {currentProject?.logo_url ? (
+          <img src={currentProject.logo_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+        ) : currentProject?.icon ? (
+          <span className="w-5 h-5 flex items-center justify-center text-sm flex-shrink-0">{currentProject.icon}</span>
+        ) : (
+          <svg className="w-4 h-4 flex-shrink-0 text-neutral-500 dark:text-[#8B949E]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+          </svg>
+        )}
         <span className="truncate">{currentProject?.name || 'Select project'}</span>
         <svg className={`w-3.5 h-3.5 flex-shrink-0 text-neutral-400 dark:text-[#8B949E] transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -69,6 +75,11 @@ export function ProjectSwitcher() {
               }`}
             >
               <div className="flex items-center gap-2">
+                {project.logo_url ? (
+                  <img src={project.logo_url} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                ) : project.icon ? (
+                  <span className="w-4 h-4 flex items-center justify-center text-xs flex-shrink-0">{project.icon}</span>
+                ) : null}
                 <span className="truncate">{project.name}</span>
                 {project.slug === 'default' && (
                   <span className="text-[10px] px-1.5 py-0.5 bg-neutral-100 dark:bg-[#30363D] text-neutral-500 dark:text-[#8B949E] rounded-full">default</span>

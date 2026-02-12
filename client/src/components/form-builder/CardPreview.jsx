@@ -12,11 +12,75 @@ const STATUS_DOT_COLORS = {
 };
 
 /**
+ * Returns a type-appropriate preview value for a custom field badge.
+ */
+function getBadgeContent(field) {
+  const type = field.type || field.field_type;
+
+  switch (type) {
+    case 'rating': {
+      const max = field.validation?.max_rating || 5;
+      const filled = Math.ceil(max * 0.8); // Show 4/5 or 3/3 etc.
+      return (
+        <span className="inline-flex items-center gap-0.5">
+          {Array.from({ length: max }, (_, i) => (
+            <span key={i} className={`text-[9px] leading-none ${i < filled ? 'opacity-100' : 'opacity-30'}`}>&#9733;</span>
+          ))}
+        </span>
+      );
+    }
+    case 'number':
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span className="font-semibold">42</span>
+        </span>
+      );
+    case 'date':
+      return (
+        <span className="inline-flex items-center gap-1">
+          <svg className="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+          </svg>
+          Mar 15
+        </span>
+      );
+    case 'checkbox':
+      return (
+        <span className="inline-flex items-center gap-1">
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          Yes
+        </span>
+      );
+    case 'select':
+    case 'multi_select': {
+      // Show first option if available, otherwise label
+      const firstOpt = Array.isArray(field.options) && field.options.length > 0
+        ? (typeof field.options[0] === 'string' ? field.options[0] : field.options[0].label)
+        : null;
+      return firstOpt || field.label;
+    }
+    case 'url':
+      return (
+        <span className="inline-flex items-center gap-1">
+          <svg className="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.504a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.243 8.88" />
+          </svg>
+          Link
+        </span>
+      );
+    default:
+      return field.label;
+  }
+}
+
+/**
  * CardPreview - Shows how request cards will look with selected visible fields.
  * Mirrors the actual RequestCard design exactly, including mobile dot behavior.
  */
 export function CardPreview({ fields, maxCardFields = 5 }) {
-  // Only card-eligible fields (select-like) count toward the badge limit and render
+  // Only card-eligible fields count toward the badge limit and render
   const cardFields = fields.filter((f) => f.showOnCard && f.enabled !== false && isCardEligible(f));
   const MAX_CARD_FIELDS = maxCardFields;
 
@@ -42,28 +106,27 @@ export function CardPreview({ fields, maxCardFields = 5 }) {
         <div className="flex items-center gap-2 mb-3">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap flex-1 min-w-0">
             {builtInBadges.map((field) => {
-              if (field.key === 'category') return <CategoryBadge key={field.key} category="new_feature" />;
+              if (field.key === 'category') return <span key={field.key} className="animate-in badge-pop duration-200"><CategoryBadge category="new_feature" /></span>;
               if (field.key === 'priority') return (
-                <span key={field.key} className="hidden sm:inline-flex">
+                <span key={field.key} className="hidden sm:inline-flex animate-in badge-pop duration-200">
                   <PriorityBadge priority="high" />
                 </span>
               );
-              if (field.key === 'team') return <TeamBadge key={field.key} team="Engineering" />;
-              if (field.key === 'region') return <RegionBadge key={field.key} region="EMEA" />;
+              if (field.key === 'team') return <span key={field.key} className="animate-in badge-pop duration-200"><TeamBadge team="Engineering" /></span>;
+              if (field.key === 'region') return <span key={field.key} className="animate-in badge-pop duration-200"><RegionBadge region="EMEA" /></span>;
               return null;
             })}
             {customBadges.map((field) => (
               <span
                 key={field.key || field.id || field.label}
-                className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded"
+                className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded animate-in badge-pop duration-200"
                 style={
                   field.color
                     ? { backgroundColor: `${field.color}18`, color: field.color, border: `1px solid ${field.color}30` }
                     : undefined
                 }
               >
-                {field.icon && <span className="hidden sm:inline">{field.icon}</span>}
-                <span className="truncate max-w-[60px] sm:max-w-none">{field.label}</span>
+                {getBadgeContent(field)}
               </span>
             ))}
           </div>
@@ -153,7 +216,7 @@ export function CardPreview({ fields, maxCardFields = 5 }) {
             {cardFields.map((field) => (
               <span
                 key={field.key || field.id || field.label}
-                className="text-[10px] px-2 py-0.5 rounded"
+                className="text-[10px] px-2 py-0.5 rounded animate-in badge-pop duration-150"
                 style={
                   field.color
                     ? { backgroundColor: `${field.color}12`, color: field.color, border: `1px solid ${field.color}20` }

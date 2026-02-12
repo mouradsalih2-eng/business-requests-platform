@@ -29,6 +29,16 @@ export const featureFlagRepository = {
     return data;
   },
 
+  async create(name, enabled, projectId) {
+    const { data, error } = await supabase
+      .from('feature_flags')
+      .insert({ name, enabled, project_id: projectId })
+      .select('name, enabled, description, project_id')
+      .single();
+    if (error) handleError(error, 'create');
+    return data;
+  },
+
   async update(name, enabled, projectId) {
     let query = supabase
       .from('feature_flags')
