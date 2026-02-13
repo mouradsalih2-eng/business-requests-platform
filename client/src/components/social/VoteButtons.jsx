@@ -83,7 +83,7 @@ export function VoteButtons({
           transition-all duration-200 ease-out min-w-[44px] min-h-[44px] sm:min-h-0
           active:scale-95
           ${hasUpvoted
-            ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
+            ? 'bg-[#4F46E5] dark:bg-[#6366F1] text-white'
             : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600 hover:text-neutral-900 dark:hover:text-neutral-100'
           }
           ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -119,7 +119,7 @@ export function VoteButtons({
           transition-all duration-200 ease-out min-w-[44px] min-h-[44px] sm:min-h-0
           active:scale-95
           ${hasLiked
-            ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
+            ? 'bg-[#E11D48] dark:bg-[#F43F5E] text-white'
             : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600 hover:text-neutral-900 dark:hover:text-neutral-100'
           }
           ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}

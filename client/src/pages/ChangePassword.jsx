@@ -5,7 +5,7 @@ import { auth as authApi } from '../lib/api';
 
 export function ChangePassword() {
   const navigate = useNavigate();
-  const { updateUser, isSuperAdmin } = useAuth();
+  const { logout } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,8 +30,8 @@ export function ChangePassword() {
     setSubmitting(true);
     try {
       await authApi.forcePasswordChange(password);
-      updateUser({ must_change_password: false });
-      navigate(isSuperAdmin ? '/super-admin' : '/dashboard', { replace: true });
+      await logout();
+      navigate('/login', { replace: true, state: { message: 'Password changed successfully. Please sign in with your new password.' } });
     } catch (err) {
       setError(err.message || 'Failed to change password');
     } finally {

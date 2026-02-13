@@ -76,10 +76,17 @@ function TrendChart({ data }) {
   }));
 
   // Create smooth bezier curve path using Catmull-Rom spline
+  // Uses linear segments for ≤3 points to avoid exaggerated curves
   const createSmoothPath = (points) => {
     if (points.length < 2) return '';
-    if (points.length === 2) {
-      return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+
+    // Use linear segments for small data sets to avoid swooping curves
+    if (points.length <= 3) {
+      let path = `M ${points[0].x} ${points[0].y}`;
+      for (let i = 1; i < points.length; i++) {
+        path += ` L ${points[i].x} ${points[i].y}`;
+      }
+      return path;
     }
 
     let path = `M ${points[0].x} ${points[0].y}`;
@@ -90,12 +97,15 @@ function TrendChart({ data }) {
       const p2 = points[i + 1];
       const p3 = points[i + 2 >= points.length ? i + 1 : i + 2];
 
-      // Catmull-Rom to Bezier conversion (lower tension = less overshoot)
-      const tension = 0.2;
+      // Catmull-Rom to Bezier conversion (higher tension = tighter curves)
+      const tension = 0.4;
       const cp1x = p1.x + (p2.x - p0.x) * tension;
-      const cp1y = p1.y + (p2.y - p0.y) * tension;
       const cp2x = p2.x - (p3.x - p1.x) * tension;
-      const cp2y = p2.y - (p3.y - p1.y) * tension;
+      // Clamp control point Y to chart bounds (prevent curves going below 0 or above max)
+      const yMin = svgPaddingTop;
+      const yMax = svgHeight - svgPaddingBottom;
+      const cp1y = Math.max(yMin, Math.min(yMax, p1.y + (p2.y - p0.y) * tension));
+      const cp2y = Math.max(yMin, Math.min(yMax, p2.y - (p3.y - p1.y) * tension));
 
       path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
     }
@@ -120,9 +130,10 @@ function TrendChart({ data }) {
       >
         {/* Y-axis labels */}
         <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-neutral-400 dark:text-neutral-500 text-right pr-1">
-          <span>{maxCount}</span>
-          <span>{Math.round(maxCount / 2)}</span>
-          <span>0</span>
+          {maxCount <= 2
+            ? [...Array(maxCount + 1)].map((_, i) => <span key={i}>{maxCount - i}</span>)
+            : <><span>{maxCount}</span><span>{Math.round(maxCount / 2)}</span><span>0</span></>
+          }
         </div>
 
         {/* Chart area */}
@@ -1218,18 +1229,61 @@ export function AdminPanel() {
                     Branding
                   </label>
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-neutral-100 dark:bg-[#161B22] border border-neutral-200 dark:border-[#30363D] flex items-center justify-center text-2xl">
-                      {projectIcon || currentProject?.icon || (currentProject?.name ? currentProject.name.charAt(0).toUpperCase() : 'P')}
+                    <div className="w-12 h-12 rounded-lg bg-neutral-100 dark:bg-[#161B22] border border-neutral-200 dark:border-[#30363D] flex items-center justify-center text-2xl overflow-hidden">
+                      {currentProject?.logo_url ? (
+                        <img src={currentProject.logo_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        projectIcon || currentProject?.icon || (currentProject?.name ? currentProject.name.charAt(0).toUpperCase() : 'P')
+                      )}
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        // Placeholder for icon/emoji picker
-                      }}
-                    >
-                      Change
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file || !currentProject) return;
+                            try {
+                              setSavingSettings(true);
+                              const formData = new FormData();
+                              formData.append('logo', file);
+                              await projectsApi.uploadLogo(currentProject.id, formData);
+                              await refreshProjects();
+                            } catch (err) {
+                              console.error('Failed to upload logo:', err);
+                            } finally {
+                              setSavingSettings(false);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        <span className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg border border-neutral-200 dark:border-[#30363D] bg-white dark:bg-[#21262D] text-neutral-700 dark:text-[#E6EDF3] hover:bg-neutral-50 dark:hover:bg-[#2D333B] transition-colors cursor-pointer">
+                          {currentProject?.logo_url ? 'Change' : 'Upload Logo'}
+                        </span>
+                      </label>
+                      {currentProject?.logo_url && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={async () => {
+                            if (!currentProject) return;
+                            try {
+                              setSavingSettings(true);
+                              await projectsApi.update(currentProject.id, { logo_url: null });
+                              await refreshProjects();
+                            } catch (err) {
+                              console.error('Failed to remove logo:', err);
+                            } finally {
+                              setSavingSettings(false);
+                            }
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
